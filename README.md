@@ -42,11 +42,22 @@ go build -o codebase-memory-mcp ./cmd/codebase-memory-mcp
 
 ### 1. Set environment variables
 
+**For Voyage AI (cloud, best quality — sends code to Voyage API):**
 ```bash
+export EMBEDDING_PROVIDER="voyage-context"
 export VOYAGE_API_KEY="your-voyage-api-key"
 export CODE_SEARCH_PATH="/path/to/code-search"
 export CODE_GRAPH_PATH="/path/to/code-graph"
 ```
+
+**For Jina Code Embeddings (local, no data leaves your machine):**
+```bash
+export EMBEDDING_PROVIDER="jina"
+export CODE_SEARCH_PATH="/path/to/code-search"
+export CODE_GRAPH_PATH="/path/to/code-graph"
+```
+
+The first run downloads the model weights (~1GB for 0.5b). After that, fully offline.
 
 ### 2. Install the plugin
 
@@ -65,7 +76,9 @@ Or copy the plugin directory to `~/.claude/plugins/`.
 /index-repo /path/to/your/monorepo
 ```
 
-This runs both semantic and structural indexing. For large repos (35K+ files), semantic indexing may take 30-90 minutes due to API rate limits. Structural indexing is local and completes in ~60 seconds.
+This runs both semantic and structural indexing. Structural indexing is local and completes in ~60 seconds. Semantic indexing time depends on the provider:
+- **Voyage AI**: 30-90 min for large repos (API rate limits)
+- **Jina local**: 5-15 min for large repos (depends on CPU/GPU)
 
 ### Ask questions
 
@@ -93,3 +106,19 @@ Rust, Python, TypeScript, JavaScript, Go, Java, C, C++, C#, Nix, HCL (Terraform)
 - **Nix-based repos**: code-graph must use `mode: "full"` (the index-repo skill handles this automatically)
 - **Multiple repos**: After indexing multiple repos, the last-indexed repo becomes the active project. The code-explore skill auto-switches if your query context doesn't match the active project.
 - **Incremental updates**: Re-running `/index-repo` only processes changed files.
+
+## Embedding Providers
+
+| Provider | Quality (MTEB Code) | Speed | Data leaves machine? | Cost |
+|----------|-------------------|-------|---------------------|------|
+| `voyage-context` | 72.3% MRR (best) | 30-90 min (API) | Yes — code sent to Voyage AI | ~$0.06/1M tokens |
+| `jina` | ~78% avg (near-parity) | 5-15 min (local) | **No** — fully on-device | Free |
+| `local` | ~40% (basic) | 2-5 min (local) | No | Free |
+
+### Jina Code Embeddings
+
+The `jina` provider uses [`jinaai/jina-code-embeddings-0.5b`](https://huggingface.co/jinaai/jina-code-embeddings-0.5b) — a 494M parameter model trained specifically for code retrieval. It achieves 78.4% on MTEB code benchmarks, nearly matching Voyage's proprietary `voyage-code-3` (79.2%).
+
+**Options:**
+- `LOCAL_EMBEDDING_MODEL=jinaai/jina-code-embeddings-1.5b` — larger model (1.5B params), slightly better quality, needs ~3GB RAM
+- `JINA_TRUNCATE_DIM=512` — reduce embedding dimensions for smaller indexes (Matryoshka support)

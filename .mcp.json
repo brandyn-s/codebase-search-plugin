@@ -6,16 +6,14 @@
         "${CODE_SEARCH_PATH}/mcp_server/server.py"
       ],
       "env": {
-        "VOYAGE_API_KEY": "${VOYAGE_API_KEY}"
+        "VOYAGE_API_KEY": "${VOYAGE_API_KEY}",
+        "EMBEDDING_PROVIDER": "${EMBEDDING_PROVIDER}"
       },
       "type": "stdio"
     },
     "code-graph": {
       "command": "${CODE_GRAPH_PATH}/codebase-memory-mcp",
       "args": [],
-      "env": {
-        "VOYAGE_API_KEY": "${VOYAGE_API_KEY}"
-      },
       "type": "stdio"
     }
   }
