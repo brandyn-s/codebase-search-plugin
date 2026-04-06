@@ -314,6 +314,34 @@ Conversely, the graph can't answer "where is the code that handles rate limiting
 
 **Best workflow:** Start with semantic search to *find* relevant code, then use graph queries to *understand* how it connects.
 
+### Versioned indexes for docs and release notes
+
+If you need to compare code across versions — generating release notes, migration guides, or version-specific documentation — create isolated indexes per version using git worktrees:
+
+```bash
+# Create worktrees for each version you want to index
+git worktree add ../myrepo-v1 v1.0.0
+git worktree add ../myrepo-v2 v2.0.0
+
+# Index each version separately — different paths = different project IDs
+/index-repo ../myrepo-v1
+/index-repo ../myrepo-v2
+```
+
+Each version gets its own isolated index. Use `switch_project` (or just ask about code in a specific version) to query one or the other. The plugin auto-switches based on which project your question targets.
+
+**Use cases:**
+- **Release notes**: Index v1 and v2, search each for "what changed in authentication" — compare results
+- **Migration guides**: Index old and new versions, find functions that moved or were renamed
+- **Version-specific docs**: Index the exact code a version ships, generate docs from that snapshot — no hallucinations from newer code
+
+**Tip for doc generation:** If your docs are well-structured (MDX, Markdown with clear sections), the local Jina model works well — structured text is self-descriptive, like typed code. You don't need Voyage's contextualized embeddings for docs that already have good headings and organization.
+
+**Current limitations:**
+- No cross-project search (can't query both versions in one call)
+- No diff between indexes ("show what changed between v1 and v2")
+- Worktrees use disk space for each checked-out version
+
 ## Troubleshooting
 
 **"Search returns irrelevant results from wrong files"**
