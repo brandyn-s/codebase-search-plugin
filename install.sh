@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Install script for codebase-search-plugin
 # Downloads and configures both MCP servers (code-search + code-graph)
+#
+# After running this script:
+#   1. Set EMBEDDING_PROVIDER (jina for local, voyage-context for cloud)
+#   2. If using Voyage: set VOYAGE_API_KEY
+#   3. Install the plugin: /install-plugin /path/to/codebase-search-plugin
+#   4. Index a repo: /index-repo /path/to/your/repo
 
 set -e
 
@@ -17,71 +23,148 @@ ARCH="$(uname -m)"
 case "$ARCH" in
     x86_64|amd64) ARCH="amd64" ;;
     aarch64|arm64) ARCH="arm64" ;;
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+    *) echo "Error: Unsupported architecture: $ARCH"; exit 1 ;;
 esac
 
 case "$OS" in
-    linux)  PLATFORM="linux" ; EXT="tar.gz" ; BINARY="codebase-memory-mcp" ;;
-    darwin) PLATFORM="darwin" ; EXT="tar.gz" ; BINARY="codebase-memory-mcp" ;;
-    mingw*|msys*|cygwin*) PLATFORM="windows" ; EXT="zip" ; BINARY="codebase-memory-mcp.exe" ;;
-    *) echo "Unsupported OS: $OS"; exit 1 ;;
+    linux)  PLATFORM="linux" ; EXT="tar.gz" ; GRAPH_BINARY="codebase-memory-mcp" ;;
+    darwin) PLATFORM="darwin" ; EXT="tar.gz" ; GRAPH_BINARY="codebase-memory-mcp" ;;
+    mingw*|msys*|cygwin*) PLATFORM="windows" ; EXT="zip" ; GRAPH_BINARY="codebase-memory-mcp.exe" ;;
+    *) echo "Error: Unsupported OS: $OS"; exit 1 ;;
 esac
 
 echo "Platform: $PLATFORM-$ARCH"
 echo ""
 
-# --- code-search (Python) ---
-echo "--- Installing code-search (semantic search) ---"
-if [ ! -d "$VENV_DIR" ]; then
-    echo "Creating Python virtual environment..."
-    python3 -m venv "$VENV_DIR" 2>/dev/null || python -m venv "$VENV_DIR"
+# ------------------------------------------------------------------
+# 1. Install code-search (Python, pip from GitHub)
+# ------------------------------------------------------------------
+echo "[1/3] Installing code-search (semantic search)..."
+
+# Find Python 3.12+
+PYTHON=""
+for cmd in python3 python; do
+    if command -v "$cmd" &>/dev/null; then
+        version=$("$cmd" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        major=$(echo "$version" | cut -d. -f1)
+        minor=$(echo "$version" | cut -d. -f2)
+        if [ "$major" -ge 3 ] && [ "$minor" -ge 12 ]; then
+            PYTHON="$cmd"
+            echo "  Using $cmd ($version)"
+            break
+        fi
+    fi
+done
+
+if [ -z "$PYTHON" ]; then
+    echo "Error: Python 3.12+ is required but not found."
+    echo "Install Python from https://www.python.org/downloads/"
+    exit 1
 fi
 
-echo "Installing code-search from GitHub..."
-"$VENV_DIR/bin/pip" install --quiet \
-    "redacted-code-search @ git+https://github.com/redacted-org/code-search.git" \
-    2>/dev/null || \
-"$VENV_DIR/Scripts/pip" install --quiet \
+if [ ! -d "$VENV_DIR" ]; then
+    echo "  Creating virtual environment..."
+    "$PYTHON" -m venv "$VENV_DIR"
+fi
+
+# Determine pip and python paths (cross-platform)
+if [ -f "$VENV_DIR/bin/pip" ]; then
+    VENV_PIP="$VENV_DIR/bin/pip"
+    VENV_PYTHON="$VENV_DIR/bin/python"
+elif [ -f "$VENV_DIR/Scripts/pip.exe" ]; then
+    VENV_PIP="$VENV_DIR/Scripts/pip"
+    VENV_PYTHON="$VENV_DIR/Scripts/python"
+else
+    echo "Error: Could not find pip in venv"
+    exit 1
+fi
+
+echo "  Installing redacted-code-search from GitHub..."
+"$VENV_PIP" install --quiet \
     "redacted-code-search @ git+https://github.com/redacted-org/code-search.git"
 
-echo "code-search installed."
+echo "  code-search installed."
 echo ""
 
-# --- code-graph (Go binary) ---
-echo "--- Installing code-graph (structural analysis) ---"
+# ------------------------------------------------------------------
+# 2. Install code-graph (Go binary from GitHub releases)
+# ------------------------------------------------------------------
+echo "[2/3] Installing code-graph (structural analysis)..."
 mkdir -p "$BIN_DIR"
 
-# Get latest release URL
-RELEASE_TAG=$(gh release list --repo redacted-org/code-graph --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "v0.5.0-redacted.4")
+# Get latest release tag
+RELEASE_TAG=""
+if command -v gh &>/dev/null; then
+    RELEASE_TAG=$(gh release list --repo redacted-org/code-graph --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+fi
+if [ -z "$RELEASE_TAG" ]; then
+    RELEASE_TAG="v0.5.0-redacted.4"
+    echo "  Using default release: $RELEASE_TAG"
+fi
+
 ASSET_NAME="codebase-memory-mcp-${PLATFORM}-${ARCH}.${EXT}"
 DOWNLOAD_URL="https://github.com/redacted-org/code-graph/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
 
-echo "Downloading code-graph ${RELEASE_TAG} for ${PLATFORM}-${ARCH}..."
+echo "  Downloading code-graph ${RELEASE_TAG} for ${PLATFORM}-${ARCH}..."
 curl -sL "$DOWNLOAD_URL" -o "$BIN_DIR/$ASSET_NAME"
 
 if [ "$EXT" = "tar.gz" ]; then
     tar xzf "$BIN_DIR/$ASSET_NAME" -C "$BIN_DIR"
-    rm "$BIN_DIR/$ASSET_NAME"
 else
     unzip -qo "$BIN_DIR/$ASSET_NAME" -d "$BIN_DIR"
-    rm "$BIN_DIR/$ASSET_NAME"
 fi
+rm -f "$BIN_DIR/$ASSET_NAME"
+chmod +x "$BIN_DIR/$GRAPH_BINARY" 2>/dev/null || true
 
-chmod +x "$BIN_DIR/$BINARY" 2>/dev/null || true
-echo "code-graph installed at $BIN_DIR/$BINARY"
+echo "  code-graph installed."
 echo ""
 
-# --- Summary ---
+# ------------------------------------------------------------------
+# 3. Create launcher script (cross-platform wrapper)
+# ------------------------------------------------------------------
+echo "[3/3] Creating launcher scripts..."
+
+# code-search launcher — invokes the venv's Python with the MCP server
+cat > "$BIN_DIR/run-code-search" << LAUNCHER
+#!/usr/bin/env bash
+SCRIPT_DIR="\$(cd "\$(dirname "\$0")/.." && pwd)"
+if [ -f "\$SCRIPT_DIR/.venv/bin/code-search-mcp" ]; then
+    exec "\$SCRIPT_DIR/.venv/bin/code-search-mcp" "\$@"
+elif [ -f "\$SCRIPT_DIR/.venv/Scripts/code-search-mcp.exe" ]; then
+    exec "\$SCRIPT_DIR/.venv/Scripts/code-search-mcp.exe" "\$@"
+else
+    echo "Error: code-search-mcp not found. Run install.sh first." >&2
+    exit 1
+fi
+LAUNCHER
+chmod +x "$BIN_DIR/run-code-search"
+
+echo "  Launchers created."
+echo ""
+
+# ------------------------------------------------------------------
+# Done
+# ------------------------------------------------------------------
 echo "=== Installation Complete ==="
 echo ""
-echo "code-search: $VENV_DIR/bin/code-search-mcp (or Scripts/code-search-mcp on Windows)"
-echo "code-graph:  $BIN_DIR/$BINARY"
+echo "Next steps:"
 echo ""
-echo "Set your embedding provider:"
-echo "  export EMBEDDING_PROVIDER=voyage-context  # best quality (needs VOYAGE_API_KEY)"
-echo "  export EMBEDDING_PROVIDER=jina            # local, free, no data leaves machine"
+echo "  1. Choose your embedding provider:"
 echo ""
-echo "If using Voyage: export VOYAGE_API_KEY=pa-..."
+echo "     Local (free, no data leaves your machine):"
+echo "       export EMBEDDING_PROVIDER=jina"
 echo ""
-echo "Install the plugin in Claude Code:"
-echo "  /install-plugin $PLUGIN_DIR"
+echo "     Cloud (best quality, sends code to Voyage AI):"
+echo "       export EMBEDDING_PROVIDER=voyage-context"
+echo "       export VOYAGE_API_KEY=pa-..."
+echo ""
+echo "  2. Install the plugin in Claude Code:"
+echo "       /install-plugin $PLUGIN_DIR"
+echo ""
+echo "  3. Index a repo:"
+echo "       /index-repo /path/to/your/repo"
+echo ""
+echo "  4. Ask questions:"
+echo "       \"How does authentication work?\""
+echo "       \"What calls processOrder?\""
+echo "       \"Find dead code\""

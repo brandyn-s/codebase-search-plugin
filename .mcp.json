@@ -1,12 +1,8 @@
 {
   "mcpServers": {
     "code-search": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/.venv/bin/code-search-mcp",
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/run-code-search",
       "args": [],
-      "env": {
-        "VOYAGE_API_KEY": "${VOYAGE_API_KEY}",
-        "EMBEDDING_PROVIDER": "${EMBEDDING_PROVIDER}"
-      },
       "type": "stdio"
     },
     "code-graph": {

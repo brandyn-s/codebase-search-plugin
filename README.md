@@ -71,10 +71,27 @@ Then configure the MCP server paths manually in `.mcp.json`.
 
 ## Environment Variables
 
+These control which embedding model code-search uses. Set them in your shell profile (`.bashrc`, `.zshrc`) or before launching Claude Code. They're read at runtime — you can switch providers without reinstalling.
+
+**For Jina (local, free):**
+```bash
+export EMBEDDING_PROVIDER="jina"
+```
+
+**For Voyage AI (cloud, best quality):**
+```bash
+export EMBEDDING_PROVIDER="voyage-context"
+export VOYAGE_API_KEY="pa-..."  # Get a key at https://dash.voyageai.com
+```
+
+**If neither is set**, code-search auto-selects: `voyage-context` if `VOYAGE_API_KEY` exists, otherwise `local` (basic quality).
+
+**All variables:**
+
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `EMBEDDING_PROVIDER` | No | `voyage-context` if `VOYAGE_API_KEY` set, else `local` | Which embedding model to use (see Model Comparison below) |
-| `VOYAGE_API_KEY` | Only for `voyage-context` / `voyage` | - | Voyage AI API key ([get one here](https://dash.voyageai.com)) |
+| `EMBEDDING_PROVIDER` | No | Auto-detect | `voyage-context`, `jina`, `local` — see Model Comparison below |
+| `VOYAGE_API_KEY` | Only for Voyage | - | Voyage AI API key |
 | `LOCAL_EMBEDDING_MODEL` | No | `jinaai/jina-code-embeddings-0.5b` | HuggingFace model for `jina` provider |
 | `JINA_TRUNCATE_DIM` | No | - | Matryoshka dim truncation (0.5b: 64-896, 1.5b: 128-1536) |
 | `QUANTIZATION` | No | `int8` | FAISS index type: `int8` (4x smaller), `float32`, `binary` (32x smaller) |
