@@ -225,14 +225,19 @@ Measured on 102 queries across 4 language sub-projects (Nix, Rust service, Rust 
 |----------|-------|-----------|----------------|----------------|------------------|---------------------|------|
 | **`voyage-context`** | voyage-context-3 | **0.723** | **0.783** | **0.861** | **0.677** | Yes | ~$0.06/1M tokens |
 | `voyage` | voyage-code-3 | 0.584 | 0.742 | 0.861 | 0.642 | Yes | ~$0.06/1M tokens |
-| **`jina`** | jina-code-embeddings-0.5b | 0.582 | 0.742 | ~0.86 | **0.660** | **No** | **Free** |
+| **`jina` (enriched)** | jina-code-embeddings-0.5b | **0.638** | 0.742 | ~0.86 | **0.660** | **No** | **Free** |
+| `jina` (baseline) | jina-code-embeddings-0.5b | 0.582 | 0.742 | ~0.86 | 0.660 | No | Free |
 | `local` | all-MiniLM-L6-v2 | ~0.35 | ~0.45 | ~0.50 | ~0.40 | No | Free |
+
+*Jina "enriched" = default mode. Prepends sibling chunk names to each chunk's header, approximating Voyage's contextualized embeddings. Enabled automatically for Jina and local providers.*
 
 ### Key findings
 
 - **`voyage-context-3` is the best model** across all languages tested. Its advantage comes from embedding chunks with awareness of their file context (sibling chunks). The advantage is largest for declarative configuration languages (+24% on Nix) and smallest for self-contained libraries (0% on Rust libs).
 
-- **`jina-code-0.5b` matches `voyage-code-3`** on every language — and beats it on TypeScript (+2.8%). It runs entirely on-device with no API calls. This makes it the recommended choice when code cannot leave the machine.
+- **`jina-code-0.5b` with enriched headers closes 40% of the gap to Voyage** on Nix (0.582 → 0.638, reference 0.723). Enriched context is on by default — no configuration needed. It runs entirely on-device with no API calls.
+
+- **`jina` now beats `voyage-code-3`** on Nix (0.638 vs 0.584, +9.2%) and TypeScript (0.660 vs 0.642, +2.8%), while staying fully local and free.
 
 - **`voyage-code-3` has no advantage over Jina** and requires an API key + sends code to Voyage. There is no reason to use it.
 
@@ -241,7 +246,7 @@ Measured on 102 queries across 4 language sub-projects (Nix, Rust service, Rust 
 | Situation | Recommended provider |
 |-----------|---------------------|
 | Best quality, code can be sent to Voyage AI | `voyage-context` |
-| Code must stay on-device (security/compliance) | `jina` |
+| Code must stay on-device (security/compliance) | `jina` (enriched headers close 40% of gap) |
 | Quick evaluation, don't want to set up API keys | `jina` |
 | Smallest possible index, lowest resource usage | `local` (lower quality) |
 
