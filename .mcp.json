@@ -1,10 +1,8 @@
 {
   "mcpServers": {
     "code-search": {
-      "command": "pythonw",
-      "args": [
-        "${CODE_SEARCH_PATH}/mcp_server/server.py"
-      ],
+      "command": "${CLAUDE_PLUGIN_ROOT}/.venv/bin/code-search-mcp",
+      "args": [],
       "env": {
         "VOYAGE_API_KEY": "${VOYAGE_API_KEY}",
         "EMBEDDING_PROVIDER": "${EMBEDDING_PROVIDER}"
@@ -12,7 +10,7 @@
       "type": "stdio"
     },
     "code-graph": {
-      "command": "${CODE_GRAPH_PATH}/codebase-memory-mcp",
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/codebase-memory-mcp",
       "args": [],
       "type": "stdio"
     }

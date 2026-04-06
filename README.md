@@ -5,24 +5,35 @@ Index a codebase, then ask natural language questions. The plugin routes between
 ## Quick Start
 
 ```bash
-# 1. Install prerequisites (see below)
-# 2. Set environment variables
-export EMBEDDING_PROVIDER="voyage-context"  # or "jina" for local
-export VOYAGE_API_KEY="your-key"            # only needed for voyage providers
-export CODE_SEARCH_PATH="/path/to/code-search"
-export CODE_GRAPH_PATH="/path/to/code-graph"
+# 1. Clone the plugin
+git clone https://github.com/redacted-org/codebase-search-plugin.git
+cd codebase-search-plugin
 
-# 3. Install the plugin in Claude Code
+# 2. Run the install script (downloads both MCP servers)
+bash install.sh
+
+# 3. Set your embedding provider
+export EMBEDDING_PROVIDER="jina"            # local, free, no data leaves machine
+# OR
+export EMBEDDING_PROVIDER="voyage-context"  # best quality (needs API key)
+export VOYAGE_API_KEY="your-key"
+
+# 4. Install the plugin in Claude Code
 /install-plugin /path/to/codebase-search-plugin
 
-# 4. Index your repo
+# 5. Index your repo
 /index-repo /path/to/your/repo
 
-# 5. Ask questions naturally
+# 6. Ask questions naturally
 # "How does authentication work?"
 # "What calls processOrder?"
 # "Find dead code"
 ```
+
+The install script:
+- Creates a Python venv inside the plugin directory and pip-installs code-search from GitHub
+- Downloads the pre-built code-graph binary for your platform from GitHub releases
+- No manual cloning, building, or path configuration needed
 
 ## What It Does
 
@@ -38,29 +49,25 @@ export CODE_GRAPH_PATH="/path/to/code-graph"
 
 ## Prerequisites
 
-Two MCP servers must be installed locally:
+- **Python 3.12+** (for code-search)
+- **`gh` CLI** (optional — install script uses it to find latest code-graph release)
+- **`curl`** and `tar`/`unzip` (for downloading code-graph binary)
 
-### code-search (semantic search)
+The `install.sh` script handles everything else — no need to manually clone or build anything.
 
-Python-based. Hybrid BM25 + vector search using FAISS.
+### Manual install (alternative)
 
-```bash
-git clone https://github.com/redacted-org/code-search.git
-cd code-search
-python -m venv .venv
-.venv/bin/pip install -r requirements.txt  # Linux/Mac
-# or: .venv\Scripts\pip install -r requirements.txt  # Windows
-```
-
-### code-graph (structural analysis)
-
-Go-based. Tree-sitter AST parsing, builds a knowledge graph with call chains, imports, and routes.
+If you prefer not to use the install script:
 
 ```bash
-git clone https://github.com/redacted-org/code-graph.git
-cd code-graph
-go build -o codebase-memory-mcp ./cmd/codebase-memory-mcp
+# code-search: install from GitHub
+pip install "redacted-code-search @ git+https://github.com/redacted-org/code-search.git"
+
+# code-graph: download binary from releases
+# https://github.com/redacted-org/code-graph/releases
 ```
+
+Then configure the MCP server paths manually in `.mcp.json`.
 
 ## Environment Variables
 
@@ -68,8 +75,6 @@ go build -o codebase-memory-mcp ./cmd/codebase-memory-mcp
 |----------|----------|---------|---------|
 | `EMBEDDING_PROVIDER` | No | `voyage-context` if `VOYAGE_API_KEY` set, else `local` | Which embedding model to use (see Model Comparison below) |
 | `VOYAGE_API_KEY` | Only for `voyage-context` / `voyage` | - | Voyage AI API key ([get one here](https://dash.voyageai.com)) |
-| `CODE_SEARCH_PATH` | Yes | - | Path to your local code-search clone |
-| `CODE_GRAPH_PATH` | Yes | - | Path to your local code-graph clone |
 | `LOCAL_EMBEDDING_MODEL` | No | `jinaai/jina-code-embeddings-0.5b` | HuggingFace model for `jina` provider |
 | `JINA_TRUNCATE_DIM` | No | - | Matryoshka dim truncation (0.5b: 64-896, 1.5b: 128-1536) |
 | `QUANTIZATION` | No | `int8` | FAISS index type: `int8` (4x smaller), `float32`, `binary` (32x smaller) |
