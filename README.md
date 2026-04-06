@@ -258,9 +258,83 @@ Set via `LOCAL_EMBEDDING_MODEL=jinaai/jina-code-embeddings-1.5b`. Both support M
 
 **code-graph** (structural): Rust, Python, TypeScript, JavaScript, Go, Java, C, C++, C#, Nix, HCL, Ruby, Swift, Kotlin, Scala, and more.
 
+## Lessons Learned: prototype-software-merry
+
+Practical advice from running this plugin on the Corsair monorepo (~4,800 files, 34K chunks, Rust/Nix/TypeScript/Python/HCL).
+
+### Index by concern, not the entire repo
+
+Indexing the entire monorepo at once produces 34K chunks. Queries compete against everything — a search for "firewall config" matches Nix modules, Rust network code, TypeScript UI components, and Terraform security groups. The results are diluted.
+
+**Better approach:** Index sub-projects separately based on what you're working on:
+
+```
+/index-repo /path/to/monorepo/nix           # NixOS system config
+/index-repo /path/to/monorepo/assetman      # Asset management service (Rust)
+/index-repo /path/to/monorepo/libnet        # Networking library (Rust)
+/index-repo /path/to/monorepo/mithrandir    # Web UI (TypeScript)
+```
+
+The active project auto-switches when you ask questions. If you're working on the Rust networking library, the results come from `libnet` — not the entire monorepo.
+
+### Quality varies by language — context matters more for config languages
+
+Our eval (102 queries, 4 languages) showed that embedding quality depends on the language:
+
+| Language type | Example | voyage-context-3 advantage | Why |
+|---|---|---|---|
+| **Declarative config** | Nix, HCL | **+24%** over baseline | `allowedTCPPorts = [ 80 443 ]` is meaningless without file context |
+| **Application services** | Rust services, TypeScript | **+5.5%** | Typed functions carry meaning in signatures, but service context helps |
+| **Self-contained libraries** | Rust libraries | **0%** (tie) | `fn login(path: &Path) -> Result<()>` is fully self-descriptive |
+
+**Practical implication:** If you work primarily in Rust libraries, Jina (free, local) gives you the same quality as Voyage. If you work in NixOS config or large service codebases, Voyage's contextualized embeddings are worth the API cost.
+
+### Nix-specific: use full mode for code-graph
+
+The `/index-repo` skill handles this automatically, but if you're calling code-graph directly: Nix repos must use `mode: "full"`. The `fast` mode returns zero results on Nix because tree-sitter Nix grammar produces different AST shapes than code-graph's fast parser expects.
+
+### First-time indexing is slow with Jina — incremental is fast
+
+The Jina 0.5b model takes ~50 minutes to index 3K chunks on CPU (no GPU). This is a one-time cost. After the initial index:
+- **Incremental re-index**: Only changed files are re-embedded. A 10-file change takes seconds.
+- **Project switching**: Instant — just loads the existing index from disk.
+- **Query latency**: ~5 seconds per query on CPU.
+
+If the initial indexing time is a blocker, index during lunch or overnight. Or use Voyage for the initial index (`EMBEDDING_PROVIDER=voyage-context`), then switch to Jina for daily use once you're willing to re-index.
+
+### The graph and semantic tools complement each other — don't use just one
+
+Common mistake: using only semantic search ("find the auth code") and ignoring the graph. The graph answers questions that semantic search fundamentally cannot:
+
+- **"What happens if I change this function?"** → Graph traces all callers (blast radius)
+- **"Is this function dead code?"** → Graph checks for zero inbound calls
+- **"What's the dependency chain from main() to this handler?"** → Graph traces the call path
+
+Conversely, the graph can't answer "where is the code that handles rate limiting?" — that requires understanding *meaning*, which is what semantic search does.
+
+**Best workflow:** Start with semantic search to *find* relevant code, then use graph queries to *understand* how it connects.
+
+## Troubleshooting
+
+**"Search returns irrelevant results from wrong files"**
+- Check which project is active: the last-indexed repo wins. Run `/index-repo` on the repo you're working in to make it active.
+
+**"Indexing seems stuck"**
+- Jina CPU indexing is genuinely slow (~1 chunk/second on CPU). Check `~/.claude_code_search/` for growing index files.
+- For Voyage, check your API key is valid and you haven't hit rate limits.
+
+**"All search results come from one large file"**
+- Some repos have very large files (generated code, lockfiles) that dominate results. Add them to `.gitignore` or index a sub-directory instead.
+
+**"code-graph returns 0 nodes"**
+- For Nix repos: ensure `mode: "full"` is used (the `/index-repo` skill does this automatically).
+- Check that the target directory has files in supported languages.
+
+**"Vector search results seem random"**
+- If you indexed before 2026-04-05: the FAISS int8 quantizer had a bug that returned zero similarities. Re-index to fix.
+
 ## Notes
 
-- **Nix-based repos**: code-graph must use `mode: "full"` — the `/index-repo` skill handles this automatically.
 - **Incremental updates**: Re-running `/index-repo` only processes changed files. No need to reindex from scratch.
 - **Index storage**: Indexes are stored in `~/.claude_code_search/` by default. Set `CODE_SEARCH_STORAGE` to change.
 - **code-graph is fully local**: No API calls, no data leaves the machine. Only code-search uses external APIs (when using Voyage providers).
