@@ -35,17 +35,92 @@ The install script:
 - Downloads the pre-built code-graph binary for your platform from GitHub releases
 - No manual cloning, building, or path configuration needed
 
-## What It Does
+## How It Works
+
+This plugin combines two different search technologies. Each solves a different problem.
+
+### Semantic Search (code-search)
+
+**What it does:** Finds code by *meaning*, not just keywords. When you search "authentication middleware," it returns functions related to auth even if they're named `verify_jwt_token` or `check_session`.
+
+**How:** Your code is split into chunks (functions, classes, modules) using tree-sitter AST parsing. Each chunk is converted into a numeric vector (embedding) that captures its meaning. Search queries are also converted to vectors, and the closest vectors are returned. A keyword index (BM25) runs in parallel and results are fused together.
+
+**When to use:**
+- "How does X work?" — conceptual understanding
+- "Find the rate limiting implementation" — discovery by meaning
+- "Where is the config for Y?" — locating code you know exists but can't grep for
+
+### Structural Graph (code-graph)
+
+**What it does:** Maps the *structure* of your code — which functions call which, what imports what, how modules connect. Answers questions about relationships and impact, not content.
+
+**How:** Tree-sitter parses your code into an AST, extracts symbols (functions, classes, routes, imports), and builds a knowledge graph stored in SQLite. Queries use a Cypher-like language to traverse call chains, find dead code, and calculate blast radius.
+
+**When to use:**
+- "What calls processOrder?" — tracing call chains
+- "Blast radius of changing UserService?" — impact analysis
+- "Find dead code" — functions with zero callers
+- "Show all API endpoints" — structural inventory
+
+### How They Work Together
+
+`/code-explore` automatically routes your question to the right tool:
+
+| Question type | Tool used | Example |
+|--------------|-----------|---------|
+| Conceptual | code-search | "How does authentication work?" |
+| Structural | code-graph | "What calls processOrder?" |
+| Mixed | Both (chained) | "Understand the auth system" → finds auth code, then traces its callers |
+
+You don't need to know which tool to use — the plugin decides based on your question.
+
+### Skills
 
 | Skill | Purpose |
 |-------|---------|
 | **`/index-repo`** | Index a repository for both semantic embeddings and structural graph analysis |
 | **`/code-explore`** | Ask natural language questions — auto-routes to the right search tool |
 
-**How routing works:**
-- *Conceptual queries* ("how does X work?", "find the Y implementation") → **code-search** (semantic vector + BM25 hybrid)
-- *Structural queries* ("what calls X?", "blast radius of changing Y") → **code-graph** (AST-based knowledge graph, Cypher queries)
-- *Mixed queries* ("understand the auth system") → both tools chained automatically
+## Offline vs Online Embedding Models
+
+"Embedding" means converting code into numeric vectors for similarity search. The plugin supports both **online** (cloud API) and **offline** (local) models.
+
+### Online: Voyage AI (`voyage-context`)
+
+Your source code chunks are sent to Voyage AI's API (`api.voyageai.com`) over HTTPS. Voyage converts them to vectors and returns the vectors. Voyage does not store your code (per their data policy), but **your code does leave your machine** during indexing and every search query.
+
+- Best quality (+24% on declarative config languages like Nix)
+- Requires internet connection and API key
+- ~$0.06 per 1M tokens (~$2-5 to index a large monorepo)
+- Indexing speed limited by API rate limits (~5-10 min per 3K chunks)
+
+**Use when:** Quality matters most and your code is not restricted from leaving the network.
+
+### Offline: Jina Code Embeddings (`jina`)
+
+A 494M parameter model runs entirely on your CPU. **No data leaves your machine** — not during indexing, not during search. The model weights are downloaded once (~1GB) from HuggingFace on first use, then everything is offline.
+
+- Matches Voyage's non-contextualized model on all languages tested
+- No API key, no internet (after first download), no cost
+- Indexing is CPU-bound (~50 min per 3K chunks without GPU)
+- Query latency ~5s vs ~1s for Voyage
+
+**Use when:** Code cannot leave the machine (security/compliance), you don't want API keys, or you're evaluating the plugin before committing to a paid provider.
+
+### Switching Between Providers
+
+The provider is selected at **runtime** via environment variable — not at install time. You can switch freely:
+
+```bash
+# Switch to local
+export EMBEDDING_PROVIDER="jina"
+
+# Switch to cloud
+export EMBEDDING_PROVIDER="voyage-context"
+export VOYAGE_API_KEY="pa-..."
+```
+
+**Important:** Switching providers requires re-indexing your repos. Each provider produces different-dimensional vectors (Voyage: 1024, Jina: 896) that are incompatible. Just run `/index-repo` again after switching.
 
 ## Prerequisites
 
