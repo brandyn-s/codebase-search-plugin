@@ -10,7 +10,8 @@ git clone https://github.com/redacted-org/codebase-search-plugin.git
 cd codebase-search-plugin
 
 # 2. Run the install script (downloads both MCP servers)
-bash install.sh
+bash install.sh            # Linux/Mac
+# pwsh install.ps1         # Windows (PowerShell)
 
 # 3. Set your embedding provider
 export EMBEDDING_PROVIDER="jina"            # local, free, no data leaves machine
@@ -126,7 +127,8 @@ export VOYAGE_API_KEY="pa-..."
 
 - **Python 3.12+** (for code-search)
 - **`gh` CLI** (optional — install script uses it to find latest code-graph release)
-- **`curl`** and `tar`/`unzip` (for downloading code-graph binary)
+- **Linux/Mac**: `curl` and `tar` (for downloading code-graph binary)
+- **Windows**: PowerShell 5.1+ (built-in) — use `install.ps1` instead of `install.sh`
 
 The `install.sh` script handles everything else — no need to manually clone or build anything.
 
