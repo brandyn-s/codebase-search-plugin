@@ -126,7 +126,7 @@ export VOYAGE_API_KEY="pa-..."
 ## Prerequisites
 
 - **Python 3.12+** (for code-search)
-- **`gh` CLI** (optional — install script uses it to find latest code-graph release)
+- **`gh` CLI** (optional — install scripts use it to find the latest code-graph release, falling back to the GitHub API)
 - **Linux/Mac**: `curl` and `tar` (for downloading code-graph binary)
 - **Windows**: PowerShell 5.1+ (built-in) — use `install.ps1` instead of `install.sh`
 

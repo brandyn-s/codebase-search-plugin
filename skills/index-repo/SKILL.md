@@ -44,8 +44,12 @@ If no path is provided, ask the user which repo to index.
 
 ## Notes
 
-- **code-search** uses Voyage AI embeddings for semantic similarity search. Takes 30-90min for large repos (35K+ chunks) due to API rate limits. Requires `VOYAGE_API_KEY`.
-- **code-graph** uses local tree-sitter AST parsing (~30-60s). When `VOYAGE_API_KEY` is set, it also generates embeddings for natural language search over graph nodes.
+- **code-search** embeds code for semantic similarity search. The embedding provider is chosen at runtime via `EMBEDDING_PROVIDER` — no key is required for local use:
+  - `jina` (default for local use) — runs on-device, no API key, no data leaves the machine. The first index of ~3K chunks takes ~50min on CPU; incremental re-indexing is fast.
+  - `voyage-context` — best quality, but sends code to Voyage AI and requires `VOYAGE_API_KEY`. ~5-10min per 3K chunks (API rate-limited).
+  - If neither is set, code-search auto-selects `voyage-context` when `VOYAGE_API_KEY` is present, otherwise a basic local model.
+  - See the plugin README for the full provider comparison.
+- **code-graph** uses local tree-sitter AST parsing (~30-60s) and never leaves the machine. When a Voyage key is configured, it also generates embeddings for natural-language search over graph nodes.
 - Both support incremental indexing — re-running only processes changed files.
 - After indexing, use natural language queries. The code-explore skill handles routing.
 

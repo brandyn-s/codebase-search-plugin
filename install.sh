@@ -14,6 +14,9 @@ PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$PLUGIN_DIR/bin"
 VENV_DIR="$PLUGIN_DIR/.venv"
 
+# GitHub org that hosts code-search and code-graph.
+ORG="redacted-org"
+
 echo "=== Codebase Search Plugin Installer ==="
 echo ""
 
@@ -48,7 +51,7 @@ for cmd in python3 python; do
         version=$("$cmd" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
         major=$(echo "$version" | cut -d. -f1)
         minor=$(echo "$version" | cut -d. -f2)
-        if [ "$major" -ge 3 ] && [ "$minor" -ge 12 ]; then
+        if [ "$major" -gt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -ge 12 ]; }; then
             PYTHON="$cmd"
             echo "  Using $cmd ($version)"
             break
@@ -81,7 +84,7 @@ fi
 
 echo "  Installing redacted-code-search from GitHub..."
 "$VENV_PIP" install --quiet \
-    "redacted-code-search @ git+https://github.com/redacted-org/code-search.git"
+    "redacted-code-search @ git+https://github.com/$ORG/code-search.git"
 
 echo "  code-search installed."
 echo ""
@@ -92,21 +95,44 @@ echo ""
 echo "[2/3] Installing code-graph (structural analysis)..."
 mkdir -p "$BIN_DIR"
 
-# Get latest release tag
+# Resolve the release tag. Prefer the gh CLI, then the GitHub API, then a
+# pinned fallback so the installer still works offline-ish / without gh.
 RELEASE_TAG=""
 if command -v gh &>/dev/null; then
-    RELEASE_TAG=$(gh release list --repo redacted-org/code-graph --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+    RELEASE_TAG=$(gh release list --repo "$ORG/code-graph" --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+fi
+if [ -z "$RELEASE_TAG" ]; then
+    RELEASE_TAG=$("$PYTHON" - "$ORG" 2>/dev/null <<'PY'
+import json, sys, urllib.request
+org = sys.argv[1]
+try:
+    with urllib.request.urlopen(f"https://api.github.com/repos/{org}/code-graph/releases", timeout=10) as r:
+        data = json.load(r)
+    if data:
+        print(data[0]["tag_name"])
+except Exception:
+    pass
+PY
+) || true
 fi
 if [ -z "$RELEASE_TAG" ]; then
     RELEASE_TAG="v0.5.0-redacted.4"
-    echo "  Using default release: $RELEASE_TAG"
+    echo "  Could not query latest release; using pinned fallback: $RELEASE_TAG"
+else
+    echo "  Latest release: $RELEASE_TAG"
 fi
 
 ASSET_NAME="codebase-memory-mcp-${PLATFORM}-${ARCH}.${EXT}"
-DOWNLOAD_URL="https://github.com/redacted-org/code-graph/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
+DOWNLOAD_URL="https://github.com/$ORG/code-graph/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
 
 echo "  Downloading code-graph ${RELEASE_TAG} for ${PLATFORM}-${ARCH}..."
-curl -sL "$DOWNLOAD_URL" -o "$BIN_DIR/$ASSET_NAME"
+if ! curl -fSL "$DOWNLOAD_URL" -o "$BIN_DIR/$ASSET_NAME"; then
+    echo "Error: failed to download code-graph binary." >&2
+    echo "  URL: $DOWNLOAD_URL" >&2
+    echo "  Check that release '$RELEASE_TAG' exists and ships an asset for ${PLATFORM}-${ARCH}." >&2
+    echo "  Releases: https://github.com/$ORG/code-graph/releases" >&2
+    exit 1
+fi
 
 if [ "$EXT" = "tar.gz" ]; then
     tar xzf "$BIN_DIR/$ASSET_NAME" -C "$BIN_DIR"

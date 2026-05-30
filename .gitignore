@@ -1,0 +1,10 @@
+# Artifacts created by install.sh / install.ps1 inside the plugin directory.
+.venv/
+bin/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# OS cruft
+.DS_Store

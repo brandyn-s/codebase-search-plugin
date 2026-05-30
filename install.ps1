@@ -9,6 +9,9 @@ $PluginDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BinDir = Join-Path $PluginDir "bin"
 $VenvDir = Join-Path $PluginDir ".venv"
 
+# GitHub org that hosts code-search and code-graph.
+$Org = "redacted-org"
+
 Write-Host "=== Codebase Search Plugin Installer ===" -ForegroundColor Cyan
 Write-Host ""
 
@@ -32,7 +35,7 @@ foreach ($cmd in @("python3", "python")) {
         $version = & $cmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
         if ($version) {
             $parts = $version.Split(".")
-            if ([int]$parts[0] -ge 3 -and [int]$parts[1] -ge 12) {
+            if ([int]$parts[0] -gt 3 -or ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 12)) {
                 $Python = $cmd
                 Write-Host "  Using $cmd ($version)"
                 break
@@ -59,7 +62,7 @@ if (-not (Test-Path $VenvPip)) {
 }
 
 Write-Host "  Installing redacted-code-search from GitHub..."
-& $VenvPip install --quiet "redacted-code-search @ git+https://github.com/redacted-org/code-search.git"
+& $VenvPip install --quiet "redacted-code-search @ git+https://github.com/$Org/code-search.git"
 
 Write-Host "  code-search installed."
 Write-Host ""
@@ -73,21 +76,42 @@ if (-not (Test-Path $BinDir)) {
     New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
 }
 
-# Get latest release tag
-$ReleaseTag = "v0.5.0-redacted.4"
+# Resolve the release tag. Prefer the gh CLI, then the GitHub API, then a
+# pinned fallback so the installer still works without gh installed.
+$ReleaseTag = $null
 try {
     if (Get-Command gh -ErrorAction SilentlyContinue) {
-        $tag = gh release list --repo redacted-org/code-graph --limit 1 --json tagName --jq '.[0].tagName' 2>$null
-        if ($tag) { $ReleaseTag = $tag }
+        $tag = gh release list --repo "$Org/code-graph" --limit 1 --json tagName --jq '.[0].tagName' 2>$null
+        if ($tag) { $ReleaseTag = $tag.Trim() }
     }
 } catch {}
+if (-not $ReleaseTag) {
+    try {
+        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Org/code-graph/releases" -UseBasicParsing -TimeoutSec 10
+        if ($releases -and $releases.Count -gt 0) { $ReleaseTag = $releases[0].tag_name }
+    } catch {}
+}
+if (-not $ReleaseTag) {
+    $ReleaseTag = "v0.5.0-redacted.4"
+    Write-Host "  Could not query latest release; using pinned fallback: $ReleaseTag"
+} else {
+    Write-Host "  Latest release: $ReleaseTag"
+}
 
 $AssetName = "codebase-memory-mcp-${Platform}-${Arch}.zip"
-$DownloadUrl = "https://github.com/redacted-org/code-graph/releases/download/${ReleaseTag}/${AssetName}"
+$DownloadUrl = "https://github.com/$Org/code-graph/releases/download/${ReleaseTag}/${AssetName}"
 $ZipPath = Join-Path $BinDir $AssetName
 
 Write-Host "  Downloading code-graph $ReleaseTag for $Platform-$Arch..."
-Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
+try {
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
+} catch {
+    Write-Host "Error: failed to download code-graph binary." -ForegroundColor Red
+    Write-Host "  URL: $DownloadUrl"
+    Write-Host "  Check that release '$ReleaseTag' exists and ships an asset for $Platform-$Arch."
+    Write-Host "  Releases: https://github.com/$Org/code-graph/releases"
+    exit 1
+}
 
 Expand-Archive -Path $ZipPath -DestinationPath $BinDir -Force
 Remove-Item $ZipPath
@@ -96,10 +120,12 @@ Write-Host "  code-graph installed."
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 3. Create launcher script
+# 3. Create launcher scripts
 # ------------------------------------------------------------------
 Write-Host "[3/3] Creating launcher scripts..." -ForegroundColor Yellow
 
+# code-search launcher (.cmd) — .mcp.json references bin/run-code-search;
+# Windows resolves that base name to run-code-search.cmd via PATHEXT.
 $LauncherContent = @"
 @echo off
 setlocal
@@ -115,7 +141,18 @@ if exist "%SCRIPT_DIR%\.venv\Scripts\code-search-mcp.exe" (
 $LauncherPath = Join-Path $BinDir "run-code-search.cmd"
 Set-Content -Path $LauncherPath -Value $LauncherContent -Encoding ASCII
 
-# Also create bash launcher for Git Bash / WSL users on Windows
+# code-graph launcher (.cmd) — .mcp.json references bin/codebase-memory-mcp.
+# The extracted binary is codebase-memory-mcp.exe; this .cmd shim ensures the
+# base name resolves for spawners that search .cmd/.bat (not just .exe).
+$GraphLauncher = @"
+@echo off
+"%~dp0codebase-memory-mcp.exe" %*
+"@
+
+$GraphLauncherPath = Join-Path $BinDir "codebase-memory-mcp.cmd"
+Set-Content -Path $GraphLauncherPath -Value $GraphLauncher -Encoding ASCII
+
+# Also create a bash launcher for Git Bash / WSL users on Windows
 $BashContent = @"
 #!/usr/bin/env bash
 SCRIPT_DIR="`$(cd "`$(dirname "`$0")/.." && pwd)"

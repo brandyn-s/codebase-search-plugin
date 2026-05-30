@@ -1,4 +1,5 @@
-# Exempt internal org shared workflows from SHA pinning.
-# External Actions (actions/checkout, github/codeql-action, etc.) remain enforced.
-redacted-org/.github/.github/workflows
+# Exempt internal org shared/reusable workflows from SHA pinning.
+# None are referenced today; this is retained for when shared workflows are
+# pulled from the org's .github repo. External Actions (actions/checkout,
+# github/codeql-action, etc.) remain enforced.
 redacted-org/.github/.github/workflows
