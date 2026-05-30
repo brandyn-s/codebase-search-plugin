@@ -12,6 +12,10 @@ $VenvDir = Join-Path $PluginDir ".venv"
 # GitHub org that hosts code-search and code-graph.
 $Org = "redacted-org"
 
+# Pin code-search to a known-good commit for reproducible, immutable installs.
+# Bump this ref to upgrade (prefer a tagged release once code-search cuts them).
+$CodeSearchRef = "69721e0df21540d35cb91ea07d7f4fc8d1535cd2"
+
 Write-Host "=== Codebase Search Plugin Installer ===" -ForegroundColor Cyan
 Write-Host ""
 
@@ -62,7 +66,7 @@ if (-not (Test-Path $VenvPip)) {
 }
 
 Write-Host "  Installing redacted-code-search from GitHub..."
-& $VenvPip install --quiet "redacted-code-search @ git+https://github.com/$Org/code-search.git"
+& $VenvPip install --quiet "redacted-code-search @ git+https://github.com/$Org/code-search.git@$CodeSearchRef"
 
 Write-Host "  code-search installed."
 Write-Host ""
@@ -111,6 +115,33 @@ try {
     Write-Host "  Check that release '$ReleaseTag' exists and ships an asset for $Platform-$Arch."
     Write-Host "  Releases: https://github.com/$Org/code-graph/releases"
     exit 1
+}
+
+# Verify the archive against the release's published checksums (supply-chain).
+Write-Host "  Verifying checksum..."
+$ChecksumsUrl = "https://github.com/$Org/code-graph/releases/download/${ReleaseTag}/checksums.txt"
+try {
+    $checksums = (Invoke-WebRequest -Uri $ChecksumsUrl -UseBasicParsing -TimeoutSec 10).Content
+    $expected = $null
+    foreach ($line in ($checksums -split "`n")) {
+        $cols = ($line -replace '\*', '').Trim() -split '\s+'
+        if ($cols.Count -ge 2 -and $cols[1] -eq $AssetName) { $expected = $cols[0].ToLower() }
+    }
+    if ($expected) {
+        $actual = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLower()
+        if ($actual -ne $expected) {
+            Write-Host "Error: checksum mismatch for $AssetName" -ForegroundColor Red
+            Write-Host "  expected: $expected"
+            Write-Host "  actual:   $actual"
+            Remove-Item $ZipPath -ErrorAction SilentlyContinue
+            exit 1
+        }
+        Write-Host "  Checksum OK."
+    } else {
+        Write-Host "  Warning: $AssetName not found in checksums.txt; skipping verification."
+    }
+} catch {
+    Write-Host "  Warning: could not fetch/parse checksums.txt; skipping verification."
 }
 
 Expand-Archive -Path $ZipPath -DestinationPath $BinDir -Force

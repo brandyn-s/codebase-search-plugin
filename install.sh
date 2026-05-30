@@ -17,6 +17,10 @@ VENV_DIR="$PLUGIN_DIR/.venv"
 # GitHub org that hosts code-search and code-graph.
 ORG="redacted-org"
 
+# Pin code-search to a known-good commit for reproducible, immutable installs.
+# Bump this ref to upgrade (prefer a tagged release once code-search cuts them).
+CODE_SEARCH_REF="69721e0df21540d35cb91ea07d7f4fc8d1535cd2"
+
 echo "=== Codebase Search Plugin Installer ==="
 echo ""
 
@@ -84,7 +88,7 @@ fi
 
 echo "  Installing redacted-code-search from GitHub..."
 "$VENV_PIP" install --quiet \
-    "redacted-code-search @ git+https://github.com/$ORG/code-search.git"
+    "redacted-code-search @ git+https://github.com/$ORG/code-search.git@${CODE_SEARCH_REF}"
 
 echo "  code-search installed."
 echo ""
@@ -132,6 +136,31 @@ if ! curl -fSL "$DOWNLOAD_URL" -o "$BIN_DIR/$ASSET_NAME"; then
     echo "  Check that release '$RELEASE_TAG' exists and ships an asset for ${PLATFORM}-${ARCH}." >&2
     echo "  Releases: https://github.com/$ORG/code-graph/releases" >&2
     exit 1
+fi
+
+# Verify the archive against the release's published checksums (supply-chain).
+echo "  Verifying checksum..."
+CHECKSUMS_URL="https://github.com/$ORG/code-graph/releases/download/${RELEASE_TAG}/checksums.txt"
+EXPECTED=$(curl -fsSL "$CHECKSUMS_URL" 2>/dev/null | awk -v f="$ASSET_NAME" '{n=$2; sub(/^\*/,"",n); if (n==f) print $1}')
+if [ -n "$EXPECTED" ]; then
+    if command -v sha256sum &>/dev/null; then
+        ACTUAL=$(sha256sum "$BIN_DIR/$ASSET_NAME" | awk '{print $1}')
+    elif command -v shasum &>/dev/null; then
+        ACTUAL=$(shasum -a 256 "$BIN_DIR/$ASSET_NAME" | awk '{print $1}')
+    else
+        ACTUAL=""
+        echo "  Warning: no sha256 tool found; skipping verification." >&2
+    fi
+    if [ -n "$ACTUAL" ] && [ "$ACTUAL" != "$EXPECTED" ]; then
+        echo "Error: checksum mismatch for $ASSET_NAME" >&2
+        echo "  expected: $EXPECTED" >&2
+        echo "  actual:   $ACTUAL" >&2
+        rm -f "$BIN_DIR/$ASSET_NAME"
+        exit 1
+    fi
+    [ -n "$ACTUAL" ] && echo "  Checksum OK."
+else
+    echo "  Warning: could not fetch/parse checksums.txt; skipping verification." >&2
 fi
 
 if [ "$EXT" = "tar.gz" ]; then

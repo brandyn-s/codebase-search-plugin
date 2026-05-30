@@ -37,6 +37,16 @@ Route code exploration queries to the right tool and chain results automatically
 | `mcp__code-graph__get_architecture` | Codebase overview (routes, hotspots, layers) |
 | `mcp__code-graph__detect_changes` | Blast radius of uncommitted changes |
 
+### code-graph (security & localization — redacted extensions)
+
+| Tool | Use for |
+|------|---------|
+| `mcp__code-graph__query_security_surfaces` | Enumerate security-tagged surfaces by `role` (`auth_boundary`, `input_entry_point`, `sensitive_sink`, `crypto_operation`, `privilege_escalation`, `session_management`, `audit_logging`, `sanitizer`). Pass `mode="tainted_paths"` to return source→sink taint paths instead of a flat surface list |
+| `mcp__code-graph__trace_data_flow` | Trace propagation from a `source` function through the graph (env-var aware) — "where does this sensitive data end up?" |
+| `mcp__code-graph__query_stig_evidence` | Map a STIG/NIST `control_id` to the code that provides evidence for it |
+| `mcp__code-graph__rank_by_query` | Rank nodes by relevance to a `query` (bidirectional PageRank). Best for **specific symbol names**; `seed_strategy` is `hybrid` (default), `embedding`, or `substring` |
+| `mcp__code-graph__code_localize` | Graph-guided localization from an `issue_description` — "where would I change code to fix X?" |
+
 ## Pre-flight Check
 
 Before routing, verify the target repo is indexed and active:
@@ -70,6 +80,11 @@ If only one index exists, route to that tool only and note the limitation.
 | "Trace from X to Y" | Structural | graph: trace_call_path |
 | "What depends on X?" | Structural | graph: query_graph IMPORTS inbound |
 | "Understand this codebase" | Overview | graph: get_architecture, then code-search |
+| "Where are the auth/input/crypto surfaces?" | Security | graph: query_security_surfaces (by `role`) |
+| "Does any user input reach a sink?" | Security | graph: query_security_surfaces mode="tainted_paths" |
+| "Trace how X (secret/PII/token) flows" | Security | graph: trace_data_flow(source=X) |
+| "What code satisfies STIG/NIST <control>?" | Compliance | graph: query_stig_evidence(control_id=...) |
+| "Where's the code I'd change for <issue>?" | Localization | graph: code_localize (issue text) / rank_by_query (symbol) |
 
 ### Step 2: Execute primary tool
 
@@ -113,6 +128,11 @@ Detailed Cypher patterns and pitfalls are in `references/graph-queries.md`.
 2. Conceptual -> code-search: `search_code("authentication logic")`
 3. Structural -> graph: trace auth call chain
 4. Answer with combined narrative
+
+**"Where are the input entry points, and does any reach a sensitive sink?"**
+1. Security -> graph: `query_security_surfaces(role="input_entry_point", mode="tainted_paths")`
+2. Chain -> graph: `trace_data_flow(source=<entry function>)` to follow propagation
+3. Answer with the surfaces, any source→sink paths, and file:line for each
 
 ## Success Criteria
 

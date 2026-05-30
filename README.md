@@ -206,6 +206,10 @@ After indexing, just ask naturally. No special syntax needed.
 | **Architecture** | "Show all API endpoints" | Graph queries for Route/Handler nodes |
 | **Impact** | "Blast radius of changing UserService?" | Graph traces all dependents with hop-distance risk |
 | **Quality** | "Find dead code" | Graph finds functions with zero inbound calls |
+| **Security** | "Where are the input entry points / auth boundaries?" | Graph queries security-tagged surfaces (auth/crypto/input/sink) |
+| **Security** | "Does user input reach a sensitive sink?" | Graph traces source→sink taint paths |
+| **Compliance** | "What code satisfies STIG control X?" | Graph maps the control ID to code evidence |
+| **Localization** | "Where would I fix \<issue\>?" | Graph-guided localization ranks the most relevant code |
 
 ### Step 3: Multi-repo
 
