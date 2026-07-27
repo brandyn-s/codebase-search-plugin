@@ -261,16 +261,52 @@ if snapshots:
                 f"skills/: {component} tool '{missing}' is not in the tested snapshot"
             )
 
+    def optional_typed_property(schema, name: str, expected_type: str):
+        if not isinstance(schema, dict):
+            return False, False
+        properties = schema.get("properties")
+        if not isinstance(properties, dict) or name not in properties:
+            return False, False
+        property_schema = properties[name]
+        required = schema.get("required", [])
+        valid = (
+            schema.get("type") == "object"
+            and isinstance(property_schema, dict)
+            and property_schema.get("type") == expected_type
+            and isinstance(required, list)
+            and name not in required
+        )
+        return True, valid
+
+    search_status_schema = (
+        snapshots.get("code-search", {})
+        .get("tools", {})
+        .get("get_index_status", {})
+        .get("input_schema", {})
+    )
+    search_project_path_present, search_supports_project_path = (
+        optional_typed_property(search_status_schema, "project_path", "string")
+    )
+    if search_project_path_present and not search_supports_project_path:
+        errors.append(
+            "compatibility/code-search-tools.json: "
+            "get_index_status.project_path must be an optional string"
+        )
+
     graph_index_schema = (
         snapshots.get("code-graph", {})
         .get("tools", {})
         .get("index_repository", {})
         .get("input_schema", {})
     )
-    graph_properties = graph_index_schema.get("properties", {})
-    graph_supports_skip_report = isinstance(
-        graph_properties, dict
-    ) and "skip_report" in graph_properties
+    graph_skip_report_present, graph_supports_skip_report = (
+        optional_typed_property(graph_index_schema, "skip_report", "boolean")
+    )
+    if graph_skip_report_present and not graph_supports_skip_report:
+        errors.append(
+            "compatibility/code-graph-tools.json: "
+            "index_repository.skip_report must be an optional boolean"
+        )
     readiness = bom.get("integrated_readiness", {}) if bom else {}
     if not isinstance(readiness, dict):
         errors.append("component-bom.json: integrated_readiness must be an object")
@@ -355,6 +391,10 @@ if snapshots:
         if search_outputs.get("semantic_index_ready") is not True:
             ready_capability_errors.append(
                 "code-search tested semantic_index_ready capability is not true"
+            )
+        if not search_supports_project_path:
+            ready_capability_errors.append(
+                "code-search get_index_status.project_path must be an optional string"
             )
         if graph_outputs.get("graph_status_ready") is not True:
             ready_capability_errors.append(

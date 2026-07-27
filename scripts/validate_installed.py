@@ -31,9 +31,16 @@ class ContractError(RuntimeError):
 
 
 def canonical_schema_fingerprint(schema: dict) -> str:
-    canonical = json.dumps(
-        schema, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    try:
+        canonical = json.dumps(
+            schema,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ContractError(f"inputSchema is not valid JSON: {exc}") from exc
     return hashlib.sha256(canonical).hexdigest()
 
 
@@ -138,7 +145,9 @@ def _await_response(
     raise ContractError(f"timeout waiting for MCP response to request {request_id}")
 
 
-def list_tools(command: str, timeout: float) -> list[dict]:
+def list_tools(
+    command: str, timeout: float, env: dict[str, str] | None = None
+) -> list[dict]:
     try:
         process = subprocess.Popen(
             [command],
@@ -147,6 +156,7 @@ def list_tools(command: str, timeout: float) -> list[dict]:
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
+            env=env,
         )
     except OSError as exc:
         raise ContractError(f"cannot start {command}: {exc}") from exc
@@ -192,15 +202,40 @@ def list_tools(command: str, timeout: float) -> list[dict]:
                 "params": {},
             },
         )
-        _send(
-            process,
-            {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
-        )
-        result = _await_response(process, messages, 2, deadline)
-        tools = result.get("tools")
-        if not isinstance(tools, list):
-            raise ContractError("tools/list result does not contain a tools array")
-        return tools
+        tools: list[dict] = []
+        cursor = None
+        seen_cursors: set[str] = set()
+        request_id = 2
+        while True:
+            params = {} if cursor is None else {"cursor": cursor}
+            _send(
+                process,
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": "tools/list",
+                    "params": params,
+                },
+            )
+            result = _await_response(process, messages, request_id, deadline)
+            page = result.get("tools")
+            if not isinstance(page, list):
+                raise ContractError(
+                    "tools/list result does not contain a tools array"
+                )
+            tools.extend(page)
+            next_cursor = result.get("nextCursor")
+            if next_cursor is None:
+                return tools
+            if (
+                not isinstance(next_cursor, str)
+                or not next_cursor
+                or next_cursor in seen_cursors
+            ):
+                raise ContractError("tools/list returned an invalid pagination cursor")
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+            request_id += 1
     finally:
         if process.stdin:
             process.stdin.close()
@@ -229,8 +264,12 @@ def validate_server(
             raise ContractError(f"{component}: duplicate tool name '{name}'")
         actual[name] = schema
 
+    expected_tools = snapshot.get("tools")
+    if not isinstance(expected_tools, dict) or not expected_tools:
+        raise ContractError(f"{component}: tested snapshot has no tools")
+
     errors: list[str] = []
-    for name, expected in snapshot.get("tools", {}).items():
+    for name, expected in expected_tools.items():
         if name not in actual:
             errors.append(f"missing tool '{name}'")
             continue
@@ -240,6 +279,8 @@ def validate_server(
                 f"schema mismatch for '{name}' "
                 f"(expected {expected.get('input_schema_sha256')}, got {fingerprint})"
             )
+    for name in sorted(set(actual) - set(expected_tools)):
+        errors.append(f"unexpected tool '{name}'")
     if errors:
         raise ContractError(f"{component}: " + "; ".join(errors))
 

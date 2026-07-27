@@ -134,6 +134,20 @@ class ReadinessContractTests(unittest.TestCase):
 
         search["tested_capabilities"] = deepcopy(READY_SEARCH_CAPABILITIES)
         graph["tested_capabilities"] = deepcopy(READY_GRAPH_CAPABILITIES)
+        search_schema = search["tools"]["get_index_status"]["input_schema"]
+        search_schema["properties"]["project_path"] = {
+            "description": "Select the indexed project explicitly.",
+            "type": "string",
+        }
+        canonical = json.dumps(
+            search_schema,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        search["tools"]["get_index_status"]["input_schema_sha256"] = hashlib.sha256(
+            canonical
+        ).hexdigest()
         graph_schema = graph["tools"]["index_repository"]["input_schema"]
         graph_schema["properties"]["skip_report"] = {
             "description": "Skip writing the architecture report.",

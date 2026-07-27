@@ -170,6 +170,12 @@ class InstalledContractTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertIn("schema mismatch for 'search_code'", completed.stderr)
 
+    def test_cli_fails_closed_when_installed_server_adds_an_unreviewed_tool(self):
+        completed = self._run_fake_contract({"FAKE_MCP_MODE": "extra"})
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("unexpected tool 'unreviewed_extra_tool'", completed.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

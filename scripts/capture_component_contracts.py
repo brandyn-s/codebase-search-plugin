@@ -1,0 +1,493 @@
+#!/usr/bin/env python3
+"""Capture pinned MCP input schemas into a blocked candidate contract.
+
+The command is offline: callers provide both the candidate component BOM and
+the already-installed server executables.  It prints a deterministic preview
+by default and only creates the output directory when ``--write`` is present.
+"""
+
+from __future__ import annotations
+
+import argparse
+from copy import deepcopy
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shutil
+import sys
+import tempfile
+
+from validate_installed import ContractError, list_tools, parse_servers
+
+
+COMPONENTS = {"code-search", "code-graph"}
+SNAPSHOT_PATHS = {
+    "code-search": Path("compatibility/code-search-tools.json"),
+    "code-graph": Path("compatibility/code-graph-tools.json"),
+}
+CODE_SEARCH_REPOSITORY = "https://github.com/redacted-org/code-search.git"
+CODE_GRAPH_REPOSITORY = "redacted-org/code-graph"
+GRAPH_ASSET_NAMES = {
+    "darwin-amd64": "codebase-memory-mcp-darwin-amd64.tar.gz",
+    "darwin-arm64": "codebase-memory-mcp-darwin-arm64.tar.gz",
+    "linux-amd64": "codebase-memory-mcp-linux-amd64.tar.gz",
+    "linux-arm64": "codebase-memory-mcp-linux-arm64.tar.gz",
+    "windows-amd64": "codebase-memory-mcp-windows-amd64.zip",
+}
+LOWER_HEX_SHA256 = re.compile(r"[0-9a-f]{64}")
+LOWER_HEX_COMMIT = re.compile(r"[0-9a-f]{40}")
+FINGERPRINT = {
+    "algorithm": "sha256",
+    "canonicalization": "UTF-8 JSON with sorted keys and separators comma/colon",
+    "document": "inputSchema",
+}
+READINESS_REQUIREMENTS = {
+    "index_identity": {
+        "schema_version": 1,
+        "required_fields": [
+            "repository_id",
+            "checkout_id",
+            "source_revision",
+            "dirty_fingerprint",
+            "index_generation",
+            "captured_at",
+        ],
+        "equal_fields": [
+            "repository_id",
+            "checkout_id",
+            "source_revision",
+            "dirty_fingerprint",
+            "index_generation",
+        ],
+    },
+    "code-search": {
+        "completion.success": True,
+        "completion.error": "empty",
+        "index_ready": True,
+    },
+    "code-graph": {
+        "index_status.status": "ready",
+        "index_repository.skip_report": True,
+    },
+    "readiness_evidence": {
+        "schema_version": 1,
+        "component_versions_match_bom": True,
+        "checkout_unchanged": True,
+    },
+}
+RUNTIME_ENV_ALLOWLIST = {
+    "COMSPEC",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "TZ",
+    "WINDIR",
+}
+
+
+class CaptureError(RuntimeError):
+    """The candidate or live MCP contract is unsafe to capture."""
+
+
+def _json_bytes(document: dict) -> bytes:
+    try:
+        rendered = json.dumps(
+            document,
+            sort_keys=True,
+            indent=2,
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise CaptureError(f"document is not valid JSON: {exc}") from exc
+    return (rendered + "\n").encode("utf-8")
+
+
+def _load_candidate(path: Path) -> dict:
+    try:
+        candidate = json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                ValueError(f"invalid JSON constant {value}")
+            ),
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        raise CaptureError(f"{path}: cannot load candidate BOM: {exc}") from exc
+    if not isinstance(candidate, dict):
+        raise CaptureError(f"{path}: candidate BOM must be an object")
+    if (
+        isinstance(candidate.get("schema_version"), bool)
+        or candidate.get("schema_version") != 1
+    ):
+        raise CaptureError(f"{path}: candidate BOM must use schema_version 1")
+    components = candidate.get("components")
+    if not isinstance(components, dict) or set(components) != COMPONENTS:
+        raise CaptureError(
+            f"{path}: components must exactly match "
+            + ", ".join(sorted(COMPONENTS))
+        )
+    readiness = candidate.get("integrated_readiness")
+    if not isinstance(readiness, dict):
+        raise CaptureError(f"{path}: integrated_readiness must be an object")
+    if readiness.get("status") not in {"blocked", "ready"}:
+        raise CaptureError(
+            f"{path}: integrated_readiness.status must be blocked or ready"
+        )
+    if readiness.get("requires") != READINESS_REQUIREMENTS:
+        raise CaptureError(
+            f"{path}: integrated_readiness.requires must preserve every "
+            "readiness gate"
+        )
+
+    for component in sorted(COMPONENTS):
+        details = components[component]
+        if not isinstance(details, dict):
+            raise CaptureError(f"{component}: component details must be an object")
+        expected_snapshot = str(SNAPSHOT_PATHS[component])
+        if details.get("schema_snapshot") != expected_snapshot:
+            raise CaptureError(
+                f"{component}: schema_snapshot must be {expected_snapshot}"
+            )
+        _source_for(component, details)
+    return candidate
+
+
+def _source_for(component: str, details: dict) -> dict[str, str]:
+    install = details.get("install")
+    if not isinstance(install, dict):
+        raise CaptureError(f"{component}: missing install object")
+    if component == "code-search":
+        if install.get("kind") != "git":
+            raise CaptureError("code-search: install kind must be git")
+        if install.get("repository") != CODE_SEARCH_REPOSITORY:
+            raise CaptureError(
+                f"code-search: repository must be {CODE_SEARCH_REPOSITORY}"
+            )
+        version = install.get("revision")
+        if not isinstance(version, str) or LOWER_HEX_COMMIT.fullmatch(version) is None:
+            raise CaptureError(
+                "code-search: revision must be a full 40-character lowercase "
+                "hex commit"
+            )
+        kind = "git"
+    else:
+        if install.get("kind") != "github-release":
+            raise CaptureError("code-graph: install kind must be github-release")
+        if install.get("repository") != CODE_GRAPH_REPOSITORY:
+            raise CaptureError(f"code-graph: repository must be {CODE_GRAPH_REPOSITORY}")
+        version = install.get("tag")
+        if (
+            not isinstance(version, str)
+            or not version
+            or version.strip() != version
+            or any(ord(character) < 32 for character in version)
+        ):
+            raise CaptureError("code-graph: tag must be a non-empty safe string")
+        assets = install.get("assets")
+        if not isinstance(assets, dict) or set(assets) != set(GRAPH_ASSET_NAMES):
+            raise CaptureError(
+                "code-graph: assets must exactly match "
+                + ", ".join(sorted(GRAPH_ASSET_NAMES))
+            )
+        for platform, expected_name in GRAPH_ASSET_NAMES.items():
+            asset = assets.get(platform)
+            if not isinstance(asset, dict):
+                raise CaptureError(f"code-graph: asset {platform} must be an object")
+            if asset.get("name") != expected_name:
+                raise CaptureError(
+                    f"code-graph: asset {platform} name must be {expected_name}"
+                )
+            digest = asset.get("sha256")
+            if (
+                not isinstance(digest, str)
+                or LOWER_HEX_SHA256.fullmatch(digest) is None
+            ):
+                raise CaptureError(
+                    f"code-graph: asset {platform} sha256 must be 64 lowercase "
+                    "hex characters"
+                )
+        kind = "github-release"
+    return {"kind": kind, "version": version}
+
+
+def _schema_fingerprint(schema: dict) -> str:
+    try:
+        canonical = json.dumps(
+            schema,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise CaptureError(f"inputSchema is not valid JSON: {exc}") from exc
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _normalized_install(component: str, details: dict) -> dict:
+    install = details["install"]
+    if component == "code-search":
+        return {
+            "kind": install["kind"],
+            "repository": install["repository"],
+            "revision": install["revision"],
+        }
+    return {
+        "kind": install["kind"],
+        "repository": install["repository"],
+        "tag": install["tag"],
+        "assets": {
+            platform: {
+                "name": install["assets"][platform]["name"],
+                "sha256": install["assets"][platform]["sha256"],
+            }
+            for platform in sorted(GRAPH_ASSET_NAMES)
+        },
+    }
+
+
+def _captured_tools(component: str, live_tools: list[dict]) -> dict[str, dict]:
+    if not live_tools:
+        raise CaptureError(f"{component}: tools/list returned no tools")
+    captured: dict[str, dict] = {}
+    for tool in live_tools:
+        if not isinstance(tool, dict):
+            raise CaptureError(f"{component}: malformed tools/list entry")
+        name = tool.get("name")
+        schema = tool.get("inputSchema")
+        if not isinstance(name, str) or not name:
+            raise CaptureError(f"{component}: tool name must be a non-empty string")
+        if name in captured:
+            raise CaptureError(f"{component}: duplicate tool name '{name}'")
+        if not isinstance(schema, dict):
+            raise CaptureError(f"{component}: tool '{name}' has malformed inputSchema")
+        captured[name] = {
+            "input_schema": schema,
+            "input_schema_sha256": _schema_fingerprint(schema),
+        }
+    return {name: captured[name] for name in sorted(captured)}
+
+
+def _is_optional_boolean(schema: dict, property_name: str) -> bool:
+    properties = schema.get("properties")
+    required = schema.get("required", [])
+    if (
+        schema.get("type") != "object"
+        or not isinstance(properties, dict)
+        or not isinstance(required, list)
+    ):
+        return False
+    property_schema = properties.get(property_name)
+    return (
+        isinstance(property_schema, dict)
+        and property_schema.get("type") == "boolean"
+        and property_name not in required
+    )
+
+
+def _capabilities(component: str, tools: dict[str, dict]) -> dict:
+    identity = {"supported": False, "schema_version": None, "fields": []}
+    if component == "code-search":
+        return {
+            "outputs": {
+                "index_identity": identity,
+                "semantic_index_ready": False,
+            }
+        }
+
+    index_repository = tools.get("index_repository", {}).get("input_schema", {})
+    return {
+        "inputs": {
+            "index_repository.skip_report": _is_optional_boolean(
+                index_repository, "skip_report"
+            )
+        },
+        "outputs": {
+            "index_identity": identity,
+            "graph_status_ready": False,
+        },
+    }
+
+
+def _capture_environment(runtime_root: Path) -> dict[str, str]:
+    paths = {
+        "HOME": runtime_root / "home",
+        "USERPROFILE": runtime_root / "home",
+        "XDG_CONFIG_HOME": runtime_root / "xdg-config",
+        "XDG_CACHE_HOME": runtime_root / "xdg-cache",
+        "XDG_DATA_HOME": runtime_root / "xdg-data",
+        "CODE_SEARCH_STORAGE": runtime_root / "code-search-storage",
+        "TMPDIR": runtime_root / "tmp",
+        "TEMP": runtime_root / "tmp",
+        "TMP": runtime_root / "tmp",
+    }
+    for path in set(paths.values()):
+        path.mkdir(parents=True, exist_ok=True)
+
+    environment = {
+        name: os.environ[name]
+        for name in RUNTIME_ENV_ALLOWLIST
+        if name in os.environ
+    }
+    environment.update(
+        {
+            "PATH": os.defpath,
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONUNBUFFERED": "1",
+            **{name: str(path) for name, path in paths.items()},
+        }
+    )
+    return environment
+
+
+def _capture(
+    candidate: dict,
+    servers: dict[str, str],
+    timeout: float,
+    runtime_env: dict[str, str],
+) -> dict[str, dict]:
+    snapshots: dict[str, dict] = {}
+    proposed_bom = {
+        "schema_version": 1,
+        "integrated_readiness": {
+            "status": "blocked",
+            "reason": (
+                "Input schemas were captured offline; output behavior and integrated "
+                "readiness require separate runtime evidence."
+            ),
+            "requires": deepcopy(READINESS_REQUIREMENTS),
+        },
+        "components": {},
+    }
+    if "tested_at" in candidate:
+        proposed_bom["tested_at"] = candidate["tested_at"]
+
+    for component in sorted(COMPONENTS):
+        details = candidate["components"][component]
+        tools = _captured_tools(
+            component,
+            list_tools(servers[component], timeout, env=runtime_env),
+        )
+        capabilities = _capabilities(component, tools)
+        snapshot = {
+            "component": component,
+            "fingerprint": FINGERPRINT,
+            "schema_version": 1,
+            "source": _source_for(component, details),
+            "tested_capabilities": capabilities,
+            "tools": tools,
+        }
+        snapshots[component] = snapshot
+        proposed_bom["components"][component] = {
+            "install": _normalized_install(component, details),
+            "schema_snapshot": str(SNAPSHOT_PATHS[component]),
+            "tested_capabilities": capabilities,
+        }
+
+    return {"component-bom.json": proposed_bom, **{
+        str(SNAPSHOT_PATHS[component]): snapshots[component]
+        for component in sorted(COMPONENTS)
+    }}
+
+
+def _summary(documents: dict[str, dict], written: bool) -> dict:
+    return {
+        "files": {
+            name: hashlib.sha256(_json_bytes(document)).hexdigest()
+            for name, document in sorted(documents.items())
+        },
+        "tool_counts": {
+            component: len(documents[str(SNAPSHOT_PATHS[component])]["tools"])
+            for component in sorted(COMPONENTS)
+        },
+        "written": written,
+    }
+
+
+def _write_transactionally(output: Path, documents: dict[str, dict]) -> None:
+    if os.path.lexists(output):
+        raise CaptureError(f"{output}: output directory already exists")
+    if not output.parent.is_dir():
+        raise CaptureError(f"{output.parent}: output parent is not a directory")
+
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{output.name}.staging-", dir=output.parent)
+    )
+    try:
+        for relative, document in documents.items():
+            destination = staging / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(_json_bytes(document))
+        os.replace(staging, output)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Capture deterministic offline MCP input-schema contracts"
+    )
+    parser.add_argument("--component-bom", type=Path, required=True)
+    parser.add_argument(
+        "--server",
+        action="append",
+        default=[],
+        metavar="COMPONENT=EXECUTABLE",
+    )
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--timeout", type=float, default=15.0)
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="atomically create the output directory (default is preview only)",
+    )
+    args = parser.parse_args()
+
+    try:
+        candidate = _load_candidate(args.component_bom)
+        servers = parse_servers(args.server)
+        if set(servers) != COMPONENTS:
+            raise CaptureError(
+                "servers must exactly match components: "
+                + ", ".join(sorted(COMPONENTS))
+            )
+        for component, command in servers.items():
+            executable = Path(command)
+            if not executable.is_absolute():
+                raise CaptureError(
+                    f"{component}: server executable path must be absolute"
+                )
+            if not executable.is_file() or not os.access(executable, os.X_OK):
+                raise CaptureError(
+                    f"{component}: server executable is missing or not executable: "
+                    f"{executable}"
+                )
+        if not math.isfinite(args.timeout) or args.timeout <= 0:
+            raise CaptureError("timeout must be a finite positive number")
+        with tempfile.TemporaryDirectory(
+            prefix="codebase-contract-capture-runtime-"
+        ) as runtime:
+            documents = _capture(
+                candidate,
+                servers,
+                args.timeout,
+                runtime_env=_capture_environment(Path(runtime)),
+            )
+        if args.write:
+            _write_transactionally(args.output_dir, documents)
+        print(json.dumps(_summary(documents, args.write), sort_keys=True))
+    except (CaptureError, ContractError, OSError) as exc:
+        print(f"Component contract capture FAILED: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
