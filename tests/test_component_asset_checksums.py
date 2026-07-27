@@ -109,6 +109,96 @@ def load_helper():
 
 
 class ComponentAssetChecksumTests(unittest.TestCase):
+    def test_graph_snapshot_matches_released_pagination_and_trace_contract(self):
+        snapshot = json.loads(
+            (ROOT / "compatibility" / "code-graph-tools.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        search_code = snapshot["tools"]["search_code"]
+        trace_call_path = snapshot["tools"]["trace_call_path"]
+
+        self.assertEqual(
+            search_code["input_schema_sha256"],
+            "3975a99e2dfab690a9f01c22d68f61e486c53c8ccd1ea5fb47e7ae58a316d7c8",
+        )
+        self.assertEqual(
+            search_code["input_schema"]["properties"]["max_results"],
+            {
+                "description": (
+                    "Max matches per page (default: 10, max: 1000). "
+                    "Response includes has_more flag for pagination."
+                ),
+                "maximum": 1000,
+                "minimum": 1,
+                "type": "integer",
+            },
+        )
+        self.assertEqual(
+            search_code["input_schema"]["properties"]["offset"],
+            {
+                "description": (
+                    "Skip N matches for pagination (default: 0). "
+                    "Check has_more in response."
+                ),
+                "maximum": 1000000,
+                "minimum": 0,
+                "type": "integer",
+            },
+        )
+
+        self.assertEqual(
+            trace_call_path["input_schema_sha256"],
+            "d60814c5e8755a72bb148fa61dba8f9de4c7c6b42acc4dd739e97b10d1543214",
+        )
+        self.assertEqual(
+            trace_call_path["input_schema"]["properties"]["edge_types"],
+            {
+                "default": ["CALLS", "HTTP_CALLS", "ASYNC_CALLS"],
+                "description": (
+                    "Relationship types to traverse. Defaults to call-like "
+                    "relationships: CALLS, HTTP_CALLS, ASYNC_CALLS. Non-call "
+                    "relationships are opt-in: USAGE, OVERRIDE."
+                ),
+                "items": {
+                    "enum": [
+                        "CALLS",
+                        "HTTP_CALLS",
+                        "ASYNC_CALLS",
+                        "USAGE",
+                        "OVERRIDE",
+                    ],
+                    "type": "string",
+                },
+                "maxItems": 5,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": True,
+            },
+        )
+        self.assertEqual(
+            trace_call_path["input_schema"]["properties"]["min_confidence"],
+            {
+                "description": (
+                    "Minimum confidence threshold (0.0-1.0) for all selected "
+                    "edge types. Filters out low-confidence fuzzy matches. "
+                    "Edges with missing or null confidence remain traversable; "
+                    "an explicit numeric zero is filtered when the threshold "
+                    "is positive. Bands: high (>=0.7), medium (>=0.45), "
+                    "speculative (<0.45). Default 0.45 — filters speculative "
+                    "cross-crate name-only matches that frequently resolve to "
+                    "wrong-crate same-named methods. Pass 0 explicitly to "
+                    "disable filtering and see the full unfiltered trace. "
+                    "confidence_band is unknown whenever min_confidence is "
+                    "positive because the resolved-edge numerator is filtered "
+                    "while unresolved_call_count is not."
+                ),
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number",
+            },
+        )
+
     def test_bom_pins_exact_code_search_release_descriptor(self):
         bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
 
