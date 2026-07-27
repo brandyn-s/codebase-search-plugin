@@ -27,7 +27,7 @@ class ComparisonDocumentationTests(unittest.TestCase):
         self.assertIn("CODE_INTEL_COMPONENT_TOKEN", runbook)
         self.assertIn("must never enter a child MCP", runbook)
         self.assertIn("locbench-june-n200.external.json", runbook)
-        self.assertIn("pending_publication", runbook)
+        self.assertIn("published at code-graph merge", runbook)
         self.assertIn("fixture-stop-after", runbook)
 
     def test_root_readme_links_runbook_and_generated_runs_are_ignored(self):

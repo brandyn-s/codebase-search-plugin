@@ -243,7 +243,7 @@ class ComparisonPinTests(unittest.TestCase):
                 "expected_count": 200,
                 "score_depth": 10,
                 "recorded_order_sha256": "c" * 64,
-                "availability": "pending_publication",
+                "availability": "published",
             }
             ordered = "\n".join(external["pinned_instance_ids"]) + "\n"
             external["recorded_order_sha256"] = hashlib.sha256(
@@ -268,7 +268,10 @@ class ComparisonPinTests(unittest.TestCase):
                 "address_verified_not_runnable",
             )
             self.assertFalse(verified["runnable"])
-            self.assertIn("missing_query_oracle_labels", verified["blockers"])
+            self.assertEqual(
+                verified["blockers"],
+                ["missing_query_oracle_labels"],
+            )
 
             invented = json.loads(json.dumps(external))
             for case in invented["cases"]:
@@ -340,11 +343,15 @@ class ComparisonPinTests(unittest.TestCase):
         )
         self.assertNotIn("cases", reference)
         self.assertNotIn("queries", reference)
-        self.assertEqual(reference["availability"], "pending_publication")
+        self.assertEqual(reference["availability"], "published")
+        self.assertEqual(
+            reference["source_revision"],
+            "d7b93959dace3215cd096a13c1a27e259063dc95",
+        )
         self.assertFalse(reference["runnable"])
         self.assertEqual(
-            set(reference["blockers"]),
-            {"pending_publication", "missing_query_oracle_labels"},
+            reference["blockers"],
+            ["missing_query_oracle_labels"],
         )
 
     def test_ci_runs_good_and_bad_instrument_falsifiers_without_secrets(self):

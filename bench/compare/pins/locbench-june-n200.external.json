@@ -1,7 +1,6 @@
 {
-  "availability": "pending_publication",
+  "availability": "published",
   "blockers": [
-    "pending_publication",
     "missing_query_oracle_labels"
   ],
   "dataset": {
@@ -18,5 +17,5 @@
   "schema_version": 1,
   "score_depth": 10,
   "sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
-  "source_revision": "1676d2c559f24f603c44cb63233fa0468e7dd8e0"
+  "source_revision": "d7b93959dace3215cd096a13c1a27e259063dc95"
 }

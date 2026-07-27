@@ -160,8 +160,8 @@ oracle labels would be circular and is forbidden.
 The exact June `n=200` cases remain external rather than copying query or case
 data here. `pins/locbench-june-n200.external.json` fixes the repository,
 commit, path, SHA-256, count, depth, and recorded-order hash.
-Its `availability` is currently `pending_publication` until the corresponding
-code-graph benchmark commit is published. The external pin identifies the
+The address was published at code-graph merge
+`d7b93959dace3215cd096a13c1a27e259063dc95`. The external pin identifies the
 exact recorded order but does not contain runnable queries, oracles, and label
 audits. Verification therefore confirms the address and recomputed order, then
 returns `address_verified_not_runnable` with exit two. Verify a local copy
