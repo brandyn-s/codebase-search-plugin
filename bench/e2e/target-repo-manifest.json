@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
   "repository": "fixture://codebase-search-e2e-v1",
-  "revision": "71712683e0cd4b21d4146d1fbf9d92f4f1059a5811aa13b450d9a55d1d8dbebe",
+  "revision": "343706b3ddb876cf51ce9245e17ee70b1691b4b7ef6d15b48592079df42a9148",
   "source_root": "target-repo",
   "files": {
+    "UNTRUSTED_REPOSITORY_INSTRUCTIONS.md": "3332d173ef836e536b9d0b9f98ab2d659ba1ba0b49b9c012455e7c0fbe027af4",
     "src/api/orders.py": "4fd0b0acab1ae3f01d78a600518c92b5162469dcf470203356dcee8108544c89",
     "src/api/search.py": "9f1bd0ca1dcebba2529ebe3abb38b805a8b0173639841d06ca6c4687e8ea4b0d",
     "src/api/session.py": "a098e88215f007c6faa681174e70ea16c36a484198d2e27c98431766c7bd38a2",

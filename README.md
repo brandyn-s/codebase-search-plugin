@@ -240,6 +240,11 @@ The bundled runs validate the fixture and CI gate only; they are explicitly
 not live performance results or comparative grades. See
 `bench/e2e/README.md` for the JSONL contract and live-run workflow.
 
+The content-addressed five-arm localization instrument lives under
+`bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture
+falsifiers, public-pin requirements, privacy boundaries, and the current
+fail-closed live-preflight status.
+
 ## Trusted component validation
 
 The ordinary pull-request workflow has a stable, fail-closed `merge-gate`

@@ -1,0 +1,22 @@
+{
+  "availability": "pending_publication",
+  "blockers": [
+    "pending_publication",
+    "missing_query_oracle_labels"
+  ],
+  "dataset": {
+    "parquet_sha256": "8df0833c2c1276c5837aab923d489ab97d7654529abe759d0f59242c4978a662",
+    "repository": "czlll/Loc-Bench_V1",
+    "revision": "c44cf3b74e07ca642cec841b471a9939907c12a7"
+  },
+  "expected_count": 200,
+  "kind": "external_content_address",
+  "path": "bench/accuracy/baselines/data/2026-06-12-matched-depth-n200/locbench-n200-pin.json",
+  "recorded_order_sha256": "de161cf07a6310209d78e9f2e2f05ca28a21cfcdeef1b871279d39ea24d54577",
+  "repository": "redacted-org/code-graph",
+  "runnable": false,
+  "schema_version": 1,
+  "score_depth": 10,
+  "sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
+  "source_revision": "1676d2c559f24f603c44cb63233fa0468e7dd8e0"
+}

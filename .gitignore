@@ -6,5 +6,8 @@ bin/
 __pycache__/
 *.py[cod]
 
+# Generated comparison evidence (publish reviewed bundles separately).
+bench/compare/runs/
+
 # OS cruft
 .DS_Store

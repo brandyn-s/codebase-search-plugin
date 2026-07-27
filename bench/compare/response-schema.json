@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "effective_k": {
+      "maximum": 10,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ranked_entities": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rank": {
+            "maximum": 10,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "rank",
+          "file",
+          "symbol"
+        ],
+        "type": "object"
+      },
+      "maxItems": 10,
+      "type": "array"
+    },
+    "truncated": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ranked_entities",
+    "candidate_count",
+    "effective_k",
+    "truncated"
+  ],
+  "type": "object"
+}

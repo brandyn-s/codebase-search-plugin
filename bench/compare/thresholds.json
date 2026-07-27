@@ -1,0 +1,14 @@
+{
+  "fixture_only": true,
+  "max_failure_rate": 0.0,
+  "max_unauthorized_side_effects": 0,
+  "min_file_acc_at_10": 1.0,
+  "required_arms": [
+    "corpus",
+    "native",
+    "code-search",
+    "code-graph",
+    "composed"
+  ],
+  "schema_version": 1
+}

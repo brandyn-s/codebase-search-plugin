@@ -43,6 +43,58 @@ jobs:
             exit 1
           fi
 
+      - name: Gate the five-arm comparison instrument
+        env:
+          COMPARE_CANARY_WRITE_PATH: ${{ runner.temp }}/compare-host-write-canary
+          COMPARE_SECRET_CANARY: fixture-host-secret-canary-do-not-emit
+        run: |
+          python3 bench/compare/build_fixture.py \
+            --pin bench/compare/pins/fixture-public-n7.json \
+            --good bench/compare/fixtures/five-arm-good.json \
+            --bad bench/compare/fixtures/five-arm-bad.json \
+            --check
+          python3 bench/compare/run.py \
+            --cases bench/compare/pins/fixture-public-n7.json \
+            --arms corpus,native,code-search,code-graph,composed \
+            --replicates 1 \
+            --top-k 10 \
+            --max-tool-calls 20 \
+            --evidence-token-budget 64000 \
+            --context-token-budget 128000 \
+            --wall-timeout 600 \
+            --run-dir "$RUNNER_TEMP/compare-good" \
+            --mode fixture \
+            --fixture-results bench/compare/fixtures/five-arm-good.json
+          python3 bench/compare/score.py \
+            --run-dir "$RUNNER_TEMP/compare-good" \
+            --intent-to-treat \
+            --bootstrap 10000 \
+            --seed 42 \
+            --holm-primary composed-corpus,composed-native \
+            --thresholds bench/compare/thresholds.json
+          python3 bench/compare/run.py \
+            --cases bench/compare/pins/fixture-public-n7.json \
+            --arms corpus,native,code-search,code-graph,composed \
+            --replicates 1 \
+            --top-k 10 \
+            --max-tool-calls 20 \
+            --evidence-token-budget 64000 \
+            --context-token-budget 128000 \
+            --wall-timeout 600 \
+            --run-dir "$RUNNER_TEMP/compare-bad" \
+            --mode fixture \
+            --fixture-results bench/compare/fixtures/five-arm-bad.json
+          if python3 bench/compare/score.py \
+            --run-dir "$RUNNER_TEMP/compare-bad" \
+            --intent-to-treat \
+            --bootstrap 10000 \
+            --seed 42 \
+            --holm-primary composed-corpus,composed-native \
+            --thresholds bench/compare/thresholds.json; then
+            echo "::error::intentionally bad five-arm fixture passed"
+            exit 1
+          fi
+
       - name: Shellcheck install.sh
         run: shellcheck install.sh
 
