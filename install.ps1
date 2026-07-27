@@ -8,13 +8,18 @@ $ErrorActionPreference = "Stop"
 $PluginDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BinDir = Join-Path $PluginDir "bin"
 $VenvDir = Join-Path $PluginDir ".venv"
-
-# GitHub org that hosts code-search and code-graph.
-$Org = "redacted-org"
-
-# Pin code-search to a known-good commit for reproducible, immutable installs.
-# Bump this ref to upgrade (prefer a tagged release once code-search cuts them).
-$CodeSearchRef = "69721e0df21540d35cb91ea07d7f4fc8d1535cd2"
+$BomPath = Join-Path $PluginDir "component-bom.json"
+if (-not (Test-Path $BomPath)) {
+    Write-Host "Error: tested component BOM not found: $BomPath" -ForegroundColor Red
+    exit 1
+}
+$Bom = Get-Content -Raw -Path $BomPath | ConvertFrom-Json
+$CodeSearchRepository = $Bom.components.'code-search'.install.repository
+$CodeSearchRef = $Bom.components.'code-search'.install.revision
+$GraphRepository = $Bom.components.'code-graph'.install.repository
+$ReleaseTag = $Bom.components.'code-graph'.install.tag
+$ReadinessStatus = $Bom.integrated_readiness.status
+$ReadinessReason = $Bom.integrated_readiness.reason
 
 Write-Host "=== Codebase Search Plugin Installer ===" -ForegroundColor Cyan
 Write-Host ""
@@ -23,6 +28,18 @@ Write-Host ""
 $Arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "386" }
 $Platform = "windows"
 $GraphBinary = "codebase-memory-mcp.exe"
+$AssetKey = "$Platform-$Arch"
+$AssetProperty = $Bom.components.'code-graph'.install.assets.PSObject.Properties[$AssetKey]
+if (-not $AssetProperty) {
+    Write-Host "Error: BOM release asset is missing for $AssetKey." -ForegroundColor Red
+    exit 1
+}
+$AssetName = $AssetProperty.Value.name
+$ExpectedSha256 = $AssetProperty.Value.sha256
+if (-not $AssetName -or $ExpectedSha256 -notmatch '^[0-9a-fA-F]{64}$') {
+    Write-Host "Error: BOM asset name or SHA-256 is missing or invalid for $AssetKey." -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "Platform: $Platform-$Arch"
 Write-Host ""
@@ -30,7 +47,7 @@ Write-Host ""
 # ------------------------------------------------------------------
 # 1. Install code-search (Python, pip from GitHub)
 # ------------------------------------------------------------------
-Write-Host "[1/3] Installing code-search (semantic search)..." -ForegroundColor Yellow
+Write-Host "[1/4] Installing code-search (semantic search)..." -ForegroundColor Yellow
 
 # Find Python 3.12+
 $Python = $null
@@ -60,13 +77,28 @@ if (-not (Test-Path $VenvDir)) {
 }
 
 $VenvPip = Join-Path $VenvDir "Scripts\pip.exe"
+$VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 if (-not (Test-Path $VenvPip)) {
     Write-Host "Error: pip not found in venv at $VenvPip" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "  Installing redacted-code-search from GitHub..."
-& $VenvPip install --quiet "redacted-code-search @ git+https://github.com/$Org/code-search.git@$CodeSearchRef"
+$CodeSearchRequirement = "redacted-code-search @ git+{0}@{1}" -f $CodeSearchRepository, $CodeSearchRef
+& $VenvPip install --quiet $CodeSearchRequirement
+if ($LASTEXITCODE -ne 0) {
+    $PipExitCode = $LASTEXITCODE
+    Write-Host "Error: code-search pip install failed with status $PipExitCode." -ForegroundColor Red
+    exit $PipExitCode
+}
+& $VenvPython (Join-Path $PluginDir "scripts\verify_code_search_revision.py") `
+    $CodeSearchRef `
+    --repository $CodeSearchRepository
+if ($LASTEXITCODE -ne 0) {
+    $RevisionExitCode = $LASTEXITCODE
+    Write-Host "Error: installed code-search revision verification failed." -ForegroundColor Red
+    exit $RevisionExitCode
+}
 
 Write-Host "  code-search installed."
 Write-Host ""
@@ -74,75 +106,59 @@ Write-Host ""
 # ------------------------------------------------------------------
 # 2. Install code-graph (Go binary from GitHub releases)
 # ------------------------------------------------------------------
-Write-Host "[2/3] Installing code-graph (structural analysis)..." -ForegroundColor Yellow
+Write-Host "[2/4] Installing code-graph (structural analysis)..." -ForegroundColor Yellow
 
 if (-not (Test-Path $BinDir)) {
     New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
 }
 
-# Resolve the release tag. Prefer the gh CLI, then the GitHub API, then a
-# pinned fallback so the installer still works without gh installed.
-$ReleaseTag = $null
-try {
-    if (Get-Command gh -ErrorAction SilentlyContinue) {
-        $tag = gh release list --repo "$Org/code-graph" --limit 1 --json tagName --jq '.[0].tagName' 2>$null
-        if ($tag) { $ReleaseTag = $tag.Trim() }
-    }
-} catch {}
-if (-not $ReleaseTag) {
-    try {
-        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Org/code-graph/releases" -UseBasicParsing -TimeoutSec 10
-        if ($releases -and $releases.Count -gt 0) { $ReleaseTag = $releases[0].tag_name }
-    } catch {}
-}
-if (-not $ReleaseTag) {
-    $ReleaseTag = "v0.5.0-redacted.4"
-    Write-Host "  Could not query latest release; using pinned fallback: $ReleaseTag"
-} else {
-    Write-Host "  Latest release: $ReleaseTag"
-}
+Write-Host "  Tested release: $ReleaseTag"
 
-$AssetName = "codebase-memory-mcp-${Platform}-${Arch}.zip"
-$DownloadUrl = "https://github.com/$Org/code-graph/releases/download/${ReleaseTag}/${AssetName}"
+$DownloadUrl = "https://github.com/${GraphRepository}/releases/download/${ReleaseTag}/${AssetName}"
 $ZipPath = Join-Path $BinDir $AssetName
 
 Write-Host "  Downloading code-graph $ReleaseTag for $Platform-$Arch..."
 try {
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
+    if ((Get-Command gh -ErrorAction SilentlyContinue) -and $env:GH_TOKEN) {
+        Write-Host "  Using authenticated GitHub CLI download."
+        & gh release download $ReleaseTag `
+            --repo $GraphRepository `
+            --pattern $AssetName `
+            --dir $BinDir `
+            --clobber
+        if ($LASTEXITCODE -ne 0) {
+            throw "gh release download exited with status $LASTEXITCODE"
+        }
+    } else {
+        Write-Host "  Using public release URL fallback (GH_TOKEN and gh are required for private assets)."
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
+    }
 } catch {
     Write-Host "Error: failed to download code-graph binary." -ForegroundColor Red
     Write-Host "  URL: $DownloadUrl"
-    Write-Host "  Check that release '$ReleaseTag' exists and ships an asset for $Platform-$Arch."
-    Write-Host "  Releases: https://github.com/$Org/code-graph/releases"
+    Write-Host "  For private releases, install gh and set GH_TOKEN with repository read access."
     exit 1
 }
 
-# Verify the archive against the release's published checksums (supply-chain).
+# Verify the archive against the SHA-256 pinned in the tested BOM.
 Write-Host "  Verifying checksum..."
-$ChecksumsUrl = "https://github.com/$Org/code-graph/releases/download/${ReleaseTag}/checksums.txt"
 try {
-    $checksums = (Invoke-WebRequest -Uri $ChecksumsUrl -UseBasicParsing -TimeoutSec 10).Content
-    $expected = $null
-    foreach ($line in ($checksums -split "`n")) {
-        $cols = ($line -replace '\*', '').Trim() -split '\s+'
-        if ($cols.Count -ge 2 -and $cols[1] -eq $AssetName) { $expected = $cols[0].ToLower() }
+    if (-not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) {
+        throw "downloaded archive is missing"
     }
-    if ($expected) {
-        $actual = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLower()
-        if ($actual -ne $expected) {
-            Write-Host "Error: checksum mismatch for $AssetName" -ForegroundColor Red
-            Write-Host "  expected: $expected"
-            Write-Host "  actual:   $actual"
-            Remove-Item $ZipPath -ErrorAction SilentlyContinue
-            exit 1
-        }
-        Write-Host "  Checksum OK."
-    } else {
-        Write-Host "  Warning: $AssetName not found in checksums.txt; skipping verification."
-    }
+    $ActualSha256 = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 } catch {
-    Write-Host "  Warning: could not fetch/parse checksums.txt; skipping verification."
+    Write-Host "Error: SHA-256 verification failed for $AssetName`: $_" -ForegroundColor Red
+    exit 1
 }
+if ($ActualSha256 -ne $ExpectedSha256.ToLowerInvariant()) {
+    Write-Host "Error: checksum mismatch for $AssetName" -ForegroundColor Red
+    Write-Host "  expected: $($ExpectedSha256.ToLowerInvariant())"
+    Write-Host "  actual:   $ActualSha256"
+    Remove-Item $ZipPath -ErrorAction SilentlyContinue
+    exit 1
+}
+Write-Host "  Checksum OK."
 
 Expand-Archive -Path $ZipPath -DestinationPath $BinDir -Force
 Remove-Item $ZipPath
@@ -153,7 +169,7 @@ Write-Host ""
 # ------------------------------------------------------------------
 # 3. Create launcher scripts
 # ------------------------------------------------------------------
-Write-Host "[3/3] Creating launcher scripts..." -ForegroundColor Yellow
+Write-Host "[3/4] Creating launcher scripts..." -ForegroundColor Yellow
 
 # code-search launcher (.cmd) — .mcp.json references bin/run-code-search;
 # Windows resolves that base name to run-code-search.cmd via PATHEXT.
@@ -204,28 +220,40 @@ Write-Host "  Launchers created."
 Write-Host ""
 
 # ------------------------------------------------------------------
+# 4. Verify the installed MCP contracts
+# ------------------------------------------------------------------
+Write-Host "[4/4] Validating installed MCP tool contracts..." -ForegroundColor Yellow
+$CodeSearchMcp = Join-Path $VenvDir "Scripts\code-search-mcp.exe"
+$GraphMcp = Join-Path $BinDir $GraphBinary
+& $VenvPython (Join-Path $PluginDir "scripts\validate_installed.py") `
+    --server "code-search=$CodeSearchMcp" `
+    --server "code-graph=$GraphMcp"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: installed MCP contract validation failed." -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+Write-Host ""
+
+# ------------------------------------------------------------------
 # Done
 # ------------------------------------------------------------------
-Write-Host "=== Installation Complete ===" -ForegroundColor Green
+Write-Host "=== Component Installation Complete ===" -ForegroundColor Green
 Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  1. Choose your embedding provider:"
-Write-Host ""
-Write-Host "     Local (free, no data leaves your machine):"
-Write-Host '       $env:EMBEDDING_PROVIDER = "jina"'
-Write-Host ""
-Write-Host "     Cloud (best quality, sends code to Voyage AI):"
-Write-Host '       $env:EMBEDDING_PROVIDER = "voyage-context"'
-Write-Host '       $env:VOYAGE_API_KEY = "pa-..."'
-Write-Host ""
-Write-Host "  2. Install the plugin in Claude Code:"
-Write-Host "       /install-plugin $PluginDir"
-Write-Host ""
-Write-Host "  3. Index a repo:"
-Write-Host "       /index-repo C:\path\to\your\repo"
-Write-Host ""
-Write-Host "  4. Ask questions:"
-Write-Host '       "How does authentication work?"'
-Write-Host '       "What calls processOrder?"'
-Write-Host '       "Find dead code"'
+switch ($ReadinessStatus) {
+    "blocked" {
+        Write-Host "=== INTEGRATED READINESS: BLOCKED ===" -ForegroundColor Yellow
+        Write-Host $ReadinessReason
+        Write-Host ""
+        Write-Host "The component schemas validated, but do not run /index-repo with this BOM."
+        Write-Host "Wait for a BOM whose tested capabilities and readiness evidence pass validation."
+    }
+    "ready" {
+        Write-Host "=== INTEGRATED READINESS: READY ===" -ForegroundColor Green
+        Write-Host "Install the plugin in Claude Code and follow the verified README workflow:"
+        Write-Host "  /install-plugin $PluginDir"
+    }
+    default {
+        Write-Host "Error: unknown integrated readiness status: $ReadinessStatus" -ForegroundColor Red
+        exit 1
+    }
+}

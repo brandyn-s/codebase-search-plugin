@@ -1,0 +1,38 @@
+"""Acceptance tests for the literal /code-explore preflight contract."""
+
+from pathlib import Path
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SKILL = ROOT / "skills" / "code-explore" / "SKILL.md"
+
+
+class CodeExploreSkillContractTests(unittest.TestCase):
+    def test_identity_mismatch_blocks_cross_engine_routing_and_chaining(self):
+        text = SKILL.read_text(encoding="utf-8")
+        preflight = text.split("## Pre-flight Check", 1)[1].split(
+            "## Routing Decision Tree", 1
+        )[0]
+
+        self.assertIn("mcp__code-search__get_index_status", preflight)
+        self.assertIn("mcp__code-graph__index_status", preflight)
+        for field in (
+            "schema_version",
+            "repository_id",
+            "checkout_id",
+            "source_revision",
+            "dirty_fingerprint",
+            "index_generation",
+        ):
+            self.assertIn(field, preflight)
+
+        self.assertIn("Compare every field exactly", preflight)
+        self.assertIn("block mixed or chained retrieval", preflight)
+        self.assertIn("Report the exact missing, stale, or mismatched fields", preflight)
+        self.assertIn("not cross-engine coherent", preflight)
+        self.assertIn("Do not combine evidence", preflight)
+
+
+if __name__ == "__main__":
+    unittest.main()

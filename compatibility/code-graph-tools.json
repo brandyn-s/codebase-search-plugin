@@ -1,0 +1,416 @@
+{
+  "component": "code-graph",
+  "fingerprint": {
+    "algorithm": "sha256",
+    "canonicalization": "UTF-8 JSON with sorted keys and separators comma/colon",
+    "document": "inputSchema"
+  },
+  "schema_version": 1,
+  "source": {
+    "kind": "github-release",
+    "version": "v0.6.0-redacted.1"
+  },
+  "tested_capabilities": {
+    "inputs": {
+      "index_repository.skip_report": false
+    },
+    "outputs": {
+      "index_identity": {
+        "supported": false,
+        "schema_version": null,
+        "fields": []
+      },
+      "graph_status_ready": true
+    },
+    "side_effects": {
+      "index_repository.writes_architecture_report": false
+    }
+  },
+  "tools": {
+    "detect_changes": {
+      "input_schema": {
+        "properties": {
+          "base_branch": {
+            "description": "Base branch for scope=branch comparison (default: main)",
+            "type": "string"
+          },
+          "depth": {
+            "description": "Maximum BFS depth for impact tracing (1-5, default 3)",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project to analyze. Defaults to session project.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "Which changes to analyze: 'unstaged' (working tree), 'staged' (git add), 'all' (HEAD, default), 'branch' (compare with base_branch)",
+            "enum": [
+              "unstaged",
+              "staged",
+              "all",
+              "branch"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "277f85ca264d934a85e0ebef8242e80d7f4f88917207ecee51ae3d8ce0b78ea8"
+    },
+    "get_architecture": {
+      "input_schema": {
+        "properties": {
+          "aspects": {
+            "description": "Which architecture aspects to return. Default: ['all']. Use specific aspects to reduce output: ['languages', 'packages'] for quick orientation, ['hotspots', 'boundaries'] for dependency analysis, ['clusters'] for community detection across CALLS/HTTP/ASYNC edges.",
+            "items": {
+              "enum": [
+                "all",
+                "languages",
+                "packages",
+                "entry_points",
+                "routes",
+                "hotspots",
+                "boundaries",
+                "services",
+                "layers",
+                "clusters",
+                "file_tree",
+                "adr"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "project": {
+            "description": "Project to analyze. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "7c78e9457d00ea7e19418afb2c435a8a25272cfcd5b9624a4c51bf9735a89acc"
+    },
+    "get_code_snippet": {
+      "input_schema": {
+        "properties": {
+          "auto_resolve": {
+            "description": "When true and <=2 ambiguous candidates exist, auto-pick the best match (highest degree, prefer non-test). Default: false.",
+            "type": "boolean"
+          },
+          "include_neighbors": {
+            "description": "When true, include caller_names and callee_names arrays (up to 10 each) alongside the counts. Default: false.",
+            "type": "boolean"
+          },
+          "project": {
+            "description": "Project to search in. Defaults to session project.",
+            "type": "string"
+          },
+          "qualified_name": {
+            "description": "Name or qualified name of the function/class (single mode). Exact QN for precision, short name for discovery.",
+            "type": "string"
+          },
+          "qualified_names": {
+            "description": "Array of names to resolve in batch (max 10). Each entry is resolved independently. Use after search_graph or trace_call_path to read multiple functions in one call.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "94e4a3bc1b7dda4ab6dd1498257e3ce30eaf89e7f7c045aaff9f907da6e75358"
+    },
+    "index_repository": {
+      "input_schema": {
+        "properties": {
+          "force": {
+            "description": "Force full re-index, ignoring cached file hashes. Use after deploying new enrichment features to ensure all post-flush passes run. Default: false.",
+            "type": "boolean"
+          },
+          "mode": {
+            "description": "Indexing mode. 'full' (default): parse all supported files. 'fast': aggressive filtering — skips generated code, test fixtures, docs, large files (>512KB), and non-source assets for faster indexing of large repos.",
+            "enum": [
+              "full",
+              "fast"
+            ],
+            "type": "string"
+          },
+          "repo_path": {
+            "description": "Absolute path to the repository to index. If omitted, uses the auto-detected session project root.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "04037c31e9fcc049669224f490255f8f1e5fdf4f09db0c2afe457e722ea6b8aa"
+    },
+    "index_status": {
+      "input_schema": {
+        "properties": {
+          "project": {
+            "description": "Project name to check. Defaults to the auto-detected session project.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "9fe966a72f1ecbba0b5b5aebe1c95271e1b5302f917e267b12d1719d36961f5b"
+    },
+    "list_projects": {
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "input_schema_sha256": "efddc7bd8bbcef73a14eb1ace1ffdaec81e518ef1e13c1e9271d0b8acb694a49"
+    },
+    "query_graph": {
+      "input_schema": {
+        "properties": {
+          "max_rows": {
+            "description": "Maximum result rows (default 200, max 10000). Overrides the internal row cap. Use higher values for COUNT/aggregation queries on large codebases.",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project to query. Defaults to session project.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Cypher query, e.g. MATCH (f:Function)-[:CALLS]->(g:Function) WHERE f.name = 'main' RETURN g.name, g.qualified_name LIMIT 20",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "c67d2ebc93e8f90e684180ba173c76bda25e8acb4b3353df98cedb788fc06711"
+    },
+    "query_security_surfaces": {
+      "input_schema": {
+        "properties": {
+          "depth": {
+            "description": "Max BFS depth for tainted_paths mode (1-6, default 4)",
+            "type": "integer"
+          },
+          "exclude_tests": {
+            "description": "Exclude test files and test functions from sources and sinks (default true). Set false to include test code in taint analysis.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Max results per role (default 20) or max paths for tainted_paths (default 50)",
+            "type": "integer"
+          },
+          "mode": {
+            "description": "Query mode. 'surfaces' (default): list security-tagged nodes. 'tainted_paths': find call paths from input_entry_point to sensitive_sink nodes using BFS.",
+            "enum": [
+              "surfaces",
+              "tainted_paths"
+            ],
+            "type": "string"
+          },
+          "project": {
+            "description": "Project to query. Defaults to session project.",
+            "type": "string"
+          },
+          "role": {
+            "description": "Filter by security role. Omit for all roles. Ignored when mode='tainted_paths'.",
+            "enum": [
+              "auth_boundary",
+              "input_entry_point",
+              "sensitive_sink",
+              "crypto_operation",
+              "privilege_escalation",
+              "session_management",
+              "audit_logging",
+              "sanitizer"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "445714eb4499a875ee99437d53cdd2ca7f2a177155dc9e8cadb95157ab178f6e"
+    },
+    "query_stig_evidence": {
+      "input_schema": {
+        "properties": {
+          "control_id": {
+            "description": "STIG or NIST control ID (e.g. 'AC-3', 'SI-10', 'SC-13'). Case-insensitive. Supports prefix matching: 'AC-3' matches 'AC-3(4)'.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Max results per security role (default 20)",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project to query. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "control_id"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "f3e72e40730b88a4793bc06c5262f22181b22861960236078cded1a31a37ca98"
+    },
+    "search_graph": {
+      "input_schema": {
+        "properties": {
+          "case_sensitive": {
+            "description": "Match patterns case-sensitively. Default: false (case-insensitive). Set true for exact case matching.",
+            "type": "boolean"
+          },
+          "direction": {
+            "description": "Edge direction for degree filters: 'inbound', 'outbound', or 'any'",
+            "enum": [
+              "inbound",
+              "outbound",
+              "any"
+            ],
+            "type": "string"
+          },
+          "exclude_entry_points": {
+            "description": "Exclude entry points (route handlers, main(), framework-registered functions) from results. Use with max_degree=0 for accurate dead code detection.",
+            "type": "boolean"
+          },
+          "exclude_labels": {
+            "description": "Labels to exclude from results. Community nodes are excluded by default — pass [] to include them.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "file_pattern": {
+            "description": "Glob pattern for file path within the project. Use to filter by directory ('**/services/**'), file extension ('*.py', '*.yaml'), or filename ('**/Makefile'). Essential for shared-repo projects where multiple languages coexist — e.g., use '*.html' to find only HTML files in a JavaScript project.",
+            "type": "string"
+          },
+          "include_connected": {
+            "description": "Include connected node names in results (default: false). Expensive — only enable when you need to see neighbor names.",
+            "type": "boolean"
+          },
+          "include_source": {
+            "description": "Inline source code for functions/classes under 50 lines. Eliminates follow-up get_code_snippet calls. Default: false. Also includes node properties (signature, return_type, decorators) in results.",
+            "type": "boolean"
+          },
+          "label": {
+            "description": "Node label filter: Function, Class, Module, Method, Interface, Enum, Type, File, Package, Folder, Route",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Max results per page (default: 10). Use small limits and paginate with offset — response includes has_more flag.",
+            "type": "integer"
+          },
+          "max_degree": {
+            "description": "Maximum edge count (e.g. 0 for dead code detection)",
+            "type": "integer"
+          },
+          "min_degree": {
+            "description": "Minimum edge count (e.g. 10 for high fan-out functions)",
+            "type": "integer"
+          },
+          "name_pattern": {
+            "description": "Regex pattern matched against the short node name. Case-insensitive by default. Supports full Go regex: '.*Handler$' (suffix), 'get|set|delete' (alternatives — no backslash before pipe), '^on[A-Z]' (prefix+char class). Best practice: include word variations in alternatives — 'auth|authenticate|authorization' (word forms), 'handler|hdlr|ctrl' (abbreviations), 'create|new|init' (synonyms). One regex with | replaces multiple separate searches.",
+            "type": "string"
+          },
+          "offset": {
+            "description": "Skip N results for pagination (default: 0). Check has_more in response to know if more pages exist.",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project to search in. Defaults to session project.",
+            "type": "string"
+          },
+          "qn_pattern": {
+            "description": "Regex pattern matched against the qualified name (full module path). Case-insensitive by default. Use to scope searches to directories/modules: '.*services\\.order\\..*' (order service), '.*tests\\..*' (test files only), '.*controller.*\\.handle.*' (handler methods in controllers). Combine with name_pattern for precise cross-cutting queries.",
+            "type": "string"
+          },
+          "relationship": {
+            "description": "Filter by relationship type: CALLS, HTTP_CALLS, ASYNC_CALLS, IMPORTS, DEFINES, DEFINES_METHOD, HANDLES, CONTAINS_FILE, CONTAINS_FOLDER, CONTAINS_PACKAGE, IMPLEMENTS",
+            "type": "string"
+          },
+          "sort_by": {
+            "description": "Sort order. Default: relevance (exact match first, prefix match second, then by connectivity)",
+            "enum": [
+              "relevance",
+              "name",
+              "degree"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "9fa31fd09b3d9b4b57fda64a72c5f267e7e1f2c190af73c1e0fb10571a84e8b1"
+    },
+    "trace_call_path": {
+      "input_schema": {
+        "properties": {
+          "depth": {
+            "description": "Maximum BFS depth (1-5, default 3)",
+            "type": "integer"
+          },
+          "direction": {
+            "description": "Traversal direction: 'outbound' (what it calls), 'inbound' (what calls it), or 'both'",
+            "enum": [
+              "outbound",
+              "inbound",
+              "both"
+            ],
+            "type": "string"
+          },
+          "function_name": {
+            "description": "Name of the function to trace (e.g. 'ProcessOrder')",
+            "type": "string"
+          },
+          "include_source": {
+            "description": "Inline source code for the root node and hop nodes under 50 lines. Makes trace results self-contained without follow-up get_code_snippet calls. Default: false.",
+            "type": "boolean"
+          },
+          "min_confidence": {
+            "description": "Minimum confidence threshold (0.0-1.0) for CALLS edges. Filters out low-confidence fuzzy matches. Bands: high (>=0.7), medium (>=0.45), speculative (<0.45). Default 0 (no filter).",
+            "type": "number"
+          },
+          "project": {
+            "description": "Project to trace in. Defaults to session project.",
+            "type": "string"
+          },
+          "risk_labels": {
+            "description": "Add risk classification (CRITICAL/HIGH/MEDIUM/LOW) based on hop depth. Hop 1=CRITICAL, 2=HIGH, 3=MEDIUM, 4+=LOW. Includes impact_summary with counts. Default false.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "function_name"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "2eea1e67e9ec51f8685ebb9ee798e5df9f0ccd5b2f0abf1152628eb2c9bb0734"
+    },
+    "trace_data_flow": {
+      "input_schema": {
+        "properties": {
+          "depth": {
+            "description": "Maximum BFS depth (1-5, default 3). Higher depths find more transitive flows but may include noise.",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project to trace in. Defaults to session project.",
+            "type": "string"
+          },
+          "source": {
+            "description": "Function name to trace data flow from (e.g. 'handleRequest', 'parse_input'). Exact name or qualified name.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "14ca0e5ba61efb54e768a82462ad7d28fbf649c169a24a349331a11e6eaf3a37"
+    }
+  }
+}

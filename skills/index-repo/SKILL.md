@@ -20,27 +20,168 @@ If no path is provided, ask the user which repo to index.
 
 ## Steps
 
-1. Resolve the repo path. Accept absolute paths or short names. Verify the path exists and is a git repo (has `.git/` directory).
+1. Resolve the candidate path to Git's canonical worktree root:
+   ```
+   git -C <candidate-path> rev-parse --show-toplevel
+   ```
+   The command must succeed and return one existing directory. Trim only the
+   trailing newline and record its exact output as `<resolved-root>`; record
+   the basename as `<resolved-project-name>`. This is the resolved repository
+   root used by every later call and comparison. Do not infer repository
+   membership from the presence of a `.git` directory: linked worktrees and
+   subdirectories must resolve through Git.
 
-2. Run **code-search** indexing:
-   ```
-   mcp__code-search__index_directory(directory_path=<path>)
-   ```
-   Report: chunks indexed, files, time taken.
+2. **Before starting either index**, require `component-bom.json` to declare
+   integrated readiness `status: "ready"`, then inspect the installed live
+   host tool metadata for both components. A tested BOM snapshot alone is
+   insufficient.
 
-3. Run **code-graph** indexing:
+   - Compute each installed tool's exact canonical input-schema fingerprint
+     (SHA-256 of its `inputSchema` serialized as sorted, compact JSON) and
+     require it to equal that tool's `input_schema_sha256` in the BOM-linked
+     compatibility snapshot. A missing live schema or any fingerprint
+     mismatch is an **incompatible component** result.
+   - After that exact match, require the live code-graph `index_repository`
+     schema to expose a boolean `skip_report` property.
+   - Also require the live code-search `get_index_status` schema to expose an
+     optional string `project_path` property. It must not appear in the
+     schema's `required` array. This binds final semantic verification to the
+     canonical checkout without changing the active project first.
+   - The current BOM is blocked because both pinned components lack complete
+     attested v1 identity outputs, code-search lacks an attested semantic
+     `index_ready` output, and these two live schema gates are absent.
+   - The pinned current graph release does not write
+     `ARCHITECTURE_REPORT.md`, but it also lacks `skip_report`; a future
+     identity-capable build writes the report unless explicitly suppressed.
+   - If any gate fails, stop before either index starts. Do not start code-search
+     or code-graph. Do not allow a graph build to write
+     `ARCHITECTURE_REPORT.md`: that would change the checkout after semantic
+     indexing and invalidate the shared dirty fingerprint/generation.
+
+3. Start **code-search** indexing:
    ```
-   mcp__code-graph__index_repository(repo_path=<path>)
+   mcp__code-search__index_directory(directory_path=<resolved-root>)
+   ```
+   Accept only the pinned new-job response envelope:
+
+   - `status == "indexing"`
+   - a non-empty `job_id`, recorded as `<semantic-job-id>`
+   - `directory == <resolved-root>`
+   - `project_name == <resolved-project-name>`
+   - `index_ready == false`
+   - the exact message `Indexing started in background. Use
+     get_indexing_progress to check status.`
+
+   Do not adopt any pre-existing job, even when it appears to target the same
+   path or provider. A response containing `requested_directory`,
+   `indexing_conflict` (whether true or false), an "already indexing" or
+   "reusing" message, a missing new-job marker, or any unknown-origin job is
+   an incompatible start response. Stop without polling or starting
+   code-graph. Starting the background job is not success and does not make
+   the semantic index ready.
+
+4. Wait for **code-search** to reach an explicit terminal state. Poll:
+   ```
+   mcp__code-search__get_indexing_progress()
+   ```
+   Poll every 15-30 seconds for at most two hours (or an earlier
+   user-supplied deadline), and show a concise progress update at least every
+   five minutes.
+
+   Every polling response, including a terminal response, must preserve the
+   recorded binding before its status is interpreted:
+
+   | Response field | Required value |
+   | --- | --- |
+   | `job_id` | `job_id == <semantic-job-id>` |
+   | `directory` | `directory == <resolved-root>` |
+   | `project_name` | `project_name == <resolved-project-name>` |
+
+   A missing field or literal value difference is a **semantic job binding
+   mismatch**. Stop, show the expected and returned envelope, and do not start
+   code-graph or switch projects. Never adopt a replacement or unknown job.
+
+   - `status: "indexing"`: continue polling.
+   - `status == "completed"`: continue only when `result` is an object,
+     `result.success == true`, top-level `index_ready == true`,
+     `result.index_ready == true`, and `result.error is absent, null, or empty`.
+     Any top-level error must also be absent, null, or empty. Missing
+     success/readiness fields fail closed; do not infer success from
+     `status` alone.
+   - `status: "failed"` or `status: "cancelled"`: stop and report the
+     returned error/result.
+   - Any missing, malformed, `idle`, or otherwise unknown status: stop as an
+     incompatible response instead of guessing.
+   - Reaching the deadline is a timeout failure.
+
+   **Do not run code-graph indexing. Do not start code-graph** and do not call
+   `switch_project` unless the bound semantic job satisfied every
+   completed-result gate above.
+
+5. Run **code-graph** indexing without mutating the checkout:
+   ```
+   mcp__code-graph__index_repository(repo_path=<resolved-root>, skip_report=true)
    ```
    For Nix-based repos (presence of `flake.nix`, `Cargo.nix`), use `mode: "full"` — fast mode returns 0 results on Nix repos.
-   Report: nodes, edges, time taken.
+   Require that MCP `isError` is absent or false, the payload
+   error is absent, null, or empty, `status` is not `"degraded"`,
+   `identity_status == "captured"`, and `index_identity` is a complete v1
+   identity. Capture the
+   non-empty `project` field for the status call; this response contract does
+   not contain a `success` field or `project_name`. A graph error, degraded
+   identity, or missing project is a partial-index failure; report semantic
+   success and graph failure, but do not claim the repository is ready.
 
-4. **Set active project** for code-search so queries work immediately:
+6. Verify both engines independently after indexing:
    ```
-   mcp__code-search__switch_project(project_path=<path>)
+   mcp__code-search__get_index_status(project_path=<resolved-root>)
+   mcp__code-graph__index_status(project=<graph-project>)
    ```
+   The semantic response must satisfy every exact gate:
+   `index_ready == true`, `index_identity_status == "ready"`, and the
+   semantic error is absent, null, or empty. Missing fields fail closed; do
+   not infer readiness from chunks, files, provider state, or a nonempty
+   identity. The graph response must report `status == "ready"`,
+   `identity_status == "captured"`, and its error must be absent, null, or
+   empty. Both responses must contain an
+   `index_identity` object with `schema_version: 1` and these fields:
+   `repository_id`, `checkout_id`, `source_revision`, `dirty_fingerprint`,
+   `index_generation`, and `captured_at`.
 
-5. Summarize both indexes and confirm the repo is ready for search. Include which project is now active.
+   Compare every identity value exactly:
+
+   - `repository_id`, `source_revision`, `dirty_fingerprint`, and
+     `index_generation` must be equal across both engines.
+   - `checkout_id` must also match because both engines indexed the same
+     resolved local checkout.
+   - `captured_at` must be a valid UTC RFC3339 timestamp in each envelope but
+     need not match; the engines capture at different moments.
+   - Legacy or missing identity fields are incompatible and therefore
+     not-ready, never a successful verification.
+
+   The identity contract is deterministic: `repository_id` is SHA-256 of
+   `remote:` plus the normalized origin URL, falling back to `path:` plus the
+   resolved root; `checkout_id` is SHA-256 of `path:` plus the resolved root;
+   `source_revision` is git `HEAD` or `unborn`; `dirty_fingerprint` is
+   `clean` or a deterministic SHA-256 over status, diffs, and untracked
+   contents; and `index_generation` is SHA-256 of
+   `repository_id + NUL + source_revision + NUL + dirty_fingerprint`.
+
+   On status or identity mismatch, report both status/identity envelopes and
+   the exact differing fields. Do not switch projects or claim readiness.
+
+7. Only after both indexes and identities verify, **set the active project**
+   for code-search:
+   ```
+   mcp__code-search__switch_project(project_path=<resolved-root>)
+   ```
+   Require an explicit success response. A switch failure means indexing
+   succeeded but the repository is not ready for immediate queries.
+
+8. Summarize semantic chunks/files/time, graph nodes/edges/time, the shared
+   `index_generation`, and the active project. Confirm readiness only when
+   every prior gate succeeded. Otherwise use the phrase **partial index** and
+   state the failed gate and safe retry action.
 
 ## Notes
 
@@ -69,7 +210,10 @@ Runs incremental indexing on both tools. Only changed files are reprocessed.
 
 ## Success Criteria
 
-- Both code-search and code-graph indexes populated without errors
+- Installed code-graph schema supports `skip_report`, and graph indexing used `skip_report=true`
+- `get_indexing_progress` explicitly returned `completed` before graph indexing began
+- Both code-search and code-graph indexes verified without errors
+- Both engines reported the same complete `index_identity` envelope
 - Chunk count (code-search) and node/edge counts (code-graph) reported
 - Repo set as active project via `switch_project`
 - Repo is immediately searchable via code-explore queries

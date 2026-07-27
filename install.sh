@@ -2,24 +2,15 @@
 # Install script for codebase-search-plugin
 # Downloads and configures both MCP servers (code-search + code-graph)
 #
-# After running this script:
-#   1. Set EMBEDDING_PROVIDER (jina for local, voyage-context for cloud)
-#   2. If using Voyage: set VOYAGE_API_KEY
-#   3. Install the plugin: /install-plugin /path/to/codebase-search-plugin
-#   4. Index a repo: /index-repo /path/to/your/repo
+# This installs the exact BOM components and reports the BOM's integrated
+# readiness. A blocked BOM must not be presented as dual-index ready.
 
 set -e
 
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$PLUGIN_DIR/bin"
 VENV_DIR="$PLUGIN_DIR/.venv"
-
-# GitHub org that hosts code-search and code-graph.
-ORG="redacted-org"
-
-# Pin code-search to a known-good commit for reproducible, immutable installs.
-# Bump this ref to upgrade (prefer a tagged release once code-search cuts them).
-CODE_SEARCH_REF="69721e0df21540d35cb91ea07d7f4fc8d1535cd2"
+BOM_FILE="$PLUGIN_DIR/component-bom.json"
 
 echo "=== Codebase Search Plugin Installer ==="
 echo ""
@@ -46,7 +37,7 @@ echo ""
 # ------------------------------------------------------------------
 # 1. Install code-search (Python, pip from GitHub)
 # ------------------------------------------------------------------
-echo "[1/3] Installing code-search (semantic search)..."
+echo "[1/4] Installing code-search (semantic search)..."
 
 # Find Python 3.12+
 PYTHON=""
@@ -69,6 +60,43 @@ if [ -z "$PYTHON" ]; then
     exit 1
 fi
 
+if [ ! -f "$BOM_FILE" ]; then
+    echo "Error: tested component BOM not found: $BOM_FILE" >&2
+    exit 1
+fi
+
+# component-bom.json is the single source of truth for both installers.
+CODE_SEARCH_REPOSITORY=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["repository"])' \
+    "$BOM_FILE")
+CODE_SEARCH_REF=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["revision"])' \
+    "$BOM_FILE")
+GRAPH_REPOSITORY=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["repository"])' \
+    "$BOM_FILE")
+RELEASE_TAG=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["tag"])' \
+    "$BOM_FILE")
+ASSET_KEY="${PLATFORM}-${ARCH}"
+ASSET_NAME=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["assets"][sys.argv[2]]["name"])' \
+    "$BOM_FILE" "$ASSET_KEY")
+EXPECTED_SHA256=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["assets"][sys.argv[2]]["sha256"])' \
+    "$BOM_FILE" "$ASSET_KEY")
+READINESS_STATUS=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["integrated_readiness"]["status"])' \
+    "$BOM_FILE")
+READINESS_REASON=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["integrated_readiness"]["reason"])' \
+    "$BOM_FILE")
+
+if [[ ! "$EXPECTED_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
+    echo "Error: BOM SHA-256 is missing or invalid for $ASSET_KEY." >&2
+    exit 1
+fi
+
 if [ ! -d "$VENV_DIR" ]; then
     echo "  Creating virtual environment..."
     "$PYTHON" -m venv "$VENV_DIR"
@@ -88,7 +116,10 @@ fi
 
 echo "  Installing redacted-code-search from GitHub..."
 "$VENV_PIP" install --quiet \
-    "redacted-code-search @ git+https://github.com/$ORG/code-search.git@${CODE_SEARCH_REF}"
+    "redacted-code-search @ git+${CODE_SEARCH_REPOSITORY}@${CODE_SEARCH_REF}"
+"$VENV_PYTHON" "$PLUGIN_DIR/scripts/verify_code_search_revision.py" \
+    "$CODE_SEARCH_REF" \
+    --repository "$CODE_SEARCH_REPOSITORY"
 
 echo "  code-search installed."
 echo ""
@@ -96,72 +127,59 @@ echo ""
 # ------------------------------------------------------------------
 # 2. Install code-graph (Go binary from GitHub releases)
 # ------------------------------------------------------------------
-echo "[2/3] Installing code-graph (structural analysis)..."
+echo "[2/4] Installing code-graph (structural analysis)..."
 mkdir -p "$BIN_DIR"
 
-# Resolve the release tag. Prefer the gh CLI, then the GitHub API, then a
-# pinned fallback so the installer still works offline-ish / without gh.
-RELEASE_TAG=""
-if command -v gh &>/dev/null; then
-    RELEASE_TAG=$(gh release list --repo "$ORG/code-graph" --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
-fi
-if [ -z "$RELEASE_TAG" ]; then
-    RELEASE_TAG=$("$PYTHON" - "$ORG" 2>/dev/null <<'PY'
-import json, sys, urllib.request
-org = sys.argv[1]
-try:
-    with urllib.request.urlopen(f"https://api.github.com/repos/{org}/code-graph/releases", timeout=10) as r:
-        data = json.load(r)
-    if data:
-        print(data[0]["tag_name"])
-except Exception:
-    pass
-PY
-) || true
-fi
-if [ -z "$RELEASE_TAG" ]; then
-    RELEASE_TAG="v0.5.0-redacted.4"
-    echo "  Could not query latest release; using pinned fallback: $RELEASE_TAG"
-else
-    echo "  Latest release: $RELEASE_TAG"
-fi
+echo "  Tested release: $RELEASE_TAG"
 
-ASSET_NAME="codebase-memory-mcp-${PLATFORM}-${ARCH}.${EXT}"
-DOWNLOAD_URL="https://github.com/$ORG/code-graph/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
+DOWNLOAD_URL="https://github.com/${GRAPH_REPOSITORY}/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
 
 echo "  Downloading code-graph ${RELEASE_TAG} for ${PLATFORM}-${ARCH}..."
-if ! curl -fSL "$DOWNLOAD_URL" -o "$BIN_DIR/$ASSET_NAME"; then
+if command -v gh &>/dev/null && [ -n "${GH_TOKEN:-}" ]; then
+    echo "  Using authenticated GitHub CLI download."
+    if ! gh release download "$RELEASE_TAG" \
+        --repo "$GRAPH_REPOSITORY" \
+        --pattern "$ASSET_NAME" \
+        --dir "$BIN_DIR" \
+        --clobber; then
+        echo "Error: authenticated code-graph download failed." >&2
+        exit 1
+    fi
+else
+    echo "  Using public release URL fallback (GH_TOKEN and gh are required for private assets)."
+    if ! curl -fSL "$DOWNLOAD_URL" -o "$BIN_DIR/$ASSET_NAME"; then
+        echo "Error: public code-graph download failed." >&2
+        echo "  URL: $DOWNLOAD_URL" >&2
+        echo "  For private releases, install gh and export GH_TOKEN with repository read access." >&2
+        exit 1
+    fi
+fi
+
+if [ ! -f "$BIN_DIR/$ASSET_NAME" ]; then
     echo "Error: failed to download code-graph binary." >&2
-    echo "  URL: $DOWNLOAD_URL" >&2
-    echo "  Check that release '$RELEASE_TAG' exists and ships an asset for ${PLATFORM}-${ARCH}." >&2
-    echo "  Releases: https://github.com/$ORG/code-graph/releases" >&2
     exit 1
 fi
 
-# Verify the archive against the release's published checksums (supply-chain).
+# Verify the archive against the SHA-256 pinned in the tested BOM.
 echo "  Verifying checksum..."
-CHECKSUMS_URL="https://github.com/$ORG/code-graph/releases/download/${RELEASE_TAG}/checksums.txt"
-EXPECTED=$(curl -fsSL "$CHECKSUMS_URL" 2>/dev/null | awk -v f="$ASSET_NAME" '{n=$2; sub(/^\*/,"",n); if (n==f) print $1}')
-if [ -n "$EXPECTED" ]; then
-    if command -v sha256sum &>/dev/null; then
-        ACTUAL=$(sha256sum "$BIN_DIR/$ASSET_NAME" | awk '{print $1}')
-    elif command -v shasum &>/dev/null; then
-        ACTUAL=$(shasum -a 256 "$BIN_DIR/$ASSET_NAME" | awk '{print $1}')
-    else
-        ACTUAL=""
-        echo "  Warning: no sha256 tool found; skipping verification." >&2
-    fi
-    if [ -n "$ACTUAL" ] && [ "$ACTUAL" != "$EXPECTED" ]; then
-        echo "Error: checksum mismatch for $ASSET_NAME" >&2
-        echo "  expected: $EXPECTED" >&2
-        echo "  actual:   $ACTUAL" >&2
-        rm -f "$BIN_DIR/$ASSET_NAME"
-        exit 1
-    fi
-    [ -n "$ACTUAL" ] && echo "  Checksum OK."
+if command -v sha256sum &>/dev/null; then
+    ACTUAL_SHA256=$(sha256sum "$BIN_DIR/$ASSET_NAME" | awk '{print $1}')
+elif command -v shasum &>/dev/null; then
+    ACTUAL_SHA256=$(shasum -a 256 "$BIN_DIR/$ASSET_NAME" | awk '{print $1}')
 else
-    echo "  Warning: could not fetch/parse checksums.txt; skipping verification." >&2
+    echo "Error: no SHA-256 verification tool is available." >&2
+    exit 1
 fi
+ACTUAL_SHA256=$(printf '%s' "$ACTUAL_SHA256" | tr '[:upper:]' '[:lower:]')
+EXPECTED_SHA256=$(printf '%s' "$EXPECTED_SHA256" | tr '[:upper:]' '[:lower:]')
+if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
+    echo "Error: checksum mismatch for $ASSET_NAME" >&2
+    echo "  expected: $EXPECTED_SHA256" >&2
+    echo "  actual:   $ACTUAL_SHA256" >&2
+    rm -f "$BIN_DIR/$ASSET_NAME"
+    exit 1
+fi
+echo "  Checksum OK."
 
 if [ "$EXT" = "tar.gz" ]; then
     tar xzf "$BIN_DIR/$ASSET_NAME" -C "$BIN_DIR"
@@ -177,7 +195,7 @@ echo ""
 # ------------------------------------------------------------------
 # 3. Create launcher script (cross-platform wrapper)
 # ------------------------------------------------------------------
-echo "[3/3] Creating launcher scripts..."
+echo "[3/4] Creating launcher scripts..."
 
 # code-search launcher — invokes the venv's Python with the MCP server
 cat > "$BIN_DIR/run-code-search" << LAUNCHER
@@ -198,28 +216,34 @@ echo "  Launchers created."
 echo ""
 
 # ------------------------------------------------------------------
+# 4. Verify the installed MCP contracts
+# ------------------------------------------------------------------
+echo "[4/4] Validating installed MCP tool contracts..."
+"$VENV_PYTHON" "$PLUGIN_DIR/scripts/validate_installed.py" \
+    --server "code-search=$BIN_DIR/run-code-search" \
+    --server "code-graph=$BIN_DIR/$GRAPH_BINARY"
+echo ""
+
+# ------------------------------------------------------------------
 # Done
 # ------------------------------------------------------------------
-echo "=== Installation Complete ==="
+echo "=== Component Installation Complete ==="
 echo ""
-echo "Next steps:"
-echo ""
-echo "  1. Choose your embedding provider:"
-echo ""
-echo "     Local (free, no data leaves your machine):"
-echo "       export EMBEDDING_PROVIDER=jina"
-echo ""
-echo "     Cloud (best quality, sends code to Voyage AI):"
-echo "       export EMBEDDING_PROVIDER=voyage-context"
-echo "       export VOYAGE_API_KEY=pa-..."
-echo ""
-echo "  2. Install the plugin in Claude Code:"
-echo "       /install-plugin $PLUGIN_DIR"
-echo ""
-echo "  3. Index a repo:"
-echo "       /index-repo /path/to/your/repo"
-echo ""
-echo "  4. Ask questions:"
-echo "       \"How does authentication work?\""
-echo "       \"What calls processOrder?\""
-echo "       \"Find dead code\""
+case "$READINESS_STATUS" in
+    blocked)
+        echo "=== INTEGRATED READINESS: BLOCKED ==="
+        echo "$READINESS_REASON"
+        echo ""
+        echo "The component schemas validated, but do not run /index-repo with this BOM."
+        echo "Wait for a BOM whose tested capabilities and readiness evidence pass validation."
+        ;;
+    ready)
+        echo "=== INTEGRATED READINESS: READY ==="
+        echo "Install the plugin in Claude Code and follow the verified README workflow:"
+        echo "  /install-plugin $PLUGIN_DIR"
+        ;;
+    *)
+        echo "Error: unknown integrated readiness status: $READINESS_STATUS" >&2
+        exit 1
+        ;;
+esac

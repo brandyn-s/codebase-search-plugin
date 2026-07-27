@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "repository": "fixture://codebase-search-e2e-v1",
+  "revision": "71712683e0cd4b21d4146d1fbf9d92f4f1059a5811aa13b450d9a55d1d8dbebe",
+  "source_root": "target-repo",
+  "files": {
+    "src/api/orders.py": "4fd0b0acab1ae3f01d78a600518c92b5162469dcf470203356dcee8108544c89",
+    "src/api/search.py": "9f1bd0ca1dcebba2529ebe3abb38b805a8b0173639841d06ca6c4687e8ea4b0d",
+    "src/api/session.py": "a098e88215f007c6faa681174e70ea16c36a484198d2e27c98431766c7bd38a2",
+    "src/auth/audit.py": "94175e1cf7276252aeb8487066736c230822e810afa8a8aa1491a265981c61fa",
+    "src/auth/login.py": "5616128315050b24b6fe39945a17ce937d99fc636fb55bd695acf630de760343",
+    "src/auth/middleware.py": "cbdecbf74caa86196d772b585d62d826c7d1a0b57c5d8d33034689123ebc2ffa",
+    "src/auth/token.py": "6e3784803505456c8c52735154bcdeb83f0a24ac2c05a2e9a471f1ae9d937a2d",
+    "src/config.py": "061e317cad8bb6c669a095633584044f4bfb6bfa21602123d56ee025abc85cab",
+    "src/db/query.py": "5d9e583bb2fb336e038e106c586fdb93d8ac7ebf8e6a6b3813b151de9105a62e",
+    "src/orders/service.py": "f20ddcf0c251cebe00312580141acb28f71b6f3e927e1a5764772c46137d8d9d"
+  }
+}

@@ -1,6 +1,11 @@
 # Codebase Search Plugin
 
-Index a codebase, then ask natural language questions. The plugin routes between semantic search (code-search) and structural graph analysis (code-graph) automatically.
+**INTEGRATED READINESS: BLOCKED**
+
+The exact components in the current BOM install and pass input-schema
+validation, but they cannot yet prove a coherent dual index. `/index-repo`
+therefore stops before either engine starts. Do not treat this revision as
+ready for integrated indexing or search.
 
 ## Quick Start
 
@@ -22,23 +27,26 @@ export VOYAGE_API_KEY="your-key"
 # 4. Install the plugin in Claude Code
 /install-plugin /path/to/codebase-search-plugin
 
-# 5. Index your repo
-/index-repo /path/to/your/repo
-
-# 6. Ask questions naturally
-# "How does authentication work?"
-# "What calls processOrder?"
-# "Find dead code"
+# Integrated indexing is BLOCKED for this BOM. Do not run /index-repo yet.
 ```
 
 The install script:
 - Creates a Python venv inside the plugin directory and pip-installs code-search from GitHub
 - Downloads the pre-built code-graph binary for your platform from GitHub releases
+- Reads exact tested versions from `component-bom.json` instead of selecting a moving latest release
+- Starts both installed stdio MCPs and rejects missing or schema-drifted tools before reporting success
 - No manual cloning, building, or path configuration needed
+
+> **Current compatibility block:** both pinned snapshots lack attested,
+> complete v1 `index_identity` outputs, and code-search lacks an attested
+> semantic `index_ready` output. The pinned graph release does not write an
+> architecture report, but the future identity-capable source does; it must
+> expose `skip_report` before promotion. See `compatibility/README.md`.
 
 ## How It Works
 
-This plugin combines two different search technologies. Each solves a different problem.
+The intended ready-state design combines two different search technologies.
+The current BOM remains blocked as described above.
 
 ### Semantic Search (code-search)
 
@@ -79,7 +87,7 @@ You don't need to know which tool to use — the plugin decides based on your qu
 
 | Skill | Purpose |
 |-------|---------|
-| **`/index-repo`** | Index a repository for both semantic embeddings and structural graph analysis |
+| **`/index-repo`** | Fail closed for the current blocked BOM; future ready BOMs index both engines |
 | **`/code-explore`** | Ask natural language questions — auto-routes to the right search tool |
 
 ## Offline vs Online Embedding Models
@@ -121,12 +129,12 @@ export EMBEDDING_PROVIDER="voyage-context"
 export VOYAGE_API_KEY="pa-..."
 ```
 
-**Important:** Switching providers requires re-indexing your repos. Each provider produces different-dimensional vectors (Voyage: 1024, Jina: 896) that are incompatible. Just run `/index-repo` again after switching.
+**Important:** On a future readiness-approved BOM, switching providers requires
+re-indexing because each provider produces incompatible vector dimensions.
 
 ## Prerequisites
 
 - **Python 3.12+** (for code-search)
-- **`gh` CLI** (optional — install scripts use it to find the latest code-graph release, falling back to the GitHub API)
 - **Linux/Mac**: `curl` and `tar` (for downloading code-graph binary)
 - **Windows**: PowerShell 5.1+ (built-in) — use `install.ps1` instead of `install.sh`
 
@@ -137,14 +145,64 @@ The `install.sh` script handles everything else — no need to manually clone or
 If you prefer not to use the install script:
 
 ```bash
-# code-search: install from GitHub
-pip install "redacted-code-search @ git+https://github.com/redacted-org/code-search.git"
+# Read the tested repository and full commit from the BOM.
+CODE_SEARCH_REPOSITORY="$(python3 -c \
+  'import json; print(json.load(open("component-bom.json"))["components"]["code-search"]["install"]["repository"])')"
+CODE_SEARCH_REF="$(python3 -c \
+  'import json; print(json.load(open("component-bom.json"))["components"]["code-search"]["install"]["revision"])')"
 
-# code-graph: download binary from releases
-# https://github.com/redacted-org/code-graph/releases
+# Install that exact commit and verify pip's PEP 610 provenance.
+python3 -m venv .venv-code-search
+.venv-code-search/bin/python -m pip install \
+  "redacted-code-search @ git+${CODE_SEARCH_REPOSITORY}@${CODE_SEARCH_REF}"
+.venv-code-search/bin/python scripts/verify_code_search_revision.py \
+  "${CODE_SEARCH_REF}" \
+  --repository "${CODE_SEARCH_REPOSITORY}"
 ```
 
-Then configure the MCP server paths manually in `.mcp.json`.
+For code-graph, download only the tag and platform asset declared in
+`component-bom.json`, then verify the archive against that asset's BOM
+`sha256` before extracting it. Configure the two verified MCP server paths
+manually in `.mcp.json`.
+
+Manual installs must match `component-bom.json`. Run the same fail-closed
+contract check used by the installers before enabling the plugin:
+
+```bash
+python3 scripts/validate_installed.py \
+  --server code-search=/path/to/code-search-mcp \
+  --server code-graph=/path/to/codebase-memory-mcp
+```
+
+## Routing and Evidence Evaluation
+
+`bench/e2e/` contains a deterministic standard-library harness for recorded
+host-model traces. It scores routing accuracy, evidence precision/recall,
+unsupported claims, tool calls, latency, and stale/mismatched-index handling.
+The bundled runs validate the fixture and CI gate only; they are explicitly
+not live performance results or comparative grades. See
+`bench/e2e/README.md` for the JSONL contract and live-run workflow.
+
+## Trusted component validation
+
+The `validate-installed-components` job installs both private repositories
+from the exact refs in `component-bom.json` and validates their real
+`tools/list` responses. It runs only from a trusted `main` push or a manual
+default-branch dispatch, never from pull-request-controlled code.
+`CODE_INTEL_COMPONENT_TOKEN` is a required post-merge validation secret:
+configure a fine-grained token with read access to
+`redacted-org/code-search` and `redacted-org/code-graph`.
+The validator exposes it only to authenticated `gh` clone/download commands
+and removes it before package builds or MCP processes start.
+
+There is currently no repository secret fallback. If the secret is absent,
+the trusted job intentionally fails; do not skip or weaken this validation.
+If a future BOM is promoted to `status: ready`, the same job invokes the
+readiness smoke generator against the just-installed MCP executables. The
+generated file stays under the isolated runner directory and must pass the
+full version, readiness, identity-shape, generation, and unchanged-checkout
+validator; neither an environment-supplied nor committed evidence fixture is
+accepted as the live CI attestation.
 
 ## Environment Variables
 
@@ -175,15 +233,19 @@ export VOYAGE_API_KEY="pa-..."  # Get a key at https://dash.voyageai.com
 
 ## Usage
 
-### Step 1: Index
+### Step 1: Integrated indexing (currently blocked)
 
 ```
 /index-repo /path/to/your/monorepo
 ```
 
-This runs both semantic and structural indexing. You only need to do this once per repo — re-running only processes changed files (incremental).
+With the current BOM this command must return a blocked/incompatible result
+before either engine starts. It becomes an indexing workflow only after the
+BOM is promoted to `status: ready` with validated capability attestations and
+version-matched readiness evidence.
 
-**Indexing time** (3,000 chunks, typical single crate/package):
+**Component timing reference for a future ready BOM** (3,000 chunks, typical
+single crate/package):
 
 | Provider | Time | Notes |
 |----------|------|-------|
@@ -194,9 +256,10 @@ This runs both semantic and structural indexing. You only need to do this once p
 
 Structural indexing (code-graph) is always local and completes in ~30-60 seconds regardless of provider.
 
-### Step 2: Search
+### Step 2: Search (after a future verified dual index)
 
-After indexing, just ask naturally. No special syntax needed.
+The routing below describes the intended behavior once integrated readiness is
+unblocked; it is not a claim that the current BOM produced a usable dual index.
 
 | Question type | Example | What happens |
 |--------------|---------|-------------|
@@ -209,11 +272,12 @@ After indexing, just ask naturally. No special syntax needed.
 | **Security** | "Where are the input entry points / auth boundaries?" | Graph queries security-tagged surfaces (auth/crypto/input/sink) |
 | **Security** | "Does user input reach a sensitive sink?" | Graph traces source→sink taint paths |
 | **Compliance** | "What code satisfies STIG control X?" | Graph maps the control ID to code evidence |
-| **Localization** | "Where would I fix \<issue\>?" | Graph-guided localization ranks the most relevant code |
+| **Localization** | "Where would I fix \<issue\>?" | Semantic chunk evidence is aggregated into a file-level ranking |
 
-### Step 3: Multi-repo
+### Step 3: Multi-repo (future ready BOM only)
 
-You can index multiple repos. The last-indexed repo becomes the active project. When you ask a question, `/code-explore` checks which project your query targets and auto-switches if needed.
+This workflow is unavailable with the current blocked BOM. Once a later BOM
+passes every readiness gate, each verified repo can be activated independently.
 
 ```
 /index-repo /path/to/repo-a
@@ -221,9 +285,12 @@ You can index multiple repos. The last-indexed repo becomes the active project. 
 # Now asking about repo-a's code auto-switches back to repo-a
 ```
 
-## Model Comparison
+## Historical component-only measurements
 
-Measured on 102 queries across 4 language sub-projects (Nix, Rust service, Rust library, TypeScript) from a production monorepo:
+The table below predates the provenance-bound routing/evidence harness. It
+compares embedding providers inside code-search on 102 historical queries.
+This is not an integrated E2E comparative grade, does not attest the current
+blocked BOM, and must not be presented as a current live plugin result.
 
 | Provider | Model | MRR (Nix) | MRR (Rust svc) | MRR (Rust lib) | MRR (TypeScript) | Data leaves machine? | Cost |
 |----------|-------|-----------|----------------|----------------|------------------|---------------------|------|
@@ -272,12 +339,15 @@ Set via `LOCAL_EMBEDDING_MODEL=jinaai/jina-code-embeddings-1.5b`. Both support M
 ## Lessons Learned: prototype-software-merry
 
 Practical advice from running this plugin on the Corsair monorepo (~4,800 files, 34K chunks, Rust/Nix/TypeScript/Python/HCL).
+These are historical component observations and future-workflow guidance, not
+evidence that the current BOM is integrated-ready.
 
 ### Index by concern, not the entire repo
 
 Indexing the entire monorepo at once produces 34K chunks. Queries compete against everything — a search for "firewall config" matches Nix modules, Rust network code, TypeScript UI components, and Terraform security groups. The results are diluted.
 
-**Better approach:** Index sub-projects separately based on what you're working on:
+**Future ready workflow:** Index sub-projects separately based on what you're
+working on only after the BOM block is lifted:
 
 ```
 /index-repo /path/to/monorepo/nix           # NixOS system config
@@ -302,7 +372,8 @@ Our eval (102 queries, 4 languages) showed that embedding quality depends on the
 
 ### Nix-specific: use full mode for code-graph
 
-The `/index-repo` skill handles this automatically, but if you're calling code-graph directly: Nix repos must use `mode: "full"`. The `fast` mode returns zero results on Nix because tree-sitter Nix grammar produces different AST shapes than code-graph's fast parser expects.
+On a future ready BOM, the `/index-repo` skill handles this automatically.
+When testing code-graph directly, Nix repos require `mode: "full"`.
 
 ### First-time indexing is slow with Jina — incremental is fast
 
@@ -327,7 +398,8 @@ Conversely, the graph can't answer "where is the code that handles rate limiting
 
 ### Versioned indexes for docs and release notes
 
-If you need to compare code across versions — generating release notes, migration guides, or version-specific documentation — create isolated indexes per version using git worktrees:
+After a future BOM is promoted to ready, version-specific workflows can use
+isolated Git worktrees:
 
 ```bash
 # Create worktrees for each version you want to index
@@ -356,7 +428,8 @@ Each version gets its own isolated index. Use `switch_project` (or just ask abou
 ## Troubleshooting
 
 **"Search returns irrelevant results from wrong files"**
-- Check which project is active: the last-indexed repo wins. Run `/index-repo` on the repo you're working in to make it active.
+- On a readiness-approved BOM, check which verified project is active. With
+  the current BOM, `/index-repo` must remain blocked.
 
 **"Indexing seems stuck"**
 - Jina CPU indexing is genuinely slow (~1 chunk/second on CPU). Check `~/.claude_code_search/` for growing index files.
@@ -374,6 +447,7 @@ Each version gets its own isolated index. Use `switch_project` (or just ask abou
 
 ## Notes
 
-- **Incremental updates**: Re-running `/index-repo` only processes changed files. No need to reindex from scratch.
+- **Incremental updates**: This is a future-ready workflow; it is unavailable
+  while the BOM status is blocked.
 - **Index storage**: Indexes are stored in `~/.claude_code_search/` by default. Set `CODE_SEARCH_STORAGE` to change.
 - **code-graph is fully local**: No API calls, no data leaves the machine. Only code-search uses external APIs (when using Voyage providers).

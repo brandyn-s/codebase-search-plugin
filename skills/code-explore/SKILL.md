@@ -23,6 +23,7 @@ Route code exploration queries to the right tool and chain results automatically
 |------|---------|
 | `mcp__code-search__search_code` | Find code by meaning/keywords |
 | `mcp__code-search__find_similar_code` | Find similar chunks to a result |
+| `mcp__code-search__code_localize` | Rank files for a natural-language issue |
 | `mcp__code-search__get_index_status` | Check if repo is indexed |
 | `mcp__code-search__switch_project` | Change active project context |
 
@@ -44,8 +45,9 @@ Route code exploration queries to the right tool and chain results automatically
 | `mcp__code-graph__query_security_surfaces` | Enumerate security-tagged surfaces by `role` (`auth_boundary`, `input_entry_point`, `sensitive_sink`, `crypto_operation`, `privilege_escalation`, `session_management`, `audit_logging`, `sanitizer`). Pass `mode="tainted_paths"` to return source→sink taint paths instead of a flat surface list |
 | `mcp__code-graph__trace_data_flow` | Trace propagation from a `source` function through the graph (env-var aware) — "where does this sensitive data end up?" |
 | `mcp__code-graph__query_stig_evidence` | Map a STIG/NIST `control_id` to the code that provides evidence for it |
-| `mcp__code-graph__rank_by_query` | Rank nodes by relevance to a `query` (bidirectional PageRank). Best for **specific symbol names**; `seed_strategy` is `hybrid` (default), `embedding`, or `substring` |
-| `mcp__code-graph__code_localize` | Graph-guided localization from an `issue_description` — "where would I change code to fix X?" |
+The pinned code-graph release does not expose `rank_by_query` or
+`code_localize`. Use code-search's `code_localize` for natural-language
+localization; do not call tools that are absent from the tested component BOM.
 
 ## Pre-flight Check
 
@@ -55,12 +57,25 @@ Before routing, verify the target repo is indexed and active:
    - If `current_project` is `null`: infer the target repo from the user's query context (CWD, mentioned crate/service names, or explicit repo reference) and run `mcp__code-search__switch_project(project_path=<path>)`.
    - If `current_project` points to a different repo than the query targets: run `switch_project` to the correct one. Tell the user which project you switched to.
    - If `current_project` matches the query context: proceed.
-2. **Check indexes exist**:
-   - `mcp__code-search__get_index_status` — if empty, suggest running `/index-repo`
-   - `mcp__code-graph__index_status` — if not found, suggest running `/index-repo`
-3. **For code-graph queries**, pass the `project` parameter explicitly (code-graph uses project name, not an active-project concept). Use `mcp__code-graph__list_projects` to find the correct project name if unsure.
+2. **Read and retain both status envelopes before retrieval**:
+   - `mcp__code-search__get_index_status` — if empty or stale, suggest running `/index-repo`
+   - `mcp__code-graph__index_status` — if not found or stale, suggest running `/index-repo`
+3. **Verify cross-engine identity**. Each status must contain
+   `index_identity.schema_version: 1` plus `repository_id`, `checkout_id`,
+   `source_revision`, `dirty_fingerprint`, and `index_generation`.
+   Compare every field exactly across the two envelopes. The `checkout_id`
+   must match because both engines must describe the same local checkout.
+   - If either status is stale, any identity field is missing, or any value
+     differs, block mixed or chained retrieval.
+   - Report the exact missing, stale, or mismatched fields and both observed
+     values. Never describe a legacy/missing envelope as ready.
+4. **For code-graph queries**, pass the `project` parameter explicitly (code-graph uses project name, not an active-project concept). Use `mcp__code-graph__list_projects` to find the correct project name if unsure.
 
-If only one index exists, route to that tool only and note the limitation.
+If only one index is usable, or both are individually usable but their
+identities do not match, a single-engine fallback is allowed only when that
+engine can answer the query. State explicitly that the result is **not cross-engine coherent**
+and name the engine used. Do not combine evidence
+from the other engine, and do not auto-chain into it.
 
 ## Routing Decision Tree
 
@@ -84,7 +99,7 @@ If only one index exists, route to that tool only and note the limitation.
 | "Does any user input reach a sink?" | Security | graph: query_security_surfaces mode="tainted_paths" |
 | "Trace how X (secret/PII/token) flows" | Security | graph: trace_data_flow(source=X) |
 | "What code satisfies STIG/NIST <control>?" | Compliance | graph: query_stig_evidence(control_id=...) |
-| "Where's the code I'd change for <issue>?" | Localization | graph: code_localize (issue text) / rank_by_query (symbol) |
+| "Where's the code I'd change for <issue>?" | Localization | code-search: code_localize (issue text) |
 
 ### Step 2: Execute primary tool
 

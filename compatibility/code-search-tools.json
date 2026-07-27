@@ -1,0 +1,217 @@
+{
+  "component": "code-search",
+  "fingerprint": {
+    "algorithm": "sha256",
+    "canonicalization": "UTF-8 JSON with sorted keys and separators comma/colon",
+    "document": "inputSchema"
+  },
+  "schema_version": 1,
+  "source": {
+    "kind": "git",
+    "version": "69721e0df21540d35cb91ea07d7f4fc8d1535cd2"
+  },
+  "tested_capabilities": {
+    "outputs": {
+      "index_identity": {
+        "supported": false,
+        "schema_version": null,
+        "fields": []
+      },
+      "semantic_index_ready": false
+    }
+  },
+  "tools": {
+    "code_localize": {
+      "input_schema": {
+        "properties": {
+          "k": {
+            "default": 10,
+            "title": "K",
+            "type": "integer"
+          },
+          "max_chunks_per_search": {
+            "default": 50,
+            "title": "Max Chunks Per Search",
+            "type": "integer"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "search_mode": {
+            "default": "auto",
+            "title": "Search Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "code_localizeArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "0919aa284eb62be87e59b584bdb98815bbb9cd9a39cf2a8e760ec30af2d3d148"
+    },
+    "find_similar_code": {
+      "input_schema": {
+        "properties": {
+          "chunk_id": {
+            "title": "Chunk Id",
+            "type": "string"
+          },
+          "k": {
+            "default": 5,
+            "title": "K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chunk_id"
+        ],
+        "title": "find_similar_codeArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "d7e0c255dba6c4df5cb2f4e33327aa5dc7f2f0a9e63c1ed818fad2477dfbd346"
+    },
+    "get_index_status": {
+      "input_schema": {
+        "properties": {},
+        "title": "get_index_statusArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "ce8d01404fa43ff6010b5b4aa9d3f7a6092bce0cebba5d1e2b5b5b44586287ec"
+    },
+    "get_indexing_progress": {
+      "input_schema": {
+        "properties": {},
+        "title": "get_indexing_progressArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "72e88b8f9609d35648bb496ed9bf45789e4972f0d3d17df774946236bf9ed52a"
+    },
+    "index_directory": {
+      "input_schema": {
+        "properties": {
+          "directory_path": {
+            "title": "Directory Path",
+            "type": "string"
+          },
+          "file_patterns": {
+            "default": null,
+            "items": {
+              "type": "string"
+            },
+            "title": "File Patterns",
+            "type": "array"
+          },
+          "incremental": {
+            "default": true,
+            "title": "Incremental",
+            "type": "boolean"
+          },
+          "project_name": {
+            "default": null,
+            "title": "Project Name",
+            "type": "string"
+          },
+          "provider": {
+            "default": null,
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "directory_path"
+        ],
+        "title": "index_directoryArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "e2d7b457ae218b3a320ed92bd4d6f750bb508680d877d529d2cd84eb833df759"
+    },
+    "list_projects": {
+      "input_schema": {
+        "properties": {},
+        "title": "list_projectsArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "2d7d1c0f8964fbec7c2e9a0049dfe8101e95070da037595f45b7cc2409906ee6"
+    },
+    "search_code": {
+      "input_schema": {
+        "properties": {
+          "auto_reindex": {
+            "default": true,
+            "title": "Auto Reindex",
+            "type": "boolean"
+          },
+          "chunk_type": {
+            "default": null,
+            "title": "Chunk Type",
+            "type": "string"
+          },
+          "file_pattern": {
+            "default": null,
+            "title": "File Pattern",
+            "type": "string"
+          },
+          "include_context": {
+            "default": true,
+            "title": "Include Context",
+            "type": "boolean"
+          },
+          "k": {
+            "default": 5,
+            "title": "K",
+            "type": "integer"
+          },
+          "max_age_minutes": {
+            "default": 5,
+            "title": "Max Age Minutes",
+            "type": "number"
+          },
+          "provider": {
+            "default": null,
+            "title": "Provider",
+            "type": "string"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "search_mode": {
+            "default": "auto",
+            "title": "Search Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_codeArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "db631c229e27ae839b1f61f138e710f9f5c31eff6b062a52a7d8bd09b25f226a"
+    },
+    "switch_project": {
+      "input_schema": {
+        "properties": {
+          "project_path": {
+            "title": "Project Path",
+            "type": "string"
+          },
+          "provider": {
+            "default": null,
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_path"
+        ],
+        "title": "switch_projectArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "95ece3918558eadc8ad58a2ca2d893b4e85fbe515b011125fa489583f1dd5b82"
+    }
+  }
+}
