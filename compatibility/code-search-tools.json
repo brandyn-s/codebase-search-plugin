@@ -8,19 +8,35 @@
   "schema_version": 1,
   "source": {
     "kind": "git",
-    "version": "69721e0df21540d35cb91ea07d7f4fc8d1535cd2"
+    "version": "915a4b6f2a85646bf611682577dd6251d34961c6"
   },
   "tested_capabilities": {
     "outputs": {
       "index_identity": {
-        "supported": false,
+        "fields": [],
         "schema_version": null,
-        "fields": []
+        "supported": false
       },
       "semantic_index_ready": false
     }
   },
   "tools": {
+    "cancel_indexing": {
+      "input_schema": {
+        "properties": {},
+        "title": "cancel_indexingArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "a0849694fa06b1df983b71de4cec8855e8e18f2d613e9739df6479dfbc2316e6"
+    },
+    "clear_index": {
+      "input_schema": {
+        "properties": {},
+        "title": "clear_indexArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "a201822f033cbd0c37b3662f391a127208fbf0370dd0e3b0c8d4dd047cf0f280"
+    },
     "code_localize": {
       "input_schema": {
         "properties": {
@@ -52,6 +68,27 @@
       },
       "input_schema_sha256": "0919aa284eb62be87e59b584bdb98815bbb9cd9a39cf2a8e760ec30af2d3d148"
     },
+    "delete_project": {
+      "input_schema": {
+        "properties": {
+          "project_hash": {
+            "default": null,
+            "title": "Project Hash",
+            "type": "string"
+          },
+          "project_name": {
+            "title": "Project Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_name"
+        ],
+        "title": "delete_projectArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "9cfb18bf8687c0207825b74b5dd8a364e6d7bbf977693d512ea9ca1ef2f8b9f4"
+    },
     "find_similar_code": {
       "input_schema": {
         "properties": {
@@ -73,13 +110,59 @@
       },
       "input_schema_sha256": "d7e0c255dba6c4df5cb2f4e33327aa5dc7f2f0a9e63c1ed818fad2477dfbd346"
     },
+    "get_file_context": {
+      "input_schema": {
+        "properties": {
+          "file_path": {
+            "title": "File Path",
+            "type": "string"
+          },
+          "line_range": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Line Range"
+          },
+          "max_chunks": {
+            "default": 20,
+            "title": "Max Chunks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file_path"
+        ],
+        "title": "get_file_contextArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "7e8916178a0a3ab876e178896ec0a3f66b07c8396201f314f4a25dbe0031d233"
+    },
     "get_index_status": {
       "input_schema": {
-        "properties": {},
+        "properties": {
+          "project_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Project Path"
+          }
+        },
         "title": "get_index_statusArguments",
         "type": "object"
       },
-      "input_schema_sha256": "ce8d01404fa43ff6010b5b4aa9d3f7a6092bce0cebba5d1e2b5b5b44586287ec"
+      "input_schema_sha256": "25dd5986a5248733e222f3dd3f18b6588821565505e5d318c77c1625a46167b9"
     },
     "get_indexing_progress": {
       "input_schema": {
@@ -128,6 +211,14 @@
       },
       "input_schema_sha256": "e2d7b457ae218b3a320ed92bd4d6f750bb508680d877d529d2cd84eb833df759"
     },
+    "index_test_project": {
+      "input_schema": {
+        "properties": {},
+        "title": "index_test_projectArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "56860d9a14b7a3782368aef25bfe354fa9a18173e94f3349fbb26e3dfd49aa43"
+    },
     "list_projects": {
       "input_schema": {
         "properties": {},
@@ -135,6 +226,27 @@
         "type": "object"
       },
       "input_schema_sha256": "2d7d1c0f8964fbec7c2e9a0049dfe8101e95070da037595f45b7cc2409906ee6"
+    },
+    "search_all_projects": {
+      "input_schema": {
+        "properties": {
+          "k": {
+            "default": 3,
+            "title": "K",
+            "type": "integer"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_all_projectsArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "745b49bb16454a03e2e99789d324923ad351d4d19cd6561340cbb1656f8c93b1"
     },
     "search_code": {
       "input_schema": {
@@ -212,6 +324,27 @@
         "type": "object"
       },
       "input_schema_sha256": "95ece3918558eadc8ad58a2ca2d893b4e85fbe515b011125fa489583f1dd5b82"
+    },
+    "verify_index_integrity": {
+      "input_schema": {
+        "properties": {
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Project"
+          }
+        },
+        "title": "verify_index_integrityArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "14fcd4513e595b29042cf00dac004a378534376ee2aaa8d9e9bdcf0b3f8cd1ea"
     }
   }
 }

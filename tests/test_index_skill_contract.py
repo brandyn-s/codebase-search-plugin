@@ -51,7 +51,7 @@ class IndexRepoSkillContractTests(unittest.TestCase):
         self.assertIn("skip_report=true", text)
         self.assertIn("Before starting either index", text)
         self.assertIn("do not start code-search", text.lower())
-        self.assertIn("v0.6.0-redacted.1", compatibility)
+        self.assertIn("v0.7.0-redacted.2", compatibility)
         self.assertIn("cannot satisfy identity readiness", compatibility)
         self.assertIn("skip_report", compatibility)
 

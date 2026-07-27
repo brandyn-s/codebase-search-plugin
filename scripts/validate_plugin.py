@@ -269,11 +269,70 @@ if snapshots:
             return False, False
         property_schema = properties[name]
         required = schema.get("required", [])
+        annotation_keys = {
+            "$comment",
+            "default",
+            "deprecated",
+            "description",
+            "examples",
+            "readOnly",
+            "title",
+            "writeOnly",
+        }
+        root_keys = annotation_keys | {
+            "additionalProperties",
+            "properties",
+            "required",
+            "type",
+        }
+        root_shape_is_safe = set(schema).issubset(root_keys)
+        required_is_valid = (
+            isinstance(required, list)
+            and all(isinstance(item, str) for item in required)
+            and len(required) == len(set(required))
+        )
+        declared_types = None
+        if isinstance(property_schema, dict):
+            direct_type = property_schema.get("type")
+            if "type" in property_schema and set(property_schema).issubset(
+                annotation_keys | {"type"}
+            ):
+                if isinstance(direct_type, str):
+                    type_names = [direct_type]
+                elif (
+                    isinstance(direct_type, list)
+                    and direct_type
+                    and all(isinstance(item, str) for item in direct_type)
+                ):
+                    type_names = direct_type
+                else:
+                    type_names = []
+                if len(type_names) == len(set(type_names)):
+                    declared_types = set(type_names)
+            elif set(property_schema).issubset(annotation_keys | {"anyOf"}):
+                alternatives = property_schema.get("anyOf")
+                if (
+                    isinstance(alternatives, list)
+                    and alternatives
+                    and all(
+                        isinstance(option, dict)
+                        and isinstance(option.get("type"), str)
+                        and set(option).issubset(annotation_keys | {"type"})
+                        for option in alternatives
+                    )
+                ):
+                    type_names = [option["type"] for option in alternatives]
+                    if len(type_names) == len(set(type_names)):
+                        declared_types = set(type_names)
         valid = (
             schema.get("type") == "object"
+            and root_shape_is_safe
             and isinstance(property_schema, dict)
-            and property_schema.get("type") == expected_type
-            and isinstance(required, list)
+            and declared_types in (
+                {expected_type},
+                {expected_type, "null"},
+            )
+            and required_is_valid
             and name not in required
         )
         return True, valid

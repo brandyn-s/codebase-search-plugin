@@ -13,12 +13,11 @@ attested semantic `index_ready` output. Those missing output contracts are
 the primary rollout block, so this BOM **cannot satisfy identity readiness**
 for coherent dual indexing.
 
-The pinned code-graph release `v0.6.0-redacted.1` does not write `ARCHITECTURE_REPORT.md`
-during `index_repository`; its lack of `skip_report` is therefore not a
-current checkout mutation. The future
-identity-capable code-graph source does write that report by default, so a
-published replacement must still expose and honor `skip_report=true` before
-promotion.
+The pinned code-graph release `v0.7.0-redacted.2` exposes an optional boolean
+`skip_report` input on `index_repository`. This offline schema capture proves
+the input surface, not runtime behavior. A readiness run must call
+`skip_report=true` and prove `checkout_unchanged: true` before the BOM can be
+promoted.
 
 `/index-repo` intentionally stops before either engine starts. Lifting the
 block requires updated real-schema snapshots, matching tested capability

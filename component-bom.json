@@ -1,12 +1,87 @@
 {
-  "schema_version": 1,
-  "tested_at": "2026-07-26",
+  "components": {
+    "code-graph": {
+      "install": {
+        "assets": {
+          "darwin-amd64": {
+            "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
+            "sha256": "5f7588f847a22a8602ccce355f7279c0bdf50808d184a5b6c082bf1b42a2e341"
+          },
+          "darwin-arm64": {
+            "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
+            "sha256": "8ad13c146c54a12ea14de1fd82a4cfd1224af149c086cea27a7ab6ca88ffc23b"
+          },
+          "linux-amd64": {
+            "name": "codebase-memory-mcp-linux-amd64.tar.gz",
+            "sha256": "d23da061459f65d8f4a1fae0d906245d1bbb9cc37998836944397b9f8a791df8"
+          },
+          "linux-arm64": {
+            "name": "codebase-memory-mcp-linux-arm64.tar.gz",
+            "sha256": "48dff8f5f602d84ea7359187211ea7d98b1c3d1102aec8220fc3d38c6174b649"
+          },
+          "windows-amd64": {
+            "name": "codebase-memory-mcp-windows-amd64.zip",
+            "sha256": "3a850b7c311d114aa93012702e838c8d3da7b75ac1afdfb980c4b33e3e18b129"
+          }
+        },
+        "kind": "github-release",
+        "repository": "redacted-org/code-graph",
+        "tag": "v0.7.0-redacted.2"
+      },
+      "schema_snapshot": "compatibility/code-graph-tools.json",
+      "tested_capabilities": {
+        "inputs": {
+          "index_repository.skip_report": true
+        },
+        "outputs": {
+          "graph_status_ready": false,
+          "index_identity": {
+            "fields": [],
+            "schema_version": null,
+            "supported": false
+          }
+        }
+      }
+    },
+    "code-search": {
+      "install": {
+        "kind": "git",
+        "repository": "https://github.com/redacted-org/code-search.git",
+        "revision": "915a4b6f2a85646bf611682577dd6251d34961c6"
+      },
+      "schema_snapshot": "compatibility/code-search-tools.json",
+      "tested_capabilities": {
+        "outputs": {
+          "index_identity": {
+            "fields": [],
+            "schema_version": null,
+            "supported": false
+          },
+          "semantic_index_ready": false
+        }
+      }
+    }
+  },
   "integrated_readiness": {
-    "status": "blocked",
-    "reason": "Both pinned components lack an attested complete v1 index_identity output, code-search lacks an attested semantic index_ready output, and code-graph lacks the skip_report input required before a future report-writing identity-capable source can be promoted.",
+    "reason": "Input schemas were captured offline; output behavior and integrated readiness require separate runtime evidence.",
     "requires": {
+      "code-graph": {
+        "index_repository.skip_report": true,
+        "index_status.status": "ready"
+      },
+      "code-search": {
+        "completion.error": "empty",
+        "completion.success": true,
+        "index_ready": true
+      },
       "index_identity": {
-        "schema_version": 1,
+        "equal_fields": [
+          "repository_id",
+          "checkout_id",
+          "source_revision",
+          "dirty_fingerprint",
+          "index_generation"
+        ],
         "required_fields": [
           "repository_id",
           "checkout_id",
@@ -15,94 +90,16 @@
           "index_generation",
           "captured_at"
         ],
-        "equal_fields": [
-          "repository_id",
-          "checkout_id",
-          "source_revision",
-          "dirty_fingerprint",
-          "index_generation"
-        ]
-      },
-      "code-search": {
-        "completion.success": true,
-        "completion.error": "empty",
-        "index_ready": true
-      },
-      "code-graph": {
-        "index_status.status": "ready",
-        "index_repository.skip_report": true
+        "schema_version": 1
       },
       "readiness_evidence": {
-        "schema_version": 1,
+        "checkout_unchanged": true,
         "component_versions_match_bom": true,
-        "checkout_unchanged": true
-      }
-    }
-  },
-  "components": {
-    "code-search": {
-      "install": {
-        "kind": "git",
-        "repository": "https://github.com/redacted-org/code-search.git",
-        "revision": "69721e0df21540d35cb91ea07d7f4fc8d1535cd2"
-      },
-      "schema_snapshot": "compatibility/code-search-tools.json",
-      "tested_capabilities": {
-        "outputs": {
-          "index_identity": {
-            "supported": false,
-            "schema_version": null,
-            "fields": []
-          },
-          "semantic_index_ready": false
-        }
+        "schema_version": 1
       }
     },
-    "code-graph": {
-      "install": {
-        "kind": "github-release",
-        "repository": "redacted-org/code-graph",
-        "tag": "v0.6.0-redacted.1",
-        "assets": {
-          "darwin-amd64": {
-            "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-            "sha256": "3891facf8e8a7c7d5345a09a5938e9b14af2fae4c53c93d5a3960c9f2bf8ca8c"
-          },
-          "darwin-arm64": {
-            "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-            "sha256": "77fa65569309c42b82bc24f6638921d01612b4509e6763dd26be6c5d0c0e835b"
-          },
-          "linux-amd64": {
-            "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-            "sha256": "45c23c40c569b9c406af2a74b6ad6516c7abdfca4d9f6fab87dbfce68a446cb5"
-          },
-          "linux-arm64": {
-            "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-            "sha256": "8393854ff5ae3d48e7c7110659ca42396ebeb8024f7b375446180b52da304fcf"
-          },
-          "windows-amd64": {
-            "name": "codebase-memory-mcp-windows-amd64.zip",
-            "sha256": "d58464c4622a49c2a04ccef3e36fde7c493e1f522d052ff6a9c2b7bc900c8cfe"
-          }
-        }
-      },
-      "schema_snapshot": "compatibility/code-graph-tools.json",
-      "tested_capabilities": {
-        "inputs": {
-          "index_repository.skip_report": false
-        },
-        "outputs": {
-          "index_identity": {
-            "supported": false,
-            "schema_version": null,
-            "fields": []
-          },
-          "graph_status_ready": true
-        },
-        "side_effects": {
-          "index_repository.writes_architecture_report": false
-        }
-      }
-    }
-  }
+    "status": "blocked"
+  },
+  "schema_version": 1,
+  "tested_at": "2026-07-26"
 }

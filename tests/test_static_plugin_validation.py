@@ -88,8 +88,24 @@ class StaticPluginValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             checkout = Path(tmp)
             self._copy_checkout(checkout)
+            snapshot_path = (
+                checkout / "compatibility" / "code-graph-tools.json"
+            )
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            schema = snapshot["tools"]["index_repository"]["input_schema"]
+            del schema["properties"]["skip_report"]
+            snapshot = self._rewrite_tool_schema(
+                checkout, "code-graph", "index_repository", schema
+            )
+            snapshot["tested_capabilities"]["inputs"][
+                "index_repository.skip_report"
+            ] = False
+            snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
             bom_path = checkout / "component-bom.json"
             bom = json.loads(bom_path.read_text(encoding="utf-8"))
+            bom["components"]["code-graph"]["tested_capabilities"] = snapshot[
+                "tested_capabilities"
+            ]
             bom["integrated_readiness"]["status"] = "ready"
             bom_path.write_text(json.dumps(bom), encoding="utf-8")
 
@@ -147,6 +163,124 @@ class StaticPluginValidationTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
         self.assertIn("project_path", completed.stdout)
         self.assertIn("optional string", completed.stdout)
+
+    def test_validator_accepts_nullable_optional_search_project_path(self):
+        representations = {
+            "anyOf": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "default": None,
+            },
+            "type-list": {
+                "type": ["string", "null"],
+                "default": None,
+            },
+        }
+        for label, property_schema in representations.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                checkout = Path(tmp)
+                self._copy_checkout(checkout)
+                snapshot_path = (
+                    checkout / "compatibility" / "code-search-tools.json"
+                )
+                snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+                schema = snapshot["tools"]["get_index_status"]["input_schema"]
+                schema["properties"]["project_path"] = property_schema
+                self._rewrite_tool_schema(
+                    checkout, "code-search", "get_index_status", schema
+                )
+
+                completed = self._run_validator(checkout)
+
+            self.assertEqual(
+                completed.returncode, 0, completed.stdout + completed.stderr
+            )
+
+    def test_validator_rejects_nullable_project_path_with_extra_type(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            snapshot_path = (
+                checkout / "compatibility" / "code-search-tools.json"
+            )
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            schema = snapshot["tools"]["get_index_status"]["input_schema"]
+            schema["properties"]["project_path"] = {
+                "anyOf": [
+                    {"type": "string"},
+                    {"type": "integer"},
+                    {"type": "null"},
+                ]
+            }
+            self._rewrite_tool_schema(
+                checkout, "code-search", "get_index_status", schema
+            )
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+        self.assertIn("project_path", completed.stdout)
+        self.assertIn("optional string", completed.stdout)
+
+    def test_validator_rejects_constraints_that_negate_optional_capabilities(self):
+        mutations = {
+            "project-path-impossible": (
+                "code-search",
+                "get_index_status",
+                "project_path",
+                {"type": "string", "not": {"type": "string"}},
+                "project_path",
+            ),
+            "skip-report-true-forbidden": (
+                "code-graph",
+                "index_repository",
+                "skip_report",
+                {
+                    "type": ["boolean", "null"],
+                    "not": {"const": True},
+                },
+                "skip_report",
+            ),
+        }
+        for label, mutation in mutations.items():
+            component, tool_name, property_name, property_schema, expected = mutation
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                checkout = Path(tmp)
+                self._copy_checkout(checkout)
+                snapshot_path = (
+                    checkout / "compatibility" / f"{component}-tools.json"
+                )
+                snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+                schema = snapshot["tools"][tool_name]["input_schema"]
+                schema["properties"][property_name] = property_schema
+                self._rewrite_tool_schema(
+                    checkout, component, tool_name, schema
+                )
+
+                completed = self._run_validator(checkout)
+
+            self.assertEqual(
+                completed.returncode, 1, completed.stdout + completed.stderr
+            )
+            self.assertIn(expected, completed.stdout)
+
+    def test_validator_rejects_parent_constraint_that_requires_project_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            snapshot_path = (
+                checkout / "compatibility" / "code-search-tools.json"
+            )
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            schema = snapshot["tools"]["get_index_status"]["input_schema"]
+            schema["allOf"] = [{"required": ["project_path"]}]
+            self._rewrite_tool_schema(
+                checkout, "code-search", "get_index_status", schema
+            )
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+        self.assertIn("project_path", completed.stdout)
 
     def test_validator_rejects_project_path_on_a_nonobject_input(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -221,6 +355,15 @@ class StaticPluginValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             checkout = Path(tmp)
             self._copy_checkout(checkout)
+            snapshot_path = (
+                checkout / "compatibility" / "code-search-tools.json"
+            )
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            schema = snapshot["tools"]["get_index_status"]["input_schema"]
+            del schema["properties"]["project_path"]
+            self._rewrite_tool_schema(
+                checkout, "code-search", "get_index_status", schema
+            )
             bom_path = checkout / "component-bom.json"
             bom = json.loads(bom_path.read_text(encoding="utf-8"))
             bom["integrated_readiness"]["status"] = "ready"

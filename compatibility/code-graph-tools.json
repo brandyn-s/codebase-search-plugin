@@ -8,25 +8,157 @@
   "schema_version": 1,
   "source": {
     "kind": "github-release",
-    "version": "v0.6.0-redacted.1"
+    "version": "v0.7.0-redacted.2"
   },
   "tested_capabilities": {
     "inputs": {
-      "index_repository.skip_report": false
+      "index_repository.skip_report": true
     },
     "outputs": {
+      "graph_status_ready": false,
       "index_identity": {
-        "supported": false,
+        "fields": [],
         "schema_version": null,
-        "fields": []
-      },
-      "graph_status_ready": true
-    },
-    "side_effects": {
-      "index_repository.writes_architecture_report": false
+        "supported": false
+      }
     }
   },
   "tools": {
+    "code_localize": {
+      "input_schema": {
+        "properties": {
+          "depth": {
+            "description": "BFS expansion radius from each seed (0-5, default 3). Higher reaches more code but adds noise.",
+            "type": "integer"
+          },
+          "issue_description": {
+            "description": "The issue/question/symbol-list to localize. Tokenized (drops 1-char tokens + English stopwords); at least one token must match a node Name or QualifiedName substring.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project name (optional — uses session project if omitted)",
+            "type": "string"
+          },
+          "seed_strategy": {
+            "description": "How to match issue → seed nodes. 'substring' (legacy): tokens substring-match Name/QualifiedName. 'embedding': Voyage-embed the issue, cosine-search node embeddings (requires VOYAGE_API_KEY + index with embeddings populated). 'hybrid' (default): both, deduplicated; falls back to substring if embeddings unavailable.",
+            "enum": [
+              "substring",
+              "embedding",
+              "hybrid"
+            ],
+            "type": "string"
+          },
+          "top_k": {
+            "description": "Maximum number of localized entities to return (1-50, default 10).",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "issue_description"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "bd6f87268d4ba26a35924ea539a5dd5cb0b040c3976d7bea590ef906e68d64e4"
+    },
+    "code_localize_agent": {
+      "input_schema": {
+        "properties": {
+          "include_transcript": {
+            "description": "If true, include the agent's per-turn transcript (tool calls + summaries) for debugging. Default false.",
+            "type": "boolean"
+          },
+          "issue_description": {
+            "description": "Natural-language issue/question to localize.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project name (optional — uses session project if omitted)",
+            "type": "string"
+          },
+          "top_k": {
+            "description": "Maximum number of entities to return (1-50, default 10).",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "issue_description"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "8b6cfd6edc910d3c2241ff10f55453c960ab36bea49186477667d296d5fecab5"
+    },
+    "degree_filter": {
+      "input_schema": {
+        "properties": {
+          "direction": {
+            "description": "inbound = count incoming edges (callers); outbound = count outgoing edges (callees). Required.",
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "type": "string"
+          },
+          "edge_type": {
+            "description": "Edge type to count. Default CALLS. Other useful types: IMPORTS, DEFINES, IMPLEMENTS, OVERRIDE.",
+            "type": "string"
+          },
+          "exclude_entry_points": {
+            "description": "When true, exclude nodes whose is_entry_point property is true (route handlers, framework-registered functions, main()). Essential for dead-code detection — without this, the count is dominated by entry points the framework calls but no internal code references.",
+            "type": "boolean"
+          },
+          "label": {
+            "description": "Node label to filter (Function, Method, Class, Interface, etc.). Required.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Max example nodes to return (1-200, default 20)",
+            "type": "integer"
+          },
+          "op": {
+            "description": "Comparison: eq (=), lt (<), le (<=), gt (>), ge (>=). Required.",
+            "enum": [
+              "eq",
+              "lt",
+              "le",
+              "gt",
+              "ge"
+            ],
+            "type": "string"
+          },
+          "project": {
+            "description": "Project name (optional — uses session project if omitted)",
+            "type": "string"
+          },
+          "value": {
+            "description": "Threshold to compare degree against. 0 for no-edge cases. Required.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "direction",
+          "op",
+          "value"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "1aa673a31654988f585b242f78ccef4700b735b2277497d4c9a2695224f7c4ea"
+    },
+    "delete_project": {
+      "input_schema": {
+        "properties": {
+          "project_name": {
+            "description": "Name of the project to delete",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_name"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "04a49e11416a9f2ff6e0b0c0a3aee42c68d89e071521a42a8a5d48efd8ec6d39"
+    },
     "detect_changes": {
       "input_schema": {
         "properties": {
@@ -56,6 +188,202 @@
         "type": "object"
       },
       "input_schema_sha256": "277f85ca264d934a85e0ebef8242e80d7f4f88917207ecee51ae3d8ce0b78ea8"
+    },
+    "detect_cycles": {
+      "input_schema": {
+        "properties": {
+          "level": {
+            "description": "Granularity: 'crate' (default) for top-level directory cycles, 'package' for submodule-level, 'file' for file-level. Crate-level is fastest and most actionable for monorepos.",
+            "enum": [
+              "crate",
+              "package",
+              "file"
+            ],
+            "type": "string"
+          },
+          "max_depth": {
+            "description": "Maximum cycle length to detect (2-6, default 4). Longer cycles take more time.",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project to analyze. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "0a0d75a4b146a7425dd611c151def56b4bcece08187a603d396cf7a61be70941"
+    },
+    "diff_graph": {
+      "input_schema": {
+        "properties": {
+          "from_sha": {
+            "description": "Starting revision: commit SHA (short or full), branch name, or HEAD~N",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project name (optional — uses session project if omitted)",
+            "type": "string"
+          },
+          "to_sha": {
+            "description": "Ending revision: commit SHA (short or full), branch name, or HEAD",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_sha",
+          "to_sha"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "ba6b28b14d1ffd873519a0497a360e24da30be160cbe150e4aa5f55f10e318c7"
+    },
+    "diff_services": {
+      "input_schema": {
+        "properties": {
+          "from_ref": {
+            "description": "Starting git ref (tag, branch, or commit SHA). Example: 'v1.0.0', 'main~50', 'abc1234'",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project to analyze. Defaults to session project.",
+            "type": "string"
+          },
+          "to_ref": {
+            "description": "Ending git ref (default: 'HEAD')",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_ref"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "1a87b20c518b0cbadf35479c70631b035d5c24e33eb44dd5c77a46e06545d13e"
+    },
+    "explain_service": {
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "project": {
+            "description": "Project to search in. Defaults to session project.",
+            "type": "string"
+          },
+          "service": {
+            "description": "Top-level directory name of the service (e.g., 'controlsd', 'apid', 'trackerd', 'sysmanager')",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "f601b58d137dcb453e5862dac1921e6f4b4846aa2e440fb692c78f78854ccac8"
+    },
+    "explain_symbol": {
+      "input_schema": {
+        "properties": {
+          "name": {
+            "description": "Function, class, or module name to explain. Accepts short name or qualified name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project to search in. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "bc11df41ec4611cc36a9da699deb5d2d5a3b5cf86157b4290c5c56d69d58fa5c"
+    },
+    "find_rationale": {
+      "input_schema": {
+        "properties": {
+          "kind": {
+            "description": "Filter by marker kind. One of WHY, NOTE, HACK, SAFETY, TODO, FIXME, IMPORTANT, XXX. Omit to return all kinds.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Max rationale entries to return (1-500, default 50)",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project name (optional — uses session project if omitted)",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "36649333b360e08b59ae0dca9b260230d3e5ca936c0cc3c3ceaa4dbb1efd5e67"
+    },
+    "find_similar_functions": {
+      "input_schema": {
+        "properties": {
+          "limit": {
+            "description": "Max number of matches to return (1-50, default 10)",
+            "type": "integer"
+          },
+          "name": {
+            "description": "Function name (exact Name match) or fully-qualified name. Ambiguous names produce a picker error listing candidates.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project name (optional — uses session project if omitted)",
+            "type": "string"
+          },
+          "threshold": {
+            "description": "Minimum cosine similarity score (0.0-1.0) — common values: 0.85 for \"worth investigating\", 0.92 for \"probable copy-paste\". Default 0.0 (return top-K regardless of score).",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "fc4da57270e20f138de383a5f84ae78ce070024b5a0b74e69733bb4b76bc3f60"
+    },
+    "generate_report": {
+      "input_schema": {
+        "properties": {
+          "project": {
+            "description": "Project name (optional — uses session project if omitted)",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "4589bc04bfbbcd48ce8dea9b2fcfd662312984d1079bc920eca42f841e20bc80"
+    },
+    "get_affected_tests": {
+      "input_schema": {
+        "properties": {
+          "base_branch": {
+            "description": "Base branch for scope=branch comparison (default: main)",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project to analyze. Defaults to session project.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "Which changes to analyze: 'unstaged', 'staged', 'all' (default), 'branch'",
+            "enum": [
+              "unstaged",
+              "staged",
+              "all",
+              "branch"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "ffa112308d28b06515dd328508d82f61b47d4b95a67b55436608fd2e1e6f8ad2"
     },
     "get_architecture": {
       "input_schema": {
@@ -90,6 +418,30 @@
       },
       "input_schema_sha256": "7c78e9457d00ea7e19418afb2c435a8a25272cfcd5b9624a4c51bf9735a89acc"
     },
+    "get_change_coupling": {
+      "input_schema": {
+        "properties": {
+          "cross_crate_only": {
+            "description": "Only show cross-crate (accidental) couplings (default true). Set false to include same-crate couplings.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of couplings to return (default 30)",
+            "type": "integer"
+          },
+          "min_score": {
+            "description": "Minimum coupling score to include (0.0-1.0, default 0.3). Higher values show stronger coupling.",
+            "type": "number"
+          },
+          "project": {
+            "description": "Project to analyze. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "cf55362e64e0877acd46865a4564f3614cae71533457c57421167c81b6fd3f3e"
+    },
     "get_code_snippet": {
       "input_schema": {
         "properties": {
@@ -121,6 +473,94 @@
       },
       "input_schema_sha256": "94e4a3bc1b7dda4ab6dd1498257e3ce30eaf89e7f7c045aaff9f907da6e75358"
     },
+    "get_graph_schema": {
+      "input_schema": {
+        "properties": {
+          "project": {
+            "description": "Project to get schema for. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "d431a229440c84f2d8e88d158d1ee12d1d00b7eda071def1a850c2915f276d46"
+    },
+    "get_relevant_context": {
+      "input_schema": {
+        "properties": {
+          "files": {
+            "description": "File paths being modified (relative to repo root, e.g. 'src/auth/jwt.rs')",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "include_content": {
+            "description": "If true, inline file contents in the response (up to token budget). Eliminates the need for separate Read calls. Default: false.",
+            "type": "boolean"
+          },
+          "project": {
+            "description": "Project to query. Defaults to session project.",
+            "type": "string"
+          },
+          "token_budget": {
+            "description": "Maximum total tokens to include (default 8000). Files are added highest-priority first until budget is exhausted.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "42bc508e705ae5b8629cb4495e659b6b2d1d5ede5fe9bc4e9cfd73f919bd0677"
+    },
+    "get_review_context": {
+      "input_schema": {
+        "properties": {
+          "base_branch": {
+            "description": "Base branch for scope=branch comparison (default: main)",
+            "type": "string"
+          },
+          "depth": {
+            "description": "Maximum BFS depth for impact tracing (1-5, default 3)",
+            "type": "integer"
+          },
+          "max_tokens": {
+            "description": "Approximate token budget for the summary (default 500, min 200, max 2000). Longer budgets include more impacted symbols and dependency details.",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project to analyze. Defaults to session project.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "Which changes to analyze: 'unstaged' (working tree), 'staged' (git add), 'all' (HEAD, default), 'branch' (compare with base_branch)",
+            "enum": [
+              "unstaged",
+              "staged",
+              "all",
+              "branch"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "0223224ff6da630a5e644fd2b722974757c0a8c73013be905fb58e47d5e23a41"
+    },
+    "index_health": {
+      "input_schema": {
+        "properties": {
+          "project": {
+            "description": "Project to check. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "ca2487f9298d85feb947f1c556c6b65434640a5cf226dedfe3650e18ba87ddf4"
+    },
     "index_repository": {
       "input_schema": {
         "properties": {
@@ -139,11 +579,15 @@
           "repo_path": {
             "description": "Absolute path to the repository to index. If omitted, uses the auto-detected session project root.",
             "type": "string"
+          },
+          "skip_report": {
+            "description": "Skip writing ARCHITECTURE_REPORT.md to the repo root after indexing. Required when indexing read-only repos (bench fixtures, vendored code, protected paths) where any write violates policy. Default: false (report is written).",
+            "type": "boolean"
           }
         },
         "type": "object"
       },
-      "input_schema_sha256": "04037c31e9fcc049669224f490255f8f1e5fdf4f09db0c2afe457e722ea6b8aa"
+      "input_schema_sha256": "1bac32d9a3b4a02ce32247bb549d856cb8eead5d6089b664bcd560c1654c47d3"
     },
     "index_status": {
       "input_schema": {
@@ -157,12 +601,84 @@
       },
       "input_schema_sha256": "9fe966a72f1ecbba0b5b5aebe1c95271e1b5302f917e267b12d1719d36961f5b"
     },
+    "ingest_traces": {
+      "input_schema": {
+        "properties": {
+          "file_path": {
+            "description": "Path to the OTLP JSON export file",
+            "type": "string"
+          },
+          "project": {
+            "description": "Name of the indexed project",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "file_path"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "f0a678a7d29c716a0cbcc037c376799256758f9e4db3f18eac1dc58c11430ab4"
+    },
     "list_projects": {
       "input_schema": {
         "properties": {},
         "type": "object"
       },
       "input_schema_sha256": "efddc7bd8bbcef73a14eb1ace1ffdaec81e518ef1e13c1e9271d0b8acb694a49"
+    },
+    "manage_adr": {
+      "input_schema": {
+        "properties": {
+          "content": {
+            "description": "Full ADR markdown (required for mode='store'). Must contain all 6 ## SECTION headers: PURPOSE, STACK, ARCHITECTURE, PATTERNS, TRADEOFFS, PHILOSOPHY. Missing sections will be rejected.",
+            "type": "string"
+          },
+          "include": {
+            "description": "Section filter for mode='get'. Returns only the listed sections instead of the full ADR. Example: ['STACK', 'PATTERNS'] returns ~800 chars instead of ~8000. Omit to get all sections.",
+            "items": {
+              "enum": [
+                "PURPOSE",
+                "STACK",
+                "ARCHITECTURE",
+                "PATTERNS",
+                "TRADEOFFS",
+                "PHILOSOPHY"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "mode": {
+            "description": "Operation: 'get' retrieves ADR, 'store' creates/replaces (all 6 sections required), 'update' patches sections (canonical keys only), 'delete' removes, 'auto' computes from indexed graph and stores (no content needed).",
+            "enum": [
+              "get",
+              "store",
+              "update",
+              "delete",
+              "auto"
+            ],
+            "type": "string"
+          },
+          "project": {
+            "description": "Project name. Defaults to session project.",
+            "type": "string"
+          },
+          "sections": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Section updates (required for mode='update'). Keys must be canonical section names (PURPOSE, STACK, ARCHITECTURE, PATTERNS, TRADEOFFS, PHILOSOPHY). Non-canonical keys are rejected. Values are new content. Unmentioned sections preserved.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "5c857886241310e67da9084bf96cd9b34f7e152bef4ab3775a61e49700e157b7"
     },
     "query_graph": {
       "input_schema": {
@@ -256,6 +772,108 @@
       },
       "input_schema_sha256": "f3e72e40730b88a4793bc06c5262f22181b22861960236078cded1a31a37ca98"
     },
+    "rank_by_query": {
+      "input_schema": {
+        "properties": {
+          "project": {
+            "description": "Project name (optional — uses session project if omitted)",
+            "type": "string"
+          },
+          "query": {
+            "description": "Natural-language query or symbol list. Tokens shorter than 2 chars and English stopwords (the/of/how/etc.) are dropped. At least one token must match a node Name or QualifiedName substring.",
+            "type": "string"
+          },
+          "seed_strategy": {
+            "description": "How to match query → seed nodes. 'hybrid' (default, recommended): substring + embedding seeds with embedding-dominance threshold (≥3 embedding seeds drops substring entirely). 'embedding': Voyage-embed only (requires VOYAGE_API_KEY + index with embeddings populated). 'substring': tokens word-boundary-match Name/QualifiedName. NOTE: when 'substring' is requested AND the project has embeddings, the call is auto-routed to 'hybrid' — substring on its own surfaces PageRank-propagation noise (generic types / error wrappers accumulating rank from seeded callers) that hybrid eliminates. Bare substring runs only when no embeddings exist.",
+            "enum": [
+              "substring",
+              "embedding",
+              "hybrid"
+            ],
+            "type": "string"
+          },
+          "top_k": {
+            "description": "Maximum number of ranked nodes to return (1-200, default 20). Higher values give wider context at cost of more tokens.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "f554aec6bbb0509ce4211136c343bf8b40d82460f6b5cc6e50b5591fdb2acc47"
+    },
+    "search_code": {
+      "input_schema": {
+        "properties": {
+          "case_sensitive": {
+            "description": "Match case-sensitively. Default: false (case-insensitive). Set true for exact case matching.",
+            "type": "boolean"
+          },
+          "file_pattern": {
+            "description": "Glob pattern to filter files (e.g. '*.go', '*.py', '*.toml'). Use to focus search on specific file types or directories.",
+            "type": "string"
+          },
+          "max_results": {
+            "description": "Max matches per page (default: 10). Response includes has_more flag for pagination.",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Skip N matches for pagination (default: 0). Check has_more in response.",
+            "type": "integer"
+          },
+          "pattern": {
+            "description": "Text to search for. Case-insensitive by default. Literal string match unless regex=true. With regex=true: Go regex syntax (no backslash before pipe). Best practice: use alternatives for word form variance — 'deprecat|obsolete|legacy' catches 'deprecated', 'deprecating', 'obsolete', etc. A partial stem with alternatives is more effective than an exact word.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project to search in. Defaults to session project.",
+            "type": "string"
+          },
+          "regex": {
+            "description": "Treat pattern as a regular expression (default: false)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pattern"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "167e4d6af775e6b4ad4381d2b7640e8d9ed41510226d181c75961e61154f57aa"
+    },
+    "search_code_semantic": {
+      "input_schema": {
+        "properties": {
+          "file_pattern": {
+            "description": "Glob pattern to filter files (e.g. '*.rs', 'src/**')",
+            "type": "string"
+          },
+          "label": {
+            "description": "Node label filter: Function, Method, Class, Struct, Interface, Trait, Enum, Module, Type",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum results (default 10, max 50)",
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project to search in. Defaults to session project.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Natural language search query. Describe what the code does, not exact keywords.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "c3a5f73756f049e04c2e0092ab8464878ee895c4d3592ca4127a68089943802f"
+    },
     "search_graph": {
       "input_schema": {
         "properties": {
@@ -303,8 +921,16 @@
             "description": "Max results per page (default: 10). Use small limits and paginate with offset — response includes has_more flag.",
             "type": "integer"
           },
+          "max_complexity": {
+            "description": "Maximum cyclomatic complexity (e.g. 5 to surface simple candidates for early documentation). Nodes without a complexity property are excluded when this filter is set.",
+            "type": "integer"
+          },
           "max_degree": {
             "description": "Maximum edge count (e.g. 0 for dead code detection)",
+            "type": "integer"
+          },
+          "min_complexity": {
+            "description": "Minimum cyclomatic complexity (e.g. 10 to surface gnarly functions for documentation/refactor focus). Nodes without a complexity property are excluded when this filter is set.",
             "type": "integer"
           },
           "min_degree": {
@@ -343,7 +969,23 @@
         },
         "type": "object"
       },
-      "input_schema_sha256": "9fa31fd09b3d9b4b57fda64a72c5f267e7e1f2c190af73c1e0fb10571a84e8b1"
+      "input_schema_sha256": "fe94861299051c544d9b0ea5f5f35264da088b854a284558ff2663249c09588c"
+    },
+    "service_map": {
+      "input_schema": {
+        "properties": {
+          "include_libraries": {
+            "description": "Include shared libraries (lib*) in the map (default false — only services with main functions).",
+            "type": "boolean"
+          },
+          "project": {
+            "description": "Project to analyze. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "0d7daa5899047047051b577f54ab022e77f5377e6dc69078b80ee5b118c18920"
     },
     "trace_call_path": {
       "input_schema": {
@@ -370,7 +1012,7 @@
             "type": "boolean"
           },
           "min_confidence": {
-            "description": "Minimum confidence threshold (0.0-1.0) for CALLS edges. Filters out low-confidence fuzzy matches. Bands: high (>=0.7), medium (>=0.45), speculative (<0.45). Default 0 (no filter).",
+            "description": "Minimum confidence threshold (0.0-1.0) for CALLS edges. Filters out low-confidence fuzzy matches. Bands: high (>=0.7), medium (>=0.45), speculative (<0.45). Default 0.45 — filters speculative cross-crate name-only matches that frequently resolve to wrong-crate same-named methods. Pass 0 explicitly to disable filtering and see the full unfiltered trace.",
             "type": "number"
           },
           "project": {
@@ -387,7 +1029,7 @@
         ],
         "type": "object"
       },
-      "input_schema_sha256": "2eea1e67e9ec51f8685ebb9ee798e5df9f0ccd5b2f0abf1152628eb2c9bb0734"
+      "input_schema_sha256": "57178343e3eaa1a9d3499ed23b3eb31de819f2ffc16754d6841a8594e0b877d5"
     },
     "trace_data_flow": {
       "input_schema": {
@@ -411,6 +1053,37 @@
         "type": "object"
       },
       "input_schema_sha256": "14ca0e5ba61efb54e768a82462ad7d28fbf649c169a24a349331a11e6eaf3a37"
+    },
+    "visualize": {
+      "input_schema": {
+        "properties": {
+          "file_pattern": {
+            "description": "Glob pattern to filter nodes by file path (e.g. '*.py', 'internal/*'). Reduces graph size for large codebases.",
+            "type": "string"
+          },
+          "include_labels": {
+            "description": "Node labels to include. Default: ['Function', 'Class', 'Method', 'Interface', 'Route', 'Module']. Use ['File', 'Package'] to see structural hierarchy.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "max_nodes": {
+            "description": "Maximum number of nodes to include (default 500, max 5000). Nodes are selected by connectivity (highest degree first).",
+            "type": "integer"
+          },
+          "output_path": {
+            "description": "Path for the output HTML file. Defaults to {project}-graph.html in the project root.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project to visualize. Defaults to session project.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_sha256": "7af71b4d7288d509ce35531e36aecba545e1849c2d6759cb9aacdb5b3809b1ba"
     }
   }
 }

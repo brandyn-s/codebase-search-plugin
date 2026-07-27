@@ -39,16 +39,15 @@ CURRENT_SEARCH_CAPABILITIES = {
     }
 }
 CURRENT_GRAPH_CAPABILITIES = {
-    "inputs": {"index_repository.skip_report": False},
+    "inputs": {"index_repository.skip_report": True},
     "outputs": {
         "index_identity": {
             "supported": False,
             "schema_version": None,
             "fields": [],
         },
-        "graph_status_ready": True,
+        "graph_status_ready": False,
     },
-    "side_effects": {"index_repository.writes_architecture_report": False},
 }
 READY_SEARCH_CAPABILITIES = {
     "outputs": {
@@ -273,7 +272,7 @@ class ReadinessContractTests(unittest.TestCase):
         self.assertEqual(readiness["status"], "blocked")
         self.assertEqual(readiness["requires"], READINESS_REQUIREMENTS)
         self.assertNotIn("evidence", readiness)
-        self.assertIn("both pinned components", readiness["reason"].lower())
+        self.assertIn("output behavior", readiness["reason"].lower())
 
     def test_valid_future_ready_fixture_passes_every_gate(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -494,9 +493,10 @@ class ReadinessContractTests(unittest.TestCase):
         self.assertIn("INTEGRATED READINESS: BLOCKED", readme)
         self.assertNotIn("This runs both semantic and structural indexing", readme)
         self.assertIn(
-            "does not write `ARCHITECTURE_REPORT.md`", normalized_compatibility
+            "exposes an optional boolean `skip_report` input",
+            normalized_compatibility,
         )
-        self.assertIn("future identity-capable", normalized_compatibility)
+        self.assertIn("runtime behavior", normalized_compatibility)
         self.assertIn("does not write", skill)
         for installer in (shell, powershell):
             self.assertIn("INTEGRATED READINESS: BLOCKED", installer)

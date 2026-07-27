@@ -39,9 +39,9 @@ The install script:
 
 > **Current compatibility block:** both pinned snapshots lack attested,
 > complete v1 `index_identity` outputs, and code-search lacks an attested
-> semantic `index_ready` output. The pinned graph release does not write an
-> architecture report, but the future identity-capable source does; it must
-> expose `skip_report` before promotion. See `compatibility/README.md`.
+> semantic `index_ready` output. The pinned graph release exposes
+> `skip_report`, but its runtime behavior and unchanged-checkout guarantee
+> still require separate readiness evidence. See `compatibility/README.md`.
 
 ## How It Works
 

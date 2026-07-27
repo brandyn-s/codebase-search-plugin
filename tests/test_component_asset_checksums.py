@@ -13,23 +13,23 @@ HELPER = ROOT / "scripts" / "validate_real_installed.py"
 EXPECTED_ASSETS = {
     "darwin-amd64": {
         "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-        "sha256": "3891facf8e8a7c7d5345a09a5938e9b14af2fae4c53c93d5a3960c9f2bf8ca8c",
+        "sha256": "5f7588f847a22a8602ccce355f7279c0bdf50808d184a5b6c082bf1b42a2e341",
     },
     "darwin-arm64": {
         "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-        "sha256": "77fa65569309c42b82bc24f6638921d01612b4509e6763dd26be6c5d0c0e835b",
+        "sha256": "8ad13c146c54a12ea14de1fd82a4cfd1224af149c086cea27a7ab6ca88ffc23b",
     },
     "linux-amd64": {
         "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-        "sha256": "45c23c40c569b9c406af2a74b6ad6516c7abdfca4d9f6fab87dbfce68a446cb5",
+        "sha256": "d23da061459f65d8f4a1fae0d906245d1bbb9cc37998836944397b9f8a791df8",
     },
     "linux-arm64": {
         "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-        "sha256": "8393854ff5ae3d48e7c7110659ca42396ebeb8024f7b375446180b52da304fcf",
+        "sha256": "48dff8f5f602d84ea7359187211ea7d98b1c3d1102aec8220fc3d38c6174b649",
     },
     "windows-amd64": {
         "name": "codebase-memory-mcp-windows-amd64.zip",
-        "sha256": "d58464c4622a49c2a04ccef3e36fde7c493e1f522d052ff6a9c2b7bc900c8cfe",
+        "sha256": "3a850b7c311d114aa93012702e838c8d3da7b75ac1afdfb980c4b33e3e18b129",
     },
 }
 
