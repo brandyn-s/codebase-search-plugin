@@ -11,6 +11,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE_INSTALL_FIXTURE = (
+    ROOT / "tests" / "fixtures" / "code-search-release-install.json"
+)
 
 
 class StaticPluginValidationTests(unittest.TestCase):
@@ -143,6 +146,102 @@ class StaticPluginValidationTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
         self.assertIn("linux-amd64", completed.stdout)
         self.assertIn("sha256", completed.stdout.lower())
+
+    def test_validator_accepts_pinned_code_search_release_wheel(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            bom_path = checkout / "component-bom.json"
+            bom = json.loads(bom_path.read_text(encoding="utf-8"))
+            bom["components"]["code-search"]["install"] = json.loads(
+                RELEASE_INSTALL_FIXTURE.read_text(encoding="utf-8")
+            )
+            bom_path.write_text(json.dumps(bom), encoding="utf-8")
+
+            snapshot_path = (
+                checkout / "compatibility" / "code-search-tools.json"
+            )
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            snapshot["source"] = {
+                "kind": "github-release",
+                "version": "v0.0.0",
+            }
+            snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+
+            evidence_path = (
+                checkout / "compatibility" / "readiness-evidence.json"
+            )
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            evidence["components"]["code-search"]["version"] = "v0.0.0"
+            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+
+    def test_validator_rejects_weakened_code_search_release_policy(self):
+        mutations = {
+            "unversioned tag": ("tag", "release"),
+            "different signer": (
+                "signer_workflow",
+                (
+                    "redacted-org/code-search/"
+                    ".github/workflows/other.yml"
+                ),
+            ),
+            "non-main source": ("source_ref", "refs/tags/v0.0.0"),
+        }
+        for label, (field, value) in mutations.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                checkout = Path(tmp)
+                self._copy_checkout(checkout)
+                bom_path = checkout / "component-bom.json"
+                bom = json.loads(bom_path.read_text(encoding="utf-8"))
+                release_install = json.loads(
+                    RELEASE_INSTALL_FIXTURE.read_text(encoding="utf-8")
+                )
+                if field in {"signer_workflow", "source_ref"}:
+                    release_install["attestation"][field] = value
+                else:
+                    release_install[field] = value
+                bom["components"]["code-search"]["install"] = release_install
+                bom_path.write_text(json.dumps(bom), encoding="utf-8")
+
+                snapshot_path = (
+                    checkout / "compatibility" / "code-search-tools.json"
+                )
+                snapshot = json.loads(
+                    snapshot_path.read_text(encoding="utf-8")
+                )
+                snapshot["source"] = {
+                    "kind": "github-release",
+                    "version": release_install["tag"],
+                }
+                snapshot_path.write_text(
+                    json.dumps(snapshot),
+                    encoding="utf-8",
+                )
+                evidence_path = (
+                    checkout / "compatibility" / "readiness-evidence.json"
+                )
+                evidence = json.loads(
+                    evidence_path.read_text(encoding="utf-8")
+                )
+                evidence["components"]["code-search"]["version"] = (
+                    release_install["tag"]
+                )
+                evidence_path.write_text(
+                    json.dumps(evidence),
+                    encoding="utf-8",
+                )
+
+                completed = self._run_validator(checkout)
+
+            self.assertEqual(
+                completed.returncode,
+                1,
+                completed.stdout + completed.stderr,
+            )
 
     def test_validator_rejects_non_string_search_project_path(self):
         with tempfile.TemporaryDirectory() as tmp:

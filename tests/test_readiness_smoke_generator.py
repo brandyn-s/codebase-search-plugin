@@ -196,6 +196,7 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         candidate_evidence: bool = False,
         marker: Path | None = None,
         behavior: str = "",
+        search_release: bool = False,
     ):
         fixture = directory / "fixture"
         shutil.copytree(ROOT / "bench" / "e2e" / "target-repo", fixture)
@@ -204,6 +205,12 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
             (ROOT / "component-bom.json").read_text(encoding="utf-8")
         )
         bom["integrated_readiness"]["status"] = readiness_status
+        if search_release:
+            bom["components"]["code-search"]["install"] = {
+                "kind": "github-release",
+                "repository": "redacted-org/code-search",
+                "tag": "v0.2.0",
+            }
         bom_path.write_text(json.dumps(bom), encoding="utf-8")
         code_search = self._wrapper(directory, "code-search", marker, behavior)
         code_graph = self._wrapper(directory, "code-graph", marker, behavior)
@@ -313,6 +320,27 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
                 graph["index_identity"][field],
             )
         self.assertNotIn("must-not-reach-smoke", completed.stdout + completed.stderr)
+
+    def test_generator_records_release_tag_as_component_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            completed, output, _bom = self._run_generator(
+                directory,
+                "ready",
+                search_release=True,
+            )
+
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stdout + completed.stderr,
+            )
+            evidence = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            evidence["components"]["code-search"]["version"],
+            "v0.2.0",
+        )
 
     def test_blocked_bom_refuses_to_start_servers_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:

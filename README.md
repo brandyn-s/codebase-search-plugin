@@ -42,7 +42,8 @@ writes, and verifies that both engines indexed the same unchanged checkout.
 Voyage unless `CODE_GRAPH_SKIP_EMBEDDINGS=1`.
 
 The install script:
-- Creates a Python venv inside the plugin directory and pip-installs code-search from GitHub
+- Creates a Python venv and installs the exact code-search source declared by
+  the BOM: either a pinned Git commit or an attested GitHub Release wheel
 - Downloads the pre-built code-graph binary for your platform from GitHub releases
 - Reads exact tested versions from `component-bom.json` instead of selecting a moving latest release
 - Starts both installed stdio MCPs and rejects missing or schema-drifted tools before reporting success
@@ -179,6 +180,8 @@ provider-specific and are not interchangeable.
 ## Prerequisites
 
 - **Python 3.12+** (for code-search)
+- **GitHub CLI (`gh`) with authenticated repository read access** when the BOM
+  selects a private code-search release
 - **Linux/Mac**: `curl` and `tar` (for downloading code-graph binary)
 - **Windows**: PowerShell 5.1+ (built-in) — use `install.ps1` instead of `install.sh`
 
@@ -203,6 +206,27 @@ python3 -m venv .venv-code-search
   "${CODE_SEARCH_REF}" \
   --repository "${CODE_SEARCH_REPOSITORY}"
 ```
+
+The current production BOM still pins code-search by full Git revision. The
+installers also support an atomic future promotion to
+`install.kind: github-release`; do not partially copy release fields into the
+production BOM. A release descriptor pins the tag, source commit, wheel name
+and SHA-256, JSONL attestation bundle name and SHA-256, signer workflow, and
+`refs/heads/main`.
+
+For a release-mode manual install, follow the same order as the installers:
+
+1. Resolve the exact Git tag through the Git refs API, peel annotated tags,
+   and require that the tag resolves to the pinned source commit.
+2. Use authenticated `gh release download` to fetch exactly the wheel and
+   attestation bundle named by the BOM and tag.
+3. Verify both files against their separate BOM SHA-256 values.
+4. Run `gh attestation verify` with the offline `--bundle`, pinned repository,
+   `--signer-workflow`, `--source-digest`, `--source-ref refs/heads/main`, and
+   `--deny-self-hosted-runners`.
+5. Only after those checks pass, pip-install the local wheel with
+   `--force-reinstall` and run `scripts/verify_code_search_wheel.py` to verify
+   its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, download only the tag and platform asset declared in
 `component-bom.json`, then verify the archive against that asset's BOM
@@ -236,8 +260,18 @@ default-branch dispatch, never from pull-request-controlled code.
 `CODE_INTEL_COMPONENT_TOKEN` is a required post-merge validation secret:
 configure a fine-grained token with read access to
 `redacted-org/code-search` and `redacted-org/code-graph`.
-The validator exposes it only to authenticated `gh` clone/download commands
-and removes it before package builds or MCP processes start.
+The validator exposes it only to authenticated GitHub fetch/tag-resolution
+commands and removes it before package builds or MCP processes start.
+
+For the release-wheel path, repository `Contents: read` is sufficient to
+resolve and peel the tag and download its private assets. The wheel is treated
+as an attested build artifact downloaded from that pinned release; the checks
+do not cryptographically prove its placement there. Its separately
+checksum-pinned offline attestation bundle is passed directly to
+`gh attestation verify`; no online Attestations API lookup is used, so the
+component token does not need `Attestations: read`. The policy binds the build
+to the pinned source commit, the release workflow, `refs/heads/main`, and
+GitHub-hosted runners.
 
 There is currently no repository secret fallback. If the secret is absent,
 the trusted job intentionally fails; do not skip or weaken this validation.

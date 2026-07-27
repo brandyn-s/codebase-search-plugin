@@ -71,8 +71,9 @@ if ($PluginValidationExitCode -ne 0) {
 Write-Host ""
 
 $Bom = Get-Content -Raw -Path $BomPath | ConvertFrom-Json
-$CodeSearchRepository = $Bom.components.'code-search'.install.repository
-$CodeSearchRef = $Bom.components.'code-search'.install.revision
+$CodeSearchInstall = $Bom.components.'code-search'.install
+$CodeSearchKind = $CodeSearchInstall.kind
+$CodeSearchRepository = $CodeSearchInstall.repository
 $GraphRepository = $Bom.components.'code-graph'.install.repository
 $ReleaseTag = $Bom.components.'code-graph'.install.tag
 $ReadinessStatus = $Bom.integrated_readiness.status
@@ -89,10 +90,124 @@ if (-not $AssetName -or $ExpectedSha256 -notmatch '^[0-9a-fA-F]{64}$') {
     exit 1
 }
 
+function Assert-Sha256 {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Expected,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    if ($Expected -notmatch '^[0-9a-f]{64}$') {
+        throw "BOM SHA-256 is missing or invalid for $Label"
+    }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "downloaded release asset is missing: $Path"
+    }
+    $Actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($Actual -ne $Expected) {
+        Remove-Item -LiteralPath $Path -ErrorAction SilentlyContinue
+        throw "checksum mismatch for $Label (expected $Expected, got $Actual)"
+    }
+}
+
+function Assert-GitHubCliAuthenticated {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        throw "GitHub CLI is required for private code-search releases"
+    }
+    & gh auth status --hostname github.com *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "authenticate GitHub CLI with gh auth login or GH_TOKEN"
+    }
+}
+
+function Invoke-WithoutGitHubTokens {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$Operation
+    )
+
+    $TokenNames = @(
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "CODE_INTEL_COMPONENT_TOKEN"
+    )
+    $SavedTokens = @{}
+    foreach ($Name in $TokenNames) {
+        $SavedTokens[$Name] = [Environment]::GetEnvironmentVariable(
+            $Name,
+            "Process"
+        )
+        Remove-Item -LiteralPath "Env:$Name" -ErrorAction SilentlyContinue
+    }
+    try {
+        & $Operation
+    } finally {
+        foreach ($Name in $TokenNames) {
+            if ($null -eq $SavedTokens[$Name]) {
+                Remove-Item -LiteralPath "Env:$Name" -ErrorAction SilentlyContinue
+            } else {
+                Set-Item -LiteralPath "Env:$Name" -Value $SavedTokens[$Name]
+            }
+        }
+    }
+}
+
+function Invoke-GitHubApiJson {
+    param(
+        [Parameter(Mandatory = $true)][string]$Endpoint
+    )
+
+    $RawResponse = & gh api --method GET $Endpoint
+    if ($LASTEXITCODE -ne 0) {
+        throw "gh api failed for $Endpoint with status $LASTEXITCODE"
+    }
+    try {
+        return $RawResponse | ConvertFrom-Json
+    } catch {
+        throw "GitHub API returned malformed JSON for $Endpoint"
+    }
+}
+
+function Resolve-ReleaseTagCommit {
+    param(
+        [Parameter(Mandatory = $true)][string]$Repository,
+        [Parameter(Mandatory = $true)][string]$Tag
+    )
+
+    $Document = Invoke-GitHubApiJson `
+        -Endpoint "repos/$Repository/git/ref/tags/$Tag"
+    for ($Depth = 0; $Depth -lt 16; $Depth++) {
+        $TargetType = $Document.object.type
+        $TargetSha = $Document.object.sha
+        if (
+            -not $TargetSha -or
+            $TargetSha -notmatch '^([0-9a-f]{40}|[0-9a-f]{64})$'
+        ) {
+            throw "GitHub tag response has an invalid object SHA"
+        }
+        switch ($TargetType) {
+            "commit" {
+                return $TargetSha
+            }
+            "tag" {
+                $Document = Invoke-GitHubApiJson `
+                    -Endpoint "repos/$Repository/git/tags/$TargetSha"
+            }
+            default {
+                throw "GitHub tag resolves to unsupported object type: $TargetType"
+            }
+        }
+    }
+    throw "GitHub annotated tag chain exceeds 16 objects"
+}
+
 # ------------------------------------------------------------------
-# 2. Install code-search (Python, pip from GitHub)
+# 2. Install code-search (Python, exact Git revision or release wheel)
 # ------------------------------------------------------------------
 Write-Host "[2/5] Installing code-search (semantic search)..." -ForegroundColor Yellow
+
+if (-not (Test-Path $BinDir)) {
+    New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
+}
 
 if (-not (Test-Path $VenvDir)) {
     Write-Host "  Creating virtual environment..."
@@ -106,21 +221,124 @@ if (-not (Test-Path $VenvPip)) {
     exit 1
 }
 
-Write-Host "  Installing redacted-code-search from GitHub..."
-$CodeSearchRequirement = "redacted-code-search @ git+{0}@{1}" -f $CodeSearchRepository, $CodeSearchRef
-& $VenvPip install --quiet $CodeSearchRequirement
-if ($LASTEXITCODE -ne 0) {
-    $PipExitCode = $LASTEXITCODE
-    Write-Host "Error: code-search pip install failed with status $PipExitCode." -ForegroundColor Red
-    exit $PipExitCode
-}
-& $VenvPython (Join-Path $PluginDir "scripts\verify_code_search_revision.py") `
-    $CodeSearchRef `
-    --repository $CodeSearchRepository
-if ($LASTEXITCODE -ne 0) {
-    $RevisionExitCode = $LASTEXITCODE
-    Write-Host "Error: installed code-search revision verification failed." -ForegroundColor Red
-    exit $RevisionExitCode
+switch ($CodeSearchKind) {
+    "git" {
+        $CodeSearchRef = $CodeSearchInstall.revision
+        Write-Host "  Installing redacted-code-search from GitHub..."
+        $CodeSearchRequirement = "redacted-code-search @ git+{0}@{1}" -f $CodeSearchRepository, $CodeSearchRef
+        & $VenvPip install --quiet $CodeSearchRequirement
+        if ($LASTEXITCODE -ne 0) {
+            $PipExitCode = $LASTEXITCODE
+            Write-Host "Error: code-search pip install failed with status $PipExitCode." -ForegroundColor Red
+            exit $PipExitCode
+        }
+        try {
+            Invoke-WithoutGitHubTokens {
+                & $VenvPython (Join-Path $PluginDir "scripts\verify_code_search_revision.py") `
+                    $CodeSearchRef `
+                    --repository $CodeSearchRepository
+                if ($LASTEXITCODE -ne 0) {
+                    throw (
+                        "installed code-search revision verification " +
+                        "failed with status $LASTEXITCODE"
+                    )
+                }
+            }
+        } catch {
+            Write-Host "Error: $_" -ForegroundColor Red
+            exit 1
+        }
+    }
+    "github-release" {
+        $CodeSearchTag = $CodeSearchInstall.tag
+        $CodeSearchSourceRevision = $CodeSearchInstall.source_revision
+        $CodeSearchWheel = $CodeSearchInstall.asset.name
+        $CodeSearchWheelSha256 = $CodeSearchInstall.asset.sha256
+        $CodeSearchBundle = $CodeSearchInstall.attestation.bundle.name
+        $CodeSearchBundleSha256 = $CodeSearchInstall.attestation.bundle.sha256
+        $CodeSearchSignerWorkflow = $CodeSearchInstall.attestation.signer_workflow
+        $CodeSearchSourceRef = $CodeSearchInstall.attestation.source_ref
+        $CodeSearchDownloadDir = Join-Path $BinDir ".code-search-download"
+        New-Item -ItemType Directory -Path $CodeSearchDownloadDir -Force | Out-Null
+        $CodeSearchWheelPath = Join-Path $CodeSearchDownloadDir $CodeSearchWheel
+        $CodeSearchBundlePath = Join-Path $CodeSearchDownloadDir $CodeSearchBundle
+
+        try {
+            Assert-GitHubCliAuthenticated
+            $ResolvedCodeSearchRevision = Resolve-ReleaseTagCommit `
+                -Repository $CodeSearchRepository `
+                -Tag $CodeSearchTag
+            if ($ResolvedCodeSearchRevision -ne $CodeSearchSourceRevision) {
+                throw (
+                    "code-search tag source revision mismatch: " +
+                    "expected $CodeSearchSourceRevision, " +
+                    "got $ResolvedCodeSearchRevision"
+                )
+            }
+            Write-Host "  Downloading tested code-search wheel and attestation bundle..."
+            & gh release download $CodeSearchTag `
+                --repo $CodeSearchRepository `
+                --pattern $CodeSearchWheel `
+                --pattern $CodeSearchBundle `
+                --dir $CodeSearchDownloadDir `
+                --clobber
+            if ($LASTEXITCODE -ne 0) {
+                throw "gh release download exited with status $LASTEXITCODE"
+            }
+
+            Assert-Sha256 `
+                -Path $CodeSearchWheelPath `
+                -Expected $CodeSearchWheelSha256 `
+                -Label $CodeSearchWheel
+            Assert-Sha256 `
+                -Path $CodeSearchBundlePath `
+                -Expected $CodeSearchBundleSha256 `
+                -Label $CodeSearchBundle
+
+            Write-Host "  Verifying offline build provenance..."
+            Push-Location $CodeSearchDownloadDir
+            try {
+                Invoke-WithoutGitHubTokens {
+                    & gh attestation verify $CodeSearchWheel `
+                        --bundle $CodeSearchBundle `
+                        --repo $CodeSearchRepository `
+                        --signer-workflow $CodeSearchSignerWorkflow `
+                        --source-digest $CodeSearchSourceRevision `
+                        --source-ref $CodeSearchSourceRef `
+                        --deny-self-hosted-runners
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "gh attestation verify exited with status $LASTEXITCODE"
+                    }
+                }
+            } finally {
+                Pop-Location
+            }
+
+            Write-Host "  Installing the verified local redacted-code-search wheel..."
+            Invoke-WithoutGitHubTokens {
+                & $VenvPip install --quiet --force-reinstall $CodeSearchWheelPath
+                if ($LASTEXITCODE -ne 0) {
+                    throw "code-search wheel install exited with status $LASTEXITCODE"
+                }
+                & $VenvPython (Join-Path $PluginDir "scripts\verify_code_search_wheel.py") `
+                    $CodeSearchTag `
+                    --asset-name $CodeSearchWheel `
+                    --sha256 $CodeSearchWheelSha256
+                if ($LASTEXITCODE -ne 0) {
+                    throw "installed code-search wheel provenance verification failed"
+                }
+            }
+        } catch {
+            Write-Host "Error: code-search release installation failed: $_" -ForegroundColor Red
+            exit 1
+        }
+        Remove-Item -LiteralPath $CodeSearchWheelPath, $CodeSearchBundlePath
+        Remove-Item -LiteralPath $CodeSearchDownloadDir -ErrorAction SilentlyContinue
+    }
+    default {
+        Write-Host "Error: unsupported code-search install kind: $CodeSearchKind" -ForegroundColor Red
+        exit 1
+    }
 }
 
 Write-Host "  code-search installed."
@@ -131,10 +349,6 @@ Write-Host ""
 # ------------------------------------------------------------------
 Write-Host "[3/5] Installing code-graph (structural analysis)..." -ForegroundColor Yellow
 
-if (-not (Test-Path $BinDir)) {
-    New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
-}
-
 Write-Host "  Tested release: $ReleaseTag"
 
 $DownloadUrl = "https://github.com/${GraphRepository}/releases/download/${ReleaseTag}/${AssetName}"
@@ -142,7 +356,12 @@ $ZipPath = Join-Path $BinDir $AssetName
 
 Write-Host "  Downloading code-graph $ReleaseTag for $Platform-$Arch..."
 try {
-    if ((Get-Command gh -ErrorAction SilentlyContinue) -and $env:GH_TOKEN) {
+    $GhAuthenticated = $false
+    if (Get-Command gh -ErrorAction SilentlyContinue) {
+        & gh auth status --hostname github.com *> $null
+        $GhAuthenticated = $LASTEXITCODE -eq 0
+    }
+    if ($GhAuthenticated) {
         Write-Host "  Using authenticated GitHub CLI download."
         & gh release download $ReleaseTag `
             --repo $GraphRepository `
@@ -153,7 +372,7 @@ try {
             throw "gh release download exited with status $LASTEXITCODE"
         }
     } else {
-        Write-Host "  Using public release URL fallback (GH_TOKEN and gh are required for private assets)."
+        Write-Host "  Using public release URL fallback (authenticated gh or GH_TOKEN is required for private assets)."
         Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
     }
 } catch {
@@ -166,19 +385,12 @@ try {
 # Verify the archive against the SHA-256 pinned in the tested BOM.
 Write-Host "  Verifying checksum..."
 try {
-    if (-not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) {
-        throw "downloaded archive is missing"
-    }
-    $ActualSha256 = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Sha256 `
+        -Path $ZipPath `
+        -Expected $ExpectedSha256.ToLowerInvariant() `
+        -Label $AssetName
 } catch {
     Write-Host "Error: SHA-256 verification failed for $AssetName`: $_" -ForegroundColor Red
-    exit 1
-}
-if ($ActualSha256 -ne $ExpectedSha256.ToLowerInvariant()) {
-    Write-Host "Error: checksum mismatch for $AssetName" -ForegroundColor Red
-    Write-Host "  expected: $($ExpectedSha256.ToLowerInvariant())"
-    Write-Host "  actual:   $ActualSha256"
-    Remove-Item $ZipPath -ErrorAction SilentlyContinue
     exit 1
 }
 Write-Host "  Checksum OK."
@@ -248,12 +460,21 @@ Write-Host ""
 Write-Host "[5/5] Validating installed MCP tool contracts..." -ForegroundColor Yellow
 $CodeSearchMcp = Join-Path $VenvDir "Scripts\code-search-mcp.exe"
 $GraphMcp = Join-Path $BinDir $GraphBinary
-& $VenvPython (Join-Path $PluginDir "scripts\validate_installed.py") `
-    --server "code-search=$CodeSearchMcp" `
-    --server "code-graph=$GraphMcp"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: installed MCP contract validation failed." -ForegroundColor Red
-    exit $LASTEXITCODE
+try {
+    Invoke-WithoutGitHubTokens {
+        & $VenvPython (Join-Path $PluginDir "scripts\validate_installed.py") `
+            --server "code-search=$CodeSearchMcp" `
+            --server "code-graph=$GraphMcp"
+        if ($LASTEXITCODE -ne 0) {
+            throw (
+                "installed MCP contract validation failed with status " +
+                "$LASTEXITCODE"
+            )
+        }
+    }
+} catch {
+    Write-Host "Error: $_" -ForegroundColor Red
+    exit 1
 }
 Write-Host ""
 

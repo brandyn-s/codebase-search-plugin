@@ -1,0 +1,18 @@
+{
+  "asset": {
+    "name": "redacted_code_search-0.0.0-py3-none-any.whl",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "attestation": {
+    "bundle": {
+      "name": "redacted_code_search-0.0.0-py3-none-any.whl.jsonl",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "signer_workflow": "redacted-org/code-search/.github/workflows/release.yml",
+    "source_ref": "refs/heads/main"
+  },
+  "kind": "github-release",
+  "repository": "redacted-org/code-search",
+  "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tag": "v0.0.0"
+}

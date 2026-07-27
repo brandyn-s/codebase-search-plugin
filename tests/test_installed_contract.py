@@ -14,6 +14,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts" / "validate_installed.py"
 REVISION_VERIFIER = ROOT / "scripts" / "verify_code_search_revision.py"
+WHEEL_VERIFIER = ROOT / "scripts" / "verify_code_search_wheel.py"
 FAKE_SERVER = ROOT / "tests" / "fixtures" / "fake_mcp_server.py"
 
 
@@ -23,6 +24,17 @@ def load_revision_verifier():
     )
     if spec is None or spec.loader is None:
         raise AssertionError("could not load code-search revision verifier")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_wheel_verifier():
+    spec = importlib.util.spec_from_file_location(
+        "verify_code_search_wheel", WHEEL_VERIFIER
+    )
+    if spec is None or spec.loader is None:
+        raise AssertionError("could not load code-search wheel verifier")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -100,7 +112,7 @@ class InstalledContractTests(unittest.TestCase):
             powershell,
             re.compile(
                 r"& \$VenvPip install --quiet \$CodeSearchRequirement\r?\n"
-                r"if \(\$LASTEXITCODE -ne 0\)",
+                r"\s*if \(\$LASTEXITCODE -ne 0\)",
             ),
         )
 
@@ -132,6 +144,28 @@ class InstalledContractTests(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(verifier.RevisionError):
                     verifier.verify_direct_url(invalid, expected, repository)
+
+    def test_wheel_verifier_accepts_pinned_local_archive(self):
+        verifier = load_wheel_verifier()
+        expected_sha256 = "a" * 64
+        verifier.verify_wheel_install(
+            {
+                "archive_info": {
+                    "hash": f"sha256={expected_sha256}",
+                    "hashes": {"sha256": expected_sha256},
+                },
+                "url": (
+                    "file:///tmp/"
+                    "redacted_code_search-0.2.0-py3-none-any.whl"
+                ),
+            },
+            installed_version="0.2.0",
+            expected_tag="v0.2.0",
+            expected_asset_name=(
+                "redacted_code_search-0.2.0-py3-none-any.whl"
+            ),
+            expected_sha256=expected_sha256,
+        )
 
     def test_manual_install_uses_bom_revision_and_verifies_provenance(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

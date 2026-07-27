@@ -631,7 +631,14 @@ def run_smoke(
     if not isinstance(components, dict):
         raise SmokeError("component BOM components are missing")
     try:
-        search_version = components["code-search"]["install"]["revision"]
+        search_install = components["code-search"]["install"]
+        search_kind = search_install["kind"]
+        if search_kind == "git":
+            search_version = search_install["revision"]
+        elif search_kind == "github-release":
+            search_version = search_install["tag"]
+        else:
+            raise KeyError("unsupported code-search install kind")
         graph_version = components["code-graph"]["install"]["tag"]
     except (KeyError, TypeError) as exc:
         raise SmokeError("component BOM versions are malformed") from exc

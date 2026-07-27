@@ -16,6 +16,9 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 CAPTURE = ROOT / "scripts" / "capture_component_contracts.py"
 FAKE_SERVER = ROOT / "tests" / "fixtures" / "fake_mcp_server.py"
+RELEASE_INSTALL_FIXTURE = (
+    ROOT / "tests" / "fixtures" / "code-search-release-install.json"
+)
 
 
 def load_capture_module():
@@ -58,6 +61,15 @@ class CaptureComponentContractsTests(unittest.TestCase):
         bom["components"]["code-search"]["install"]["revision"] = "a" * 40
         bom["components"]["code-graph"]["install"]["tag"] = "v9.9.9-test"
         path = directory / "candidate-bom.json"
+        path.write_text(json.dumps(bom), encoding="utf-8")
+        return path
+
+    def _release_candidate_bom(self, directory: Path) -> Path:
+        path = self._candidate_bom(directory)
+        bom = json.loads(path.read_text(encoding="utf-8"))
+        bom["components"]["code-search"]["install"] = json.loads(
+            RELEASE_INSTALL_FIXTURE.read_text(encoding="utf-8")
+        )
         path.write_text(json.dumps(bom), encoding="utf-8")
         return path
 
@@ -302,6 +314,73 @@ class CaptureComponentContractsTests(unittest.TestCase):
             graph["tested_capabilities"]["outputs"]["index_identity"]["supported"]
         )
         self.assertNotIn("side_effects", graph["tested_capabilities"])
+
+    def test_capture_preserves_code_search_release_descriptor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            candidate_bom = self._release_candidate_bom(directory)
+            candidate = json.loads(candidate_bom.read_text(encoding="utf-8"))
+            code_search = self._wrapper(directory, "code-search")
+            code_graph = self._wrapper(directory, "code-graph")
+            output = directory / "captured"
+
+            completed = self._run(
+                candidate_bom=candidate_bom,
+                code_search=code_search,
+                code_graph=code_graph,
+                output=output,
+                write=True,
+            )
+
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stdout + completed.stderr,
+            )
+            captured_bom = json.loads(
+                (output / "component-bom.json").read_text(encoding="utf-8")
+            )
+            search_snapshot = json.loads(
+                (
+                    output / "compatibility" / "code-search-tools.json"
+                ).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(
+            captured_bom["components"]["code-search"]["install"],
+            candidate["components"]["code-search"]["install"],
+        )
+        self.assertEqual(
+            search_snapshot["source"],
+            {"kind": "github-release", "version": "v0.0.0"},
+        )
+
+    def test_capture_rejects_weakened_code_search_release_policy(self):
+        capture = load_capture_module()
+        release_install = json.loads(
+            RELEASE_INSTALL_FIXTURE.read_text(encoding="utf-8")
+        )
+        mutations = {
+            "unversioned tag": ("tag", "release"),
+            "different signer": (
+                "signer_workflow",
+                (
+                    "redacted-org/code-search/"
+                    ".github/workflows/other.yml"
+                ),
+            ),
+            "non-main source": ("source_ref", "refs/tags/v0.0.0"),
+        }
+
+        for label, (field, value) in mutations.items():
+            with self.subTest(label=label):
+                mutated = json.loads(json.dumps(release_install))
+                if field in {"signer_workflow", "source_ref"}:
+                    mutated["attestation"][field] = value
+                else:
+                    mutated[field] = value
+                with self.assertRaises(capture.CaptureError):
+                    capture._validate_code_search_release(mutated)
 
     def test_rejects_malformed_duplicate_and_empty_tool_lists(self):
         with tempfile.TemporaryDirectory() as tmp:

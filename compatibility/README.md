@@ -30,7 +30,7 @@ executables produced it. Treat it as supporting promotion-review evidence,
 not as the trusted runtime attestation for a `main` revision.
 
 On every trusted `main` push or manual default-branch run, real-component CI
-installs the exact code-search revision and checksum-verified graph release,
+installs the exact code-search descriptor and checksum-verified graph release,
 then generates a fresh `ready-validation` record under the isolated runner
 directory. The validator requires that live override to report
 `bom_readiness_status: ready`; it cannot be replaced by the committed
@@ -40,3 +40,28 @@ artifact is the authoritative runtime check for the revision.
 A blocked BOM remains fail-closed. The smoke generator refuses to start either
 server for a blocked BOM unless a reviewer explicitly supplies
 `--candidate-evidence`, and candidate mode rejects an already-ready BOM.
+
+## Code-search release promotion
+
+The current production BOM remains on its full Git revision until an actual
+code-search release exists and every exact release fact is known. Contract
+capture and validation support a GitHub Release wheel candidate without
+weakening readiness: capture preserves the complete release descriptor,
+records the tag as the component version, and resets behavioral claims to a
+blocked candidate that must be re-observed.
+
+A release candidate must pin both the wheel and its JSONL attestation bundle
+by filename and SHA-256. Installers download both through authenticated `gh`,
+after resolving and peeling the exact release tag and requiring that the tag
+resolves to the pinned source commit. The downloaded wheel is an attested build
+artifact from the pinned release; its two BOM digests and offline
+`gh attestation verify` result are the artifact checks. The attestation policy
+fixes the release workflow, source digest, `refs/heads/main`, and
+`--deny-self-hosted-runners`. Only then may pip install the local wheel; the
+post-install verifier binds its distribution version, asset name, digest, and
+PEP 610 record back to the BOM.
+
+Promotion is one reviewed change: flip the production BOM descriptor, capture
+fresh schema contracts from the installed candidate, regenerate candidate
+readiness evidence, and run trusted live validation. A tag, wheel, checksum,
+bundle, or snapshot update on its own is not a valid promotion.

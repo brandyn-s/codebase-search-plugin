@@ -1,6 +1,8 @@
 """Acceptance contract for validating the real BOM components in CI."""
 
 import importlib.util
+import hashlib
+import json
 import os
 import subprocess
 import tempfile
@@ -139,16 +141,253 @@ class RealInstalledCIContractTests(unittest.TestCase):
             {
                 "PATH": os.environ.get("PATH", ""),
                 "GH_TOKEN": "ambient-token",
+                "GITHUB_TOKEN": "ambient-actions-token",
                 "CODE_INTEL_COMPONENT_TOKEN": "private-token",
             },
         )
         self.assertEqual(fetch_env["GH_TOKEN"], "private-token")
         self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", fetch_env)
+        self.assertNotIn("GITHUB_TOKEN", fetch_env)
         self.assertNotIn("GH_TOKEN", runtime_env)
+        self.assertNotIn("GITHUB_TOKEN", runtime_env)
         self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", runtime_env)
 
         helper_source = HELPER.read_text(encoding="utf-8")
         self.assertNotIn('"git", "-C", str(source), "fetch"', helper_source)
+
+    def test_release_wheel_is_verified_offline_before_secret_free_install(self):
+        helper = load_helper()
+        wheel_bytes = b"pinned wheel"
+        bundle_bytes = b"offline attestation bundle"
+        wheel_name = "redacted_code_search-0.2.0-py3-none-any.whl"
+        bundle_name = f"{wheel_name}.jsonl"
+        install = {
+            "kind": "github-release",
+            "repository": "redacted-org/code-search",
+            "tag": "v0.2.0",
+            "source_revision": "a" * 40,
+            "asset": {
+                "name": wheel_name,
+                "sha256": hashlib.sha256(wheel_bytes).hexdigest(),
+            },
+            "attestation": {
+                "bundle": {
+                    "name": bundle_name,
+                    "sha256": hashlib.sha256(bundle_bytes).hexdigest(),
+                },
+                "signer_workflow": (
+                    "redacted-org/code-search/"
+                    ".github/workflows/release.yml"
+                ),
+                "source_ref": "refs/heads/main",
+            },
+        }
+        fetch_env = {"PATH": "/bin", "GH_TOKEN": "private-token"}
+        runtime_env = {"PATH": "/bin"}
+        calls = []
+        events = []
+
+        def emulate(command, *, env, cwd=None):
+            calls.append((command, env, cwd))
+            if command[:3] == ["gh", "release", "download"]:
+                events.append("download")
+                download_dir = Path(command[command.index("--dir") + 1])
+                download_dir.mkdir(parents=True, exist_ok=True)
+                (download_dir / wheel_name).write_bytes(wheel_bytes)
+                (download_dir / bundle_name).write_bytes(bundle_bytes)
+            elif command[1:4] == ["-m", "pip", "install"]:
+                executable = (
+                    Path(command[0]).parents[1] / "bin" / "code-search-mcp"
+                )
+                executable.parent.mkdir(parents=True, exist_ok=True)
+                executable.write_text("#!/bin/sh\n", encoding="utf-8")
+
+        def resolve_tag(*_args, **_kwargs):
+            events.append("tag")
+            return "a" * 40
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp)
+            with (
+                mock.patch.object(helper, "run", side_effect=emulate),
+                mock.patch.object(
+                    helper,
+                    "resolve_release_tag_commit",
+                    create=True,
+                    side_effect=resolve_tag,
+                ) as resolve,
+            ):
+                python, executable = helper.install_code_search(
+                    install,
+                    destination,
+                    fetch_env,
+                    runtime_env,
+                )
+
+        resolve.assert_called_once_with(
+            "redacted-org/code-search",
+            "v0.2.0",
+            fetch_env,
+        )
+        self.assertLess(events.index("tag"), events.index("download"))
+        commands = [call[0] for call in calls]
+        environments = [call[1] for call in calls]
+        release_download = next(
+            index
+            for index, command in enumerate(commands)
+            if command[:3] == ["gh", "release", "download"]
+        )
+        attestation = next(
+            index
+            for index, command in enumerate(commands)
+            if command[:3] == ["gh", "attestation", "verify"]
+        )
+        pip_install = next(
+            index
+            for index, command in enumerate(commands)
+            if command[1:4] == ["-m", "pip", "install"]
+        )
+        installed_provenance = next(
+            index
+            for index, command in enumerate(commands)
+            if any(
+                argument.endswith("verify_code_search_wheel.py")
+                for argument in command
+            )
+        )
+
+        self.assertFalse(
+            any(
+                command[:3] == ["gh", "release", "verify-asset"]
+                for command in commands
+            )
+        )
+        self.assertLess(release_download, attestation)
+        self.assertLess(attestation, pip_install)
+        self.assertLess(pip_install, installed_provenance)
+        self.assertEqual(environments[release_download], fetch_env)
+        self.assertEqual(environments[attestation], runtime_env)
+        self.assertEqual(environments[pip_install], runtime_env)
+        self.assertEqual(environments[installed_provenance], runtime_env)
+        self.assertNotIn("GH_TOKEN", environments[pip_install])
+        self.assertIn("--bundle", commands[attestation])
+        self.assertIn(bundle_name, commands[attestation])
+        self.assertIn("--source-digest", commands[attestation])
+        self.assertIn("a" * 40, commands[attestation])
+        self.assertIn("--source-ref", commands[attestation])
+        self.assertIn("refs/heads/main", commands[attestation])
+        self.assertIn("--deny-self-hosted-runners", commands[attestation])
+        self.assertIn("--force-reinstall", commands[pip_install])
+        self.assertEqual(
+            commands[pip_install][-1],
+            str(destination / "code-search-download" / wheel_name),
+        )
+        self.assertIn("--asset-name", commands[installed_provenance])
+        self.assertIn("--sha256", commands[installed_provenance])
+        self.assertEqual(
+            python,
+            destination / "code-search-venv" / "bin" / "python",
+        )
+        self.assertEqual(
+            executable,
+            destination / "code-search-venv" / "bin" / "code-search-mcp",
+        )
+
+    def test_tag_resolution_peels_nested_annotated_tags(self):
+        helper = load_helper()
+        self.assertTrue(
+            hasattr(helper, "resolve_release_tag_commit"),
+            "trusted installer must resolve and peel the release tag",
+        )
+        tag_object = "b" * 40
+        nested_tag_object = "c" * 40
+        commit = "a" * 40
+        responses = [
+            subprocess.CompletedProcess(
+                [],
+                0,
+                stdout=json.dumps(
+                    {"object": {"type": "tag", "sha": tag_object}}
+                ),
+            ),
+            subprocess.CompletedProcess(
+                [],
+                0,
+                stdout=json.dumps(
+                    {"object": {"type": "tag", "sha": nested_tag_object}}
+                ),
+            ),
+            subprocess.CompletedProcess(
+                [],
+                0,
+                stdout=json.dumps(
+                    {"object": {"type": "commit", "sha": commit}}
+                ),
+            ),
+        ]
+        fetch_env = {"PATH": "/bin", "GH_TOKEN": "private-token"}
+
+        with mock.patch.object(
+            helper.subprocess,
+            "run",
+            side_effect=responses,
+        ) as run:
+            resolved = helper.resolve_release_tag_commit(
+                "redacted-org/code-search",
+                "v0.2.0",
+                fetch_env,
+            )
+
+        self.assertEqual(resolved, commit)
+        self.assertEqual(run.call_count, 3)
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertIn(
+            "repos/redacted-org/code-search/git/ref/tags/v0.2.0",
+            commands[0],
+        )
+        self.assertIn(
+            f"repos/redacted-org/code-search/git/tags/{tag_object}",
+            commands[1],
+        )
+        self.assertIn(
+            (
+                "repos/redacted-org/code-search/git/tags/"
+                f"{nested_tag_object}"
+            ),
+            commands[2],
+        )
+        for call in run.call_args_list:
+            self.assertEqual(call.kwargs["env"], fetch_env)
+
+    def test_release_install_rejects_tag_commit_mismatch_before_download(self):
+        helper = load_helper()
+        fixture = (
+            ROOT / "tests" / "fixtures" / "code-search-release-install.json"
+        )
+        install = json.loads(fixture.read_text(encoding="utf-8"))
+
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch.object(
+                helper,
+                "resolve_release_tag_commit",
+                create=True,
+                return_value="d" * 40,
+            ),
+            mock.patch.object(helper, "run") as run,
+            self.assertRaisesRegex(
+                helper.RealInstallError,
+                "tag source revision mismatch",
+            ),
+        ):
+            helper.install_code_search(
+                install,
+                Path(tmp),
+                {"PATH": "/bin", "GH_TOKEN": "private-token"},
+                {"PATH": "/bin"},
+            )
+
+        run.assert_not_called()
 
     def test_readiness_evidence_output_rejects_paths_outside_runner_temp(self):
         helper = load_helper()

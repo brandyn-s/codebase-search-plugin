@@ -25,6 +25,14 @@ GRAPH_ASSET_NAMES = {
     "linux-arm64": "codebase-memory-mcp-linux-arm64.tar.gz",
     "windows-amd64": "codebase-memory-mcp-windows-amd64.zip",
 }
+CODE_SEARCH_GIT_REPOSITORY = (
+    "https://github.com/redacted-org/code-search.git"
+)
+CODE_SEARCH_RELEASE_REPOSITORY = "redacted-org/code-search"
+CODE_SEARCH_RELEASE_SIGNER_WORKFLOW = (
+    "redacted-org/code-search/.github/workflows/release.yml"
+)
+CODE_SEARCH_RELEASE_SOURCE_REF = "refs/heads/main"
 REQUIRED_IDENTITY_FIELDS = [
     "repository_id",
     "checkout_id",
@@ -61,6 +69,136 @@ READINESS_REQUIREMENTS = {
         "checkout_unchanged": True,
     },
 }
+
+
+def component_install_version(component: str, install: dict):
+    if component == "code-search" and install.get("kind") == "git":
+        return install.get("revision")
+    return install.get("tag")
+
+
+def safe_release_asset_name(value, suffix: str) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and value == value.strip()
+        and "/" not in value
+        and "\\" not in value
+        and all(ord(character) >= 32 for character in value)
+        and value.endswith(suffix)
+    )
+
+
+def validate_code_search_install(install: dict) -> None:
+    kind = install.get("kind")
+    if kind == "git":
+        if install.get("repository") != CODE_SEARCH_GIT_REPOSITORY:
+            errors.append(
+                "component-bom.json: code-search Git repository must be "
+                f"{CODE_SEARCH_GIT_REPOSITORY}"
+            )
+        revision = install.get("revision")
+        if not isinstance(revision, str) or re.fullmatch(
+            r"[0-9a-f]{40}|[0-9a-f]{64}", revision
+        ) is None:
+            errors.append(
+                "component-bom.json: code-search.install.revision must be "
+                "a full lowercase Git object ID"
+            )
+        return
+
+    if kind != "github-release":
+        errors.append(
+            "component-bom.json: code-search.install.kind must be git "
+            "or github-release"
+        )
+        return
+    if install.get("repository") != CODE_SEARCH_RELEASE_REPOSITORY:
+        errors.append(
+            "component-bom.json: code-search release repository must be "
+            f"{CODE_SEARCH_RELEASE_REPOSITORY}"
+        )
+    tag = install.get("tag")
+    if (
+        not isinstance(tag, str)
+        or re.fullmatch(r"v[0-9][0-9A-Za-z._+-]*", tag) is None
+    ):
+        errors.append(
+            "component-bom.json: code-search.install.tag must be a "
+            "safe version tag beginning with v"
+        )
+    source_revision = install.get("source_revision")
+    if not isinstance(source_revision, str) or re.fullmatch(
+        r"[0-9a-f]{40}|[0-9a-f]{64}", source_revision
+    ) is None:
+        errors.append(
+            "component-bom.json: code-search.install.source_revision must "
+            "be a full lowercase Git object ID"
+        )
+
+    asset = install.get("asset")
+    if not isinstance(asset, dict):
+        errors.append(
+            "component-bom.json: code-search.install.asset must be an object"
+        )
+    else:
+        name = asset.get("name")
+        if not safe_release_asset_name(name, ".whl") or not name.startswith(
+            "redacted_code_search-"
+        ):
+            errors.append(
+                "component-bom.json: code-search release asset must be a "
+                "safe redacted_code_search wheel filename"
+            )
+        sha256 = asset.get("sha256")
+        if not isinstance(sha256, str) or re.fullmatch(
+            r"[0-9a-f]{64}", sha256
+        ) is None:
+            errors.append(
+                "component-bom.json: code-search release asset sha256 must "
+                "be 64 lowercase hex characters"
+            )
+
+    attestation = install.get("attestation")
+    if not isinstance(attestation, dict):
+        errors.append(
+            "component-bom.json: code-search.install.attestation must be "
+            "an object"
+        )
+        return
+    bundle = attestation.get("bundle")
+    if not isinstance(bundle, dict):
+        errors.append(
+            "component-bom.json: code-search attestation bundle must be "
+            "an object"
+        )
+    else:
+        bundle_name = bundle.get("name")
+        if not safe_release_asset_name(bundle_name, ".jsonl"):
+            errors.append(
+                "component-bom.json: code-search attestation bundle name "
+                "must be a safe JSONL filename"
+            )
+        bundle_sha256 = bundle.get("sha256")
+        if not isinstance(bundle_sha256, str) or re.fullmatch(
+            r"[0-9a-f]{64}", bundle_sha256
+        ) is None:
+            errors.append(
+                "component-bom.json: code-search attestation bundle sha256 "
+                "must be 64 lowercase hex characters"
+            )
+    signer_workflow = attestation.get("signer_workflow")
+    if signer_workflow != CODE_SEARCH_RELEASE_SIGNER_WORKFLOW:
+        errors.append(
+            "component-bom.json: code-search attestation signer_workflow "
+            f"must be {CODE_SEARCH_RELEASE_SIGNER_WORKFLOW}"
+        )
+    source_ref = attestation.get("source_ref")
+    if source_ref != CODE_SEARCH_RELEASE_SOURCE_REF:
+        errors.append(
+            "component-bom.json: code-search attestation source_ref must "
+            f"be {CODE_SEARCH_RELEASE_SOURCE_REF}"
+        )
 
 
 def load_json(rel: str, required_keys: tuple[str, ...]):
@@ -144,6 +282,8 @@ if bom:
                     f"component-bom.json: {component}.schema_snapshot missing"
                 )
                 continue
+            if component == "code-search":
+                validate_code_search_install(install)
             snapshot = load_json(
                 snapshot_rel,
                 (
@@ -179,17 +319,22 @@ if bom:
                     f"does not match {snapshot_rel}"
                 )
 
-            version_key = "revision" if component == "code-search" else "tag"
-            install_version = install.get(version_key)
-            source_version = snapshot.get("source", {}).get("version")
+            install_version = component_install_version(component, install)
+            snapshot_source = snapshot.get("source", {})
+            source_version = snapshot_source.get("version")
             if not isinstance(install_version, str) or not install_version:
                 errors.append(
-                    f"component-bom.json: {component}.install.{version_key} missing"
+                    f"component-bom.json: {component} install version missing"
                 )
             elif source_version != install_version:
                 errors.append(
                     f"{snapshot_rel}: source version does not match BOM "
-                    f"{component}.{version_key}"
+                    f"{component} install version"
+                )
+            if snapshot_source.get("kind") != install.get("kind"):
+                errors.append(
+                    f"{snapshot_rel}: source kind does not match BOM "
+                    f"{component} install kind"
                 )
 
             if component == "code-graph":
@@ -572,10 +717,11 @@ if snapshots:
                 evidence_components = {}
 
             expected_versions = {
-                "code-search": bom["components"]["code-search"]["install"].get(
-                    "revision"
-                ),
-                "code-graph": bom["components"]["code-graph"]["install"].get("tag"),
+                component: component_install_version(
+                    component,
+                    bom["components"][component]["install"],
+                )
+                for component in ("code-search", "code-graph")
             }
             for component, expected_version in expected_versions.items():
                 component_evidence = evidence_components.get(component)
@@ -779,9 +925,7 @@ if bom and isinstance(bom.get("components"), dict):
                 )
         for component, details in bom["components"].items():
             install = details.get("install", {})
-            version = install.get(
-                "revision" if component == "code-search" else "tag"
-            )
+            version = component_install_version(component, install)
             if isinstance(version, str) and version in installer:
                 errors.append(
                     f"{installer_rel}: duplicates {component} version instead "

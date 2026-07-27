@@ -87,6 +87,7 @@ def build_subprocess_environments(
     """Separate authenticated fetches from secret-free build/runtime work."""
     runtime_env = dict(os.environ if source is None else source)
     runtime_env.pop("GH_TOKEN", None)
+    runtime_env.pop("GITHUB_TOKEN", None)
     runtime_env.pop("CODE_INTEL_COMPONENT_TOKEN", None)
     fetch_env = {**runtime_env, "GH_TOKEN": token}
     return fetch_env, runtime_env
@@ -101,7 +102,9 @@ def load_bom() -> dict:
     except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
         raise RealInstallError(f"component-bom.json is malformed: {exc}") from exc
 
-    if search.get("kind") != "git" or graph.get("kind") != "github-release":
+    if search.get("kind") not in {"git", "github-release"} or graph.get(
+        "kind"
+    ) != "github-release":
         raise RealInstallError("component-bom.json uses unsupported install kinds")
     return bom
 
@@ -254,7 +257,7 @@ def verify_sha256(archive: Path, expected: str) -> None:
         )
 
 
-def install_code_search(
+def install_code_search_git(
     install: dict,
     destination: Path,
     fetch_env: dict[str, str],
@@ -313,6 +316,243 @@ def install_code_search(
     if not executable.is_file():
         raise RealInstallError(f"installed code-search MCP is missing: {executable}")
     return venv_python, executable
+
+
+def release_asset(
+    document: object,
+    *,
+    component: str,
+    suffix: str,
+) -> tuple[str, str]:
+    if not isinstance(document, dict):
+        raise RealInstallError(f"{component} release asset metadata is missing")
+    name = document.get("name")
+    sha256 = document.get("sha256")
+    if (
+        not isinstance(name, str)
+        or not name
+        or Path(name).name != name
+        or "/" in name
+        or "\\" in name
+        or not name.endswith(suffix)
+    ):
+        raise RealInstallError(f"{component} release asset name is invalid")
+    if not isinstance(sha256, str) or re.fullmatch(
+        r"[0-9a-f]{64}", sha256
+    ) is None:
+        raise RealInstallError(f"{component} release asset SHA-256 is invalid")
+    return name, sha256
+
+
+def github_api_json(endpoint: str, fetch_env: dict[str, str]) -> dict:
+    completed = subprocess.run(
+        ["gh", "api", "--method", "GET", endpoint],
+        env=fetch_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        document = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RealInstallError(
+            f"GitHub API returned malformed JSON for {endpoint}"
+        ) from exc
+    if not isinstance(document, dict):
+        raise RealInstallError(
+            f"GitHub API returned a non-object response for {endpoint}"
+        )
+    return document
+
+
+def resolve_release_tag_commit(
+    repository: str,
+    tag: str,
+    fetch_env: dict[str, str],
+) -> str:
+    """Resolve a lightweight or annotated release tag to its final commit."""
+    document = github_api_json(
+        f"repos/{repository}/git/ref/tags/{tag}",
+        fetch_env,
+    )
+    visited: set[str] = set()
+    for _depth in range(16):
+        target = document.get("object")
+        if not isinstance(target, dict):
+            raise RealInstallError("GitHub tag response has no object target")
+        target_type = target.get("type")
+        target_sha = target.get("sha")
+        if not isinstance(target_sha, str) or re.fullmatch(
+            r"[0-9a-f]{40}|[0-9a-f]{64}", target_sha
+        ) is None:
+            raise RealInstallError("GitHub tag response has an invalid object SHA")
+        if target_type == "commit":
+            return target_sha
+        if target_type != "tag":
+            raise RealInstallError(
+                f"GitHub tag resolves to unsupported object type: {target_type!r}"
+            )
+        if target_sha in visited:
+            raise RealInstallError("GitHub annotated tag chain contains a cycle")
+        visited.add(target_sha)
+        document = github_api_json(
+            f"repos/{repository}/git/tags/{target_sha}",
+            fetch_env,
+        )
+    raise RealInstallError("GitHub annotated tag chain exceeds 16 objects")
+
+
+def install_code_search_release(
+    install: dict,
+    destination: Path,
+    fetch_env: dict[str, str],
+    runtime_env: dict[str, str],
+) -> tuple[Path, Path]:
+    repository = install.get("repository")
+    tag = install.get("tag")
+    source_revision = install.get("source_revision")
+    attestation = install.get("attestation")
+    if (
+        repository != "redacted-org/code-search"
+        or not isinstance(tag, str)
+        or not tag.startswith("v")
+        or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", source_revision or "")
+        is None
+        or not isinstance(attestation, dict)
+    ):
+        raise RealInstallError("code-search release BOM metadata is invalid")
+
+    wheel_name, wheel_sha256 = release_asset(
+        install.get("asset"),
+        component="code-search wheel",
+        suffix=".whl",
+    )
+    bundle_name, bundle_sha256 = release_asset(
+        attestation.get("bundle"),
+        component="code-search attestation bundle",
+        suffix=".jsonl",
+    )
+    signer_workflow = attestation.get("signer_workflow")
+    source_ref = attestation.get("source_ref")
+    if (
+        signer_workflow
+        != (
+            "redacted-org/code-search/"
+            ".github/workflows/release.yml"
+        )
+        or source_ref != "refs/heads/main"
+    ):
+        raise RealInstallError("code-search attestation policy is invalid")
+
+    resolved_revision = resolve_release_tag_commit(repository, tag, fetch_env)
+    if resolved_revision != source_revision:
+        raise RealInstallError(
+            "code-search tag source revision mismatch: "
+            f"expected {source_revision}, got {resolved_revision}"
+        )
+
+    downloads = destination / "code-search-download"
+    downloads.mkdir()
+    run(
+        [
+            "gh",
+            "release",
+            "download",
+            tag,
+            "--repo",
+            repository,
+            "--pattern",
+            wheel_name,
+            "--pattern",
+            bundle_name,
+            "--dir",
+            str(downloads),
+            "--clobber",
+        ],
+        env=fetch_env,
+    )
+    wheel = downloads / wheel_name
+    bundle = downloads / bundle_name
+    verify_sha256(wheel, wheel_sha256)
+    verify_sha256(bundle, bundle_sha256)
+    run(
+        [
+            "gh",
+            "attestation",
+            "verify",
+            wheel_name,
+            "--bundle",
+            bundle_name,
+            "--repo",
+            repository,
+            "--signer-workflow",
+            signer_workflow,
+            "--source-digest",
+            source_revision,
+            "--source-ref",
+            source_ref,
+            "--deny-self-hosted-runners",
+        ],
+        env=runtime_env,
+        cwd=downloads,
+    )
+
+    venv = destination / "code-search-venv"
+    run([sys.executable, "-m", "venv", str(venv)], env=runtime_env)
+    venv_python = venv / "bin" / "python"
+    run(
+        [
+            str(venv_python),
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--quiet",
+            "--force-reinstall",
+            str(wheel),
+        ],
+        env=runtime_env,
+    )
+    run(
+        [
+            str(venv_python),
+            str(ROOT / "scripts" / "verify_code_search_wheel.py"),
+            tag,
+            "--asset-name",
+            wheel_name,
+            "--sha256",
+            wheel_sha256,
+        ],
+        env=runtime_env,
+    )
+    executable = venv / "bin" / "code-search-mcp"
+    if not executable.is_file():
+        raise RealInstallError(f"installed code-search MCP is missing: {executable}")
+    return venv_python, executable
+
+
+def install_code_search(
+    install: dict,
+    destination: Path,
+    fetch_env: dict[str, str],
+    runtime_env: dict[str, str],
+) -> tuple[Path, Path]:
+    kind = install.get("kind")
+    if kind == "git":
+        return install_code_search_git(
+            install,
+            destination,
+            fetch_env,
+            runtime_env,
+        )
+    if kind == "github-release":
+        return install_code_search_release(
+            install,
+            destination,
+            fetch_env,
+            runtime_env,
+        )
+    raise RealInstallError(f"unsupported code-search install kind: {kind!r}")
 
 
 def linux_asset(install: dict) -> tuple[str, str]:
@@ -402,6 +642,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         fetch_env, runtime_env = build_subprocess_environments(token)
         os.environ.pop("GH_TOKEN", None)
+        os.environ.pop("GITHUB_TOKEN", None)
         os.environ.pop("CODE_INTEL_COMPONENT_TOKEN", None)
         bom = load_bom()
         runtime_env = {

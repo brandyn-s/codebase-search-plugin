@@ -28,7 +28,14 @@ SNAPSHOT_PATHS = {
     "code-search": Path("compatibility/code-search-tools.json"),
     "code-graph": Path("compatibility/code-graph-tools.json"),
 }
-CODE_SEARCH_REPOSITORY = "https://github.com/redacted-org/code-search.git"
+CODE_SEARCH_GIT_REPOSITORY = (
+    "https://github.com/redacted-org/code-search.git"
+)
+CODE_SEARCH_RELEASE_REPOSITORY = "redacted-org/code-search"
+CODE_SEARCH_RELEASE_SIGNER_WORKFLOW = (
+    "redacted-org/code-search/.github/workflows/release.yml"
+)
+CODE_SEARCH_RELEASE_SOURCE_REF = "refs/heads/main"
 CODE_GRAPH_REPOSITORY = "redacted-org/code-graph"
 GRAPH_ASSET_NAMES = {
     "darwin-amd64": "codebase-memory-mcp-darwin-amd64.tar.gz",
@@ -162,19 +169,29 @@ def _source_for(component: str, details: dict) -> dict[str, str]:
     if not isinstance(install, dict):
         raise CaptureError(f"{component}: missing install object")
     if component == "code-search":
-        if install.get("kind") != "git":
-            raise CaptureError("code-search: install kind must be git")
-        if install.get("repository") != CODE_SEARCH_REPOSITORY:
+        kind = install.get("kind")
+        if kind == "git":
+            if install.get("repository") != CODE_SEARCH_GIT_REPOSITORY:
+                raise CaptureError(
+                    "code-search: Git repository must be "
+                    f"{CODE_SEARCH_GIT_REPOSITORY}"
+                )
+            version = install.get("revision")
+            if (
+                not isinstance(version, str)
+                or LOWER_HEX_COMMIT.fullmatch(version) is None
+            ):
+                raise CaptureError(
+                    "code-search: revision must be a full 40-character "
+                    "lowercase hex commit"
+                )
+        elif kind == "github-release":
+            _validate_code_search_release(install)
+            version = install["tag"]
+        else:
             raise CaptureError(
-                f"code-search: repository must be {CODE_SEARCH_REPOSITORY}"
+                "code-search: install kind must be git or github-release"
             )
-        version = install.get("revision")
-        if not isinstance(version, str) or LOWER_HEX_COMMIT.fullmatch(version) is None:
-            raise CaptureError(
-                "code-search: revision must be a full 40-character lowercase "
-                "hex commit"
-            )
-        kind = "git"
     else:
         if install.get("kind") != "github-release":
             raise CaptureError("code-graph: install kind must be github-release")
@@ -215,6 +232,80 @@ def _source_for(component: str, details: dict) -> dict[str, str]:
     return {"kind": kind, "version": version}
 
 
+def _safe_asset_name(value, suffix: str) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and value == value.strip()
+        and "/" not in value
+        and "\\" not in value
+        and all(ord(character) >= 32 for character in value)
+        and value.endswith(suffix)
+    )
+
+
+def _validate_code_search_release(install: dict) -> None:
+    if install.get("repository") != CODE_SEARCH_RELEASE_REPOSITORY:
+        raise CaptureError(
+            "code-search: release repository must be "
+            f"{CODE_SEARCH_RELEASE_REPOSITORY}"
+        )
+    tag = install.get("tag")
+    if (
+        not isinstance(tag, str)
+        or re.fullmatch(r"v[0-9][0-9A-Za-z._+-]*", tag) is None
+    ):
+        raise CaptureError(
+            "code-search: release tag must be a safe version beginning with v"
+        )
+    source_revision = install.get("source_revision")
+    if (
+        not isinstance(source_revision, str)
+        or LOWER_HEX_COMMIT.fullmatch(source_revision) is None
+    ):
+        raise CaptureError(
+            "code-search: release source_revision must be a full "
+            "40-character lowercase hex commit"
+        )
+    asset = install.get("asset")
+    if (
+        not isinstance(asset, dict)
+        or not _safe_asset_name(asset.get("name"), ".whl")
+        or not asset["name"].startswith("redacted_code_search-")
+        or not isinstance(asset.get("sha256"), str)
+        or LOWER_HEX_SHA256.fullmatch(asset["sha256"]) is None
+    ):
+        raise CaptureError(
+            "code-search: release asset must name a safe wheel and pinned SHA-256"
+        )
+    attestation = install.get("attestation")
+    bundle = (
+        attestation.get("bundle") if isinstance(attestation, dict) else None
+    )
+    if (
+        not isinstance(bundle, dict)
+        or not _safe_asset_name(bundle.get("name"), ".jsonl")
+        or not isinstance(bundle.get("sha256"), str)
+        or LOWER_HEX_SHA256.fullmatch(bundle["sha256"]) is None
+    ):
+        raise CaptureError(
+            "code-search: attestation bundle must name a safe JSONL "
+            "asset and pinned SHA-256"
+        )
+    signer_workflow = attestation.get("signer_workflow")
+    if signer_workflow != CODE_SEARCH_RELEASE_SIGNER_WORKFLOW:
+        raise CaptureError(
+            "code-search: attestation signer_workflow must be "
+            f"{CODE_SEARCH_RELEASE_SIGNER_WORKFLOW}"
+        )
+    source_ref = attestation.get("source_ref")
+    if source_ref != CODE_SEARCH_RELEASE_SOURCE_REF:
+        raise CaptureError(
+            "code-search: attestation source_ref must be "
+            f"{CODE_SEARCH_RELEASE_SOURCE_REF}"
+        )
+
+
 def _schema_fingerprint(schema: dict) -> str:
     try:
         canonical = json.dumps(
@@ -232,6 +323,27 @@ def _schema_fingerprint(schema: dict) -> str:
 def _normalized_install(component: str, details: dict) -> dict:
     install = details["install"]
     if component == "code-search":
+        if install["kind"] == "github-release":
+            return {
+                "kind": install["kind"],
+                "repository": install["repository"],
+                "tag": install["tag"],
+                "source_revision": install["source_revision"],
+                "asset": {
+                    "name": install["asset"]["name"],
+                    "sha256": install["asset"]["sha256"],
+                },
+                "attestation": {
+                    "bundle": {
+                        "name": install["attestation"]["bundle"]["name"],
+                        "sha256": install["attestation"]["bundle"]["sha256"],
+                    },
+                    "signer_workflow": install["attestation"][
+                        "signer_workflow"
+                    ],
+                    "source_ref": install["attestation"]["source_ref"],
+                },
+            }
         return {
             "kind": install["kind"],
             "repository": install["repository"],
