@@ -43,9 +43,10 @@ server for a blocked BOM unless a reviewer explicitly supplies
 
 ## Code-search release promotion
 
-The current production BOM remains on its full Git revision until an actual
-code-search release exists and every exact release fact is known. Contract
-capture and validation support a GitHub Release wheel candidate without
+The production BOM pins code-search release
+[`v0.2.0`](https://github.com/redacted-org/code-search/releases/tag/v0.2.0),
+its exact source commit, wheel, and offline attestation bundle. Contract
+capture and validation support future GitHub Release wheel candidates without
 weakening readiness: capture preserves the complete release descriptor,
 records the tag as the component version, and resets behavioral claims to a
 blocked candidate that must be re-observed.

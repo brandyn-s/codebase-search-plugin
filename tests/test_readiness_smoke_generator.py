@@ -287,7 +287,12 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         graph = evidence["components"]["code-graph"]
         self.assertEqual(
             search["version"],
-            bom["components"]["code-search"]["install"]["revision"],
+            (
+                bom["components"]["code-search"]["install"]["tag"]
+                if bom["components"]["code-search"]["install"]["kind"]
+                == "github-release"
+                else bom["components"]["code-search"]["install"]["revision"]
+            ),
         )
         self.assertEqual(
             graph["version"],

@@ -79,7 +79,12 @@ class InstalledContractTests(unittest.TestCase):
 
     def test_installers_consume_fixed_bom_and_run_contract_validation(self):
         bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
-        code_search_revision = bom["components"]["code-search"]["install"]["revision"]
+        code_search_install = bom["components"]["code-search"]["install"]
+        code_search_version = (
+            code_search_install["tag"]
+            if code_search_install["kind"] == "github-release"
+            else code_search_install["revision"]
+        )
         graph_tag = bom["components"]["code-graph"]["install"]["tag"]
 
         shell = (ROOT / "install.sh").read_text(encoding="utf-8")
@@ -92,7 +97,7 @@ class InstalledContractTests(unittest.TestCase):
             self.assertNotIn("release list", installer)
             self.assertNotIn("api.github.com", installer)
             self.assertNotIn("Invoke-RestMethod", installer)
-            self.assertNotIn(code_search_revision, installer)
+            self.assertNotIn(code_search_version, installer)
             self.assertNotIn(graph_tag, installer)
             self.assertLess(
                 installer.index("validate_plugin.py"),
@@ -118,8 +123,7 @@ class InstalledContractTests(unittest.TestCase):
 
     def test_revision_verifier_accepts_only_the_exact_installed_commit(self):
         verifier = load_revision_verifier()
-        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
-        expected = bom["components"]["code-search"]["install"]["revision"]
+        expected = "a" * 40
         valid = {
             "url": "https://github.com/redacted-org/code-search.git",
             "vcs_info": {
@@ -167,20 +171,18 @@ class InstalledContractTests(unittest.TestCase):
             expected_sha256=expected_sha256,
         )
 
-    def test_manual_install_uses_bom_revision_and_verifies_provenance(self):
+    def test_manual_install_uses_bom_release_and_verifies_provenance(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         manual = readme.split("### Manual install (alternative)", 1)[1].split(
             "## Routing and Evidence Evaluation", 1
         )[0]
 
-        self.assertIn("CODE_SEARCH_REF", manual)
-        self.assertIn("@${CODE_SEARCH_REF}", manual)
-        self.assertIn("verify_code_search_revision.py", manual)
-        self.assertIn('--repository "${CODE_SEARCH_REPOSITORY}"', manual)
-        self.assertNotIn(
-            "git+https://github.com/redacted-org/code-search.git\"",
-            manual,
-        )
+        self.assertIn("github-release", manual)
+        self.assertIn("gh release download", manual)
+        self.assertIn("gh attestation verify", manual)
+        self.assertIn("verify_code_search_wheel.py", manual)
+        self.assertIn("--source-digest", manual)
+        self.assertIn("--deny-self-hosted-runners", manual)
 
     def _run_fake_contract(
         self,

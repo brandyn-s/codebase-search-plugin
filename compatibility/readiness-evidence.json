@@ -4,13 +4,13 @@
   "components": {
     "code-graph": {
       "index_identity": {
-        "captured_at": "2026-07-27T03:26:27Z",
-        "checkout_id": "9598bd4dbf0123c467d9f10506e939378febb45843b2c4caeca6f004934ff418",
+        "captured_at": "2026-07-27T05:33:37Z",
+        "checkout_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
         "dirty_fingerprint": "clean",
-        "index_generation": "359397699a700b987328d5cbaf47356f44f65adae7deb7d85244d356e070285d",
-        "repository_id": "9598bd4dbf0123c467d9f10506e939378febb45843b2c4caeca6f004934ff418",
+        "index_generation": "c31fe48ce786cbe5d0787097e94369728b9705eae0dc44fe8bba60d86277cb98",
+        "repository_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
         "schema_version": 1,
-        "source_revision": "0e93610a9cd036f3614c04e5215f52972a5b82f3"
+        "source_revision": "65ed864fc73456428583b9bd7dcf3271095b0f21"
       },
       "status": "ready",
       "version": "v0.7.0-redacted.2"
@@ -26,16 +26,16 @@
         "success": true
       },
       "index_identity": {
-        "captured_at": "2026-07-27T03:26:26.707448Z",
-        "checkout_id": "9598bd4dbf0123c467d9f10506e939378febb45843b2c4caeca6f004934ff418",
+        "captured_at": "2026-07-27T05:33:37.494221Z",
+        "checkout_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
         "dirty_fingerprint": "clean",
-        "index_generation": "359397699a700b987328d5cbaf47356f44f65adae7deb7d85244d356e070285d",
-        "repository_id": "9598bd4dbf0123c467d9f10506e939378febb45843b2c4caeca6f004934ff418",
+        "index_generation": "c31fe48ce786cbe5d0787097e94369728b9705eae0dc44fe8bba60d86277cb98",
+        "repository_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
         "schema_version": 1,
-        "source_revision": "0e93610a9cd036f3614c04e5215f52972a5b82f3"
+        "source_revision": "65ed864fc73456428583b9bd7dcf3271095b0f21"
       },
       "index_ready": true,
-      "version": "aaff0b25d608d4c4e5735974b1c6526788e579e1"
+      "version": "v0.2.0"
     }
   },
   "evidence_mode": "promotion-candidate",

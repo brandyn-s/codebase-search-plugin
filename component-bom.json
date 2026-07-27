@@ -55,9 +55,22 @@
     },
     "code-search": {
       "install": {
-        "kind": "git",
-        "repository": "https://github.com/redacted-org/code-search.git",
-        "revision": "aaff0b25d608d4c4e5735974b1c6526788e579e1"
+        "asset": {
+          "name": "redacted_code_search-0.2.0-py3-none-any.whl",
+          "sha256": "766477c9985af8365831bf3794d8c9c879376ab8c66dc6b287633102135ea5f6"
+        },
+        "attestation": {
+          "bundle": {
+            "name": "redacted_code_search-0.2.0-provenance.jsonl",
+            "sha256": "c4075ed6ecc5af5a52a4ad9bc6223fc0de55b7d3509f98c3a56204bf92d61438"
+          },
+          "signer_workflow": "redacted-org/code-search/.github/workflows/release.yml",
+          "source_ref": "refs/heads/main"
+        },
+        "kind": "github-release",
+        "repository": "redacted-org/code-search",
+        "source_revision": "4d9189acbed744e2089df008262fe46ba62c71f7",
+        "tag": "v0.2.0"
       },
       "schema_snapshot": "compatibility/code-search-tools.json",
       "tested_capabilities": {
@@ -119,5 +132,5 @@
     "status": "ready"
   },
   "schema_version": 1,
-  "tested_at": "2026-07-26"
+  "tested_at": "2026-07-27"
 }

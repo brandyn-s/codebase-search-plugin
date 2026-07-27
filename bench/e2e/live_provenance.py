@@ -287,10 +287,20 @@ def _validate_components(bom_path: Path, evidence_path: Path) -> None:
     components = bom.get("components")
     if not isinstance(components, dict):
         raise ProvenanceError("component BOM is malformed")
+    search_install = (
+        components.get("code-search", {}).get("install", {})
+    )
+    search_kind = search_install.get("kind")
+    if search_kind == "git":
+        search_version = search_install.get("revision")
+    elif search_kind == "github-release":
+        search_version = search_install.get("tag")
+    else:
+        raise ProvenanceError(
+            "code-search: component BOM install kind is unsupported"
+        )
     expected_versions = {
-        "code-search": components.get("code-search", {})
-        .get("install", {})
-        .get("revision"),
+        "code-search": search_version,
         "code-graph": components.get("code-graph", {})
         .get("install", {})
         .get("tag"),

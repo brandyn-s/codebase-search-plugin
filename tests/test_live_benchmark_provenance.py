@@ -54,6 +54,15 @@ def identity(captured_at: str) -> dict:
     }
 
 
+def code_search_version(bom: dict) -> str:
+    install = bom["components"]["code-search"]["install"]
+    return (
+        install["tag"]
+        if install["kind"] == "github-release"
+        else install["revision"]
+    )
+
+
 class LiveBenchmarkProvenanceTests(unittest.TestCase):
     def _prepare_bundle(self, bundle: Path) -> dict[str, Path]:
         cases = bundle / "cases.jsonl"
@@ -139,7 +148,7 @@ class LiveBenchmarkProvenanceTests(unittest.TestCase):
             "checkout_unchanged": True,
             "components": {
                 "code-search": {
-                    "version": bom["components"]["code-search"]["install"]["revision"],
+                    "version": code_search_version(bom),
                     "index_ready": True,
                     "index_identity": identity("2026-07-26T20:00:00Z"),
                 },

@@ -162,7 +162,12 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             self.assertIn(required, combined)
         self.assertNotIn("gh release verify-asset", combined)
         self.assertNotIn("release membership", combined)
-        self.assertIn("current production BOM still pins", readme)
+        self.assertIn("production BOM pins code-search release", readme)
+        self.assertIn(
+            "code-search/releases/tag/v0.2.0",
+            readme,
+        )
+        self.assertIn("`install.kind: github-release`", readme)
         self.assertIn("Contents: read", readme)
         self.assertIn("does not need `Attestations: read`", readme)
         self.assertIn(

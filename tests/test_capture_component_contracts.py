@@ -58,7 +58,13 @@ class CaptureComponentContractsTests(unittest.TestCase):
         bom = json.loads(
             (ROOT / "component-bom.json").read_text(encoding="utf-8")
         )
-        bom["components"]["code-search"]["install"]["revision"] = "a" * 40
+        bom["components"]["code-search"]["install"] = {
+            "kind": "git",
+            "repository": (
+                "https://github.com/redacted-org/code-search.git"
+            ),
+            "revision": "a" * 40,
+        }
         bom["components"]["code-graph"]["install"]["tag"] = "v9.9.9-test"
         path = directory / "candidate-bom.json"
         path.write_text(json.dumps(bom), encoding="utf-8")

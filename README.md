@@ -116,7 +116,7 @@ You don't need to know which tool to use — the plugin decides based on your qu
 ### Online: Voyage AI
 
 For code-search, source chunks and search queries are sent to Voyage AI's API
-over HTTPS and returned as vectors. The pinned code-search revision exposes
+over HTTPS and returned as vectors. The pinned code-search release exposes
 three distinct Voyage selectors:
 
 | Provider | Model | Current role |
@@ -189,32 +189,14 @@ The `install.sh` script handles everything else — no need to manually clone or
 
 ### Manual install (alternative)
 
-If you prefer not to use the install script:
+The production BOM pins code-search release
+[`v0.2.0`](https://github.com/redacted-org/code-search/releases/tag/v0.2.0)
+with `install.kind: github-release`. Its descriptor fixes the source commit,
+wheel name and SHA-256, JSONL attestation bundle name and SHA-256, signer
+workflow, and `refs/heads/main`; use those values directly rather than
+selecting a moving release.
 
-```bash
-# Read the tested repository and full commit from the BOM.
-CODE_SEARCH_REPOSITORY="$(python3 -c \
-  'import json; print(json.load(open("component-bom.json"))["components"]["code-search"]["install"]["repository"])')"
-CODE_SEARCH_REF="$(python3 -c \
-  'import json; print(json.load(open("component-bom.json"))["components"]["code-search"]["install"]["revision"])')"
-
-# Install that exact commit and verify pip's PEP 610 provenance.
-python3 -m venv .venv-code-search
-.venv-code-search/bin/python -m pip install \
-  "redacted-code-search @ git+${CODE_SEARCH_REPOSITORY}@${CODE_SEARCH_REF}"
-.venv-code-search/bin/python scripts/verify_code_search_revision.py \
-  "${CODE_SEARCH_REF}" \
-  --repository "${CODE_SEARCH_REPOSITORY}"
-```
-
-The current production BOM still pins code-search by full Git revision. The
-installers also support an atomic future promotion to
-`install.kind: github-release`; do not partially copy release fields into the
-production BOM. A release descriptor pins the tag, source commit, wheel name
-and SHA-256, JSONL attestation bundle name and SHA-256, signer workflow, and
-`refs/heads/main`.
-
-For a release-mode manual install, follow the same order as the installers:
+For a manual install, follow the same order as the installers:
 
 1. Resolve the exact Git tag through the Git refs API, peel annotated tags,
    and require that the tag resolves to the pinned source commit.
@@ -254,7 +236,7 @@ not live performance results or comparative grades. See
 ## Trusted component validation
 
 The `validate-installed-components` job installs both private repositories
-from the exact refs in `component-bom.json` and validates their real
+from the exact descriptors in `component-bom.json` and validates their real
 `tools/list` responses. It runs only from a trusted `main` push or a manual
 default-branch dispatch, never from pull-request-controlled code.
 `CODE_INTEL_COMPONENT_TOKEN` is a required post-merge validation secret:
@@ -386,7 +368,7 @@ current live plugin result.
 
 At the time of this measurement, the recorded `voyage` selector resolved to
 `voyage-code-3`. That historical label is not the current `voyage` provider:
-at the pinned code-search revision, `voyage` maps to `voyage-4-large`, while
+at the pinned code-search release, `voyage` maps to `voyage-4-large`, while
 `voyage-code-3` is a separately selected non-default provider.
 
 ### Key findings

@@ -7,8 +7,8 @@
   },
   "schema_version": 1,
   "source": {
-    "kind": "git",
-    "version": "aaff0b25d608d4c4e5735974b1c6526788e579e1"
+    "kind": "github-release",
+    "version": "v0.2.0"
   },
   "tested_capabilities": {
     "outputs": {

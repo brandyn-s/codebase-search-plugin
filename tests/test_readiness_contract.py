@@ -96,6 +96,15 @@ READINESS_REQUIREMENTS = {
 }
 
 
+def code_search_version(bom: dict) -> str:
+    install = bom["components"]["code-search"]["install"]
+    return (
+        install["tag"]
+        if install["kind"] == "github-release"
+        else install["revision"]
+    )
+
+
 class ReadinessContractTests(unittest.TestCase):
     def _copy_checkout(self, checkout: Path) -> None:
         for directory in (
@@ -216,7 +225,7 @@ class ReadinessContractTests(unittest.TestCase):
             "bom_readiness_status": "blocked",
             "components": {
                 "code-search": {
-                    "version": bom["components"]["code-search"]["install"]["revision"],
+                    "version": code_search_version(bom),
                     "completion": {"success": True, "error": None},
                     "index_ready": True,
                     "index_identity": deepcopy(identity),
