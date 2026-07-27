@@ -180,9 +180,9 @@ provider-specific and are not interchangeable.
 ## Prerequisites
 
 - **Python 3.12+** (for code-search)
-- **GitHub CLI (`gh`) with authenticated repository read access** when the BOM
-  selects a private code-search release
-- **Linux/Mac**: `curl` and `tar` (for downloading code-graph binary)
+- **GitHub CLI (`gh`) with authenticated read access** to both private
+  component repositories
+- **Linux/Mac**: `tar` (for extracting the verified code-graph archive)
 - **Windows**: PowerShell 5.1+ (built-in) — use `install.ps1` instead of `install.sh`
 
 The `install.sh` script handles everything else — no need to manually clone or build anything.
@@ -190,19 +190,20 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.2.0`](https://github.com/redacted-org/code-search/releases/tag/v0.2.0)
+[`v0.2.1`](https://github.com/redacted-org/code-search/releases/tag/v0.2.1)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
-wheel name and SHA-256, JSONL attestation bundle name and SHA-256, signer
-workflow, and `refs/heads/main`; use those values directly rather than
-selecting a moving release.
+wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
+attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
+use those values directly rather than selecting a moving release.
 
 For a manual install, follow the same order as the installers:
 
 1. Resolve the exact Git tag through the Git refs API, peel annotated tags,
    and require that the tag resolves to the pinned source commit.
-2. Use authenticated `gh release download` to fetch exactly the wheel and
-   attestation bundle named by the BOM and tag.
-3. Verify both files against their separate BOM SHA-256 values.
+2. Use authenticated `gh release download` to fetch exactly the wheel,
+   checksum manifest, and attestation bundle named by the BOM and tag.
+3. Verify all three files against their separate BOM SHA-256 values, then
+   require exactly one manifest entry matching the wheel name and digest.
 4. Run `gh attestation verify` with the offline `--bundle`, pinned repository,
    `--signer-workflow`, `--source-digest`, `--source-ref refs/heads/main`, and
    `--deny-self-hosted-runners`.
@@ -210,10 +211,16 @@ For a manual install, follow the same order as the installers:
    `--force-reinstall` and run `scripts/verify_code_search_wheel.py` to verify
    its version, filename, checksum, and PEP 610 installation provenance.
 
-For code-graph, download only the tag and platform asset declared in
-`component-bom.json`, then verify the archive against that asset's BOM
-`sha256` before extracting it. Configure the two verified MCP server paths
-manually in `.mcp.json`.
+For code-graph, use release
+[`v0.7.0-redacted.3`](https://github.com/redacted-org/code-graph/releases/tag/v0.7.0-redacted.3).
+Resolve its tag to the BOM's pinned source commit; download exactly the
+platform archive and `checksums.txt`; verify both BOM digests and the exact
+archive manifest entry; use authenticated `gh attestation download` to fetch
+the archive's digest-named bundle; then run secret-free
+`gh attestation verify --bundle` with the pinned repository, release workflow,
+source digest, `refs/heads/main`, and GitHub-hosted-runner policy. Extract only
+after every check passes. Configure the two verified MCP server paths manually
+in `.mcp.json`.
 
 Manual installs must match `component-bom.json`. Run the same fail-closed
 contract check used by the installers before enabling the plugin:
@@ -235,10 +242,14 @@ not live performance results or comparative grades. See
 
 ## Trusted component validation
 
-The `validate-installed-components` job installs both private repositories
-from the exact descriptors in `component-bom.json` and validates their real
-`tools/list` responses. It runs only from a trusted `main` push or a manual
-default-branch dispatch, never from pull-request-controlled code.
+The ordinary pull-request workflow has a stable, fail-closed `merge-gate`
+whose only dependency is the deterministic `validate` job. It does not read a
+component token. Trusted installation is isolated in
+`.github/workflows/trusted-component-promotion.yml`; its
+`validate-installed-components` job installs both private repositories from
+the exact descriptor path passed with `--component-bom` and validates their
+real `tools/list` responses. It runs only from a trusted `main` push or a
+manual default-branch dispatch, never on `pull_request`.
 `CODE_INTEL_COMPONENT_TOKEN` is a required post-merge validation secret:
 configure a fine-grained token with read access to
 `redacted-org/code-search` and `redacted-org/code-graph`.
@@ -251,9 +262,11 @@ as an attested build artifact downloaded from that pinned release; the checks
 do not cryptographically prove its placement there. Its separately
 checksum-pinned offline attestation bundle is passed directly to
 `gh attestation verify`; no online Attestations API lookup is used, so the
-component token does not need `Attestations: read`. The policy binds the build
-to the pinned source commit, the release workflow, `refs/heads/main`, and
-GitHub-hosted runners.
+search verification does not need `Attestations: read`. Code-graph verification
+uses the online attestation API only to download a digest-named bundle and
+therefore requires `Attestations: read`; verification then runs offline without
+the token. Both policies bind the build to the pinned source commit, release
+workflow, `refs/heads/main`, and GitHub-hosted runners.
 
 There is currently no repository secret fallback. If the secret is absent,
 the trusted job intentionally fails; do not skip or weaken this validation.
@@ -263,7 +276,20 @@ smoke generator against the just-installed MCP executables on every trusted
 stays under the isolated runner directory and must pass the full version,
 readiness, identity-shape, generation, binding, and unchanged-checkout
 validator. The committed `promotion-candidate` record cannot substitute for
-that run-specific attestation.
+that run-specific attestation. The uploaded trusted artifact includes freshly
+captured schema contracts and readiness evidence, each bound to the canonical
+SHA-256 of the complete install descriptor.
+
+Rollback is descriptor-atomic: revert the reviewed component-promotion commit
+that changed the BOM, snapshots, and readiness record together, then rerun the
+deterministic validation gate and trusted workflow. Never roll back only a tag,
+digest, manifest, or evidence file.
+
+The interactive installers also preserve the previously installed `.venv` and
+`bin` until the replacement components pass their live MCP schema check. Graph
+artifacts and launchers are built in an isolated `.install-staging` directory;
+if any install, provenance, extraction, or validation step fails, the rollback
+handler restores the prior installation instead of leaving a partial upgrade.
 
 ## Environment Variables
 

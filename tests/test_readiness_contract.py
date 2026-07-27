@@ -90,7 +90,7 @@ READINESS_REQUIREMENTS = {
     },
     "readiness_evidence": {
         "schema_version": 1,
-        "component_versions_match_bom": True,
+        "component_install_descriptors_match_bom": True,
         "checkout_unchanged": True,
     },
 }
@@ -103,6 +103,17 @@ def code_search_version(bom: dict) -> str:
         if install["kind"] == "github-release"
         else install["revision"]
     )
+
+
+def install_descriptor_sha256(bom: dict, component: str) -> str:
+    canonical = json.dumps(
+        bom["components"][component]["install"],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 class ReadinessContractTests(unittest.TestCase):
@@ -226,12 +237,20 @@ class ReadinessContractTests(unittest.TestCase):
             "components": {
                 "code-search": {
                     "version": code_search_version(bom),
+                    "install_descriptor_sha256": install_descriptor_sha256(
+                        bom,
+                        "code-search",
+                    ),
                     "completion": {"success": True, "error": None},
                     "index_ready": True,
                     "index_identity": deepcopy(identity),
                 },
                 "code-graph": {
                     "version": bom["components"]["code-graph"]["install"]["tag"],
+                    "install_descriptor_sha256": install_descriptor_sha256(
+                        bom,
+                        "code-graph",
+                    ),
                     "status": "ready",
                     "index_identity": graph_identity,
                 },
@@ -312,6 +331,28 @@ class ReadinessContractTests(unittest.TestCase):
             completed = self._run_validator(checkout)
 
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+
+    def test_readiness_evidence_rejects_mislabeled_install_descriptor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            evidence_path = (
+                checkout / "compatibility" / "readiness-evidence.json"
+            )
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            evidence["components"]["code-search"][
+                "install_descriptor_sha256"
+            ] = "0" * 64
+            self._write_json(evidence_path, evidence)
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(
+            completed.returncode,
+            1,
+            completed.stdout + completed.stderr,
+        )
+        self.assertIn("install descriptor", completed.stdout)
 
     def test_live_override_requires_ready_validation_mode_and_ready_bom_status(self):
         with tempfile.TemporaryDirectory() as tmp:

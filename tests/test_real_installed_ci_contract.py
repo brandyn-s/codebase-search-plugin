@@ -2,9 +2,12 @@
 
 import importlib.util
 import hashlib
+import io
 import json
 import os
 import subprocess
+import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,23 +15,35 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
+TRUSTED_WORKFLOW = (
+    ROOT / ".github" / "workflows" / "trusted-component-promotion.yml"
+)
 HELPER = ROOT / "scripts" / "validate_real_installed.py"
 MODEL_BUILDER = ROOT / "scripts" / "build_readiness_model.py"
 README = ROOT / "README.md"
 
 
 def load_helper():
-    spec = importlib.util.spec_from_file_location("validate_real_installed_ci", HELPER)
-    if spec is None or spec.loader is None:
-        raise AssertionError("could not load real-install helper")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    scripts = str(ROOT / "scripts")
+    sys.path.insert(0, scripts)
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "validate_real_installed_ci",
+            HELPER,
+        )
+        if spec is None or spec.loader is None:
+            raise AssertionError("could not load real-install helper")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        sys.path.remove(scripts)
 
 
 class RealInstalledCIContractTests(unittest.TestCase):
     def test_distinct_ci_job_installs_and_validates_real_private_components(self):
-        workflow = WORKFLOW.read_text(encoding="utf-8")
+        workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
+        pull_request_workflow = WORKFLOW.read_text(encoding="utf-8")
 
         self.assertIn("validate-installed-components:", workflow)
         self.assertIn(
@@ -41,6 +56,9 @@ class RealInstalledCIContractTests(unittest.TestCase):
             "fake_mcp_server",
             workflow.split("validate-installed-components:", 1)[1],
         )
+        self.assertNotIn("validate-installed-components:", pull_request_workflow)
+        self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", pull_request_workflow)
+        self.assertNotIn("pull_request:", workflow)
 
         self.assertTrue(HELPER.is_file(), HELPER)
         helper = HELPER.read_text(encoding="utf-8")
@@ -67,7 +85,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("post-merge validation secret", normalized_readme)
 
     def test_trusted_job_uploads_successful_live_readiness_evidence(self):
-        workflow = WORKFLOW.read_text(encoding="utf-8")
+        workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
         real_job = workflow.split("validate-installed-components:", 1)[1]
         normalized_job = " ".join(real_job.split())
         output = (
@@ -81,6 +99,9 @@ class RealInstalledCIContractTests(unittest.TestCase):
 
         self.assertIn(
             "python3 scripts/validate_real_installed.py "
+            "--component-bom component-bom.json "
+            '--contract-evidence-output "$RUNNER_TEMP/'
+            'code-intel-ready-validation/contracts" '
             f'--readiness-evidence-output "{output}"',
             normalized_job,
         )
@@ -92,8 +113,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("name: Upload trusted readiness evidence", real_job)
         self.assertIn("name: code-intel-ready-validation", real_job)
         self.assertIn(
-            "path: ${{ runner.temp }}/code-intel-ready-validation/"
-            "readiness-evidence.json",
+            "path: ${{ runner.temp }}/code-intel-ready-validation",
             real_job,
         )
         self.assertIn("if-no-files-found: error", real_job)
@@ -118,7 +138,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("throw", validation_job)
 
     def test_private_token_is_limited_to_trusted_fetch_operations(self):
-        workflow = WORKFLOW.read_text(encoding="utf-8")
+        workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
         real_job = workflow.split("validate-installed-components:", 1)[1]
 
         self.assertIn("workflow_dispatch:", workflow)
@@ -140,41 +160,114 @@ class RealInstalledCIContractTests(unittest.TestCase):
             "private-token",
             {
                 "PATH": os.environ.get("PATH", ""),
+                "LANG": "C.UTF-8",
                 "GH_TOKEN": "ambient-token",
                 "GITHUB_TOKEN": "ambient-actions-token",
                 "CODE_INTEL_COMPONENT_TOKEN": "private-token",
+                "AWS_SECRET_ACCESS_KEY": "must-not-leak",
+                "OPENAI_API_KEY": "must-not-leak",
+                "UNRELATED_CREDENTIAL": "must-not-leak",
+                "SSH_AUTH_SOCK": "/tmp/credential-agent.sock",
             },
         )
         self.assertEqual(fetch_env["GH_TOKEN"], "private-token")
+        self.assertEqual(fetch_env["PATH"], os.environ.get("PATH", ""))
+        self.assertEqual(fetch_env["LANG"], "C.UTF-8")
         self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", fetch_env)
         self.assertNotIn("GITHUB_TOKEN", fetch_env)
         self.assertNotIn("GH_TOKEN", runtime_env)
         self.assertNotIn("GITHUB_TOKEN", runtime_env)
         self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", runtime_env)
+        for environment in (fetch_env, runtime_env):
+            self.assertNotIn("AWS_SECRET_ACCESS_KEY", environment)
+            self.assertNotIn("OPENAI_API_KEY", environment)
+            self.assertNotIn("UNRELATED_CREDENTIAL", environment)
+            self.assertNotIn("SSH_AUTH_SOCK", environment)
 
         helper_source = HELPER.read_text(encoding="utf-8")
         self.assertNotIn('"git", "-C", str(source), "fetch"', helper_source)
+
+    def test_pull_request_merge_gate_is_stable_and_fail_closed(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("pull_request:", workflow)
+        self.assertIn("merge-gate:", workflow)
+        merge_gate = workflow.split("merge-gate:", 1)[1]
+        self.assertIn("name: merge-gate", merge_gate)
+        self.assertIn("if: ${{ always() }}", merge_gate)
+        self.assertIn("needs: [validate]", merge_gate)
+        self.assertIn(
+            "VALIDATE_RESULT: ${{ needs.validate.result }}",
+            merge_gate,
+        )
+        self.assertIn('test "$VALIDATE_RESULT" = "success"', merge_gate)
+        self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", workflow)
+
+    def test_load_bom_uses_the_exact_requested_candidate_path(self):
+        helper = load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate_path = Path(tmp) / "candidate-bom.json"
+            candidate = json.loads(
+                (ROOT / "component-bom.json").read_text(encoding="utf-8")
+            )
+            candidate["components"]["code-graph"]["install"]["tag"] = (
+                "v9.9.9-candidate"
+            )
+            candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+
+            loaded = helper.load_bom(candidate_path)
+
+        self.assertEqual(
+            loaded["components"]["code-graph"]["install"]["tag"],
+            "v9.9.9-candidate",
+        )
+
+    def test_load_bom_rejects_unknown_install_descriptor_fields(self):
+        helper = load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate_path = Path(tmp) / "candidate-bom.json"
+            candidate = json.loads(
+                (ROOT / "component-bom.json").read_text(encoding="utf-8")
+            )
+            candidate["components"]["code-graph"]["install"]["assets"][
+                "linux-amd64"
+            ]["unexpected_policy"] = True
+            candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                helper.RealInstallError,
+                "keys must exactly match",
+            ):
+                helper.load_bom(candidate_path)
 
     def test_release_wheel_is_verified_offline_before_secret_free_install(self):
         helper = load_helper()
         wheel_bytes = b"pinned wheel"
         bundle_bytes = b"offline attestation bundle"
-        wheel_name = "redacted_code_search-0.2.0-py3-none-any.whl"
-        bundle_name = f"{wheel_name}.jsonl"
+        wheel_name = "redacted_code_search-0.2.1-py3-none-any.whl"
+        bundle_name = "redacted_code_search-0.2.1-provenance.jsonl"
+        checksums_name = "SHA256SUMS"
+        checksums_bytes = (
+            f"{hashlib.sha256(wheel_bytes).hexdigest()}  {wheel_name}\n"
+        ).encode()
         install = {
             "kind": "github-release",
             "repository": "redacted-org/code-search",
-            "tag": "v0.2.0",
+            "tag": "v0.2.1",
             "source_revision": "a" * 40,
             "asset": {
                 "name": wheel_name,
                 "sha256": hashlib.sha256(wheel_bytes).hexdigest(),
+            },
+            "checksums": {
+                "name": checksums_name,
+                "sha256": hashlib.sha256(checksums_bytes).hexdigest(),
             },
             "attestation": {
                 "bundle": {
                     "name": bundle_name,
                     "sha256": hashlib.sha256(bundle_bytes).hexdigest(),
                 },
+                "deny_self_hosted_runners": True,
                 "signer_workflow": (
                     "redacted-org/code-search/"
                     ".github/workflows/release.yml"
@@ -195,6 +288,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 download_dir.mkdir(parents=True, exist_ok=True)
                 (download_dir / wheel_name).write_bytes(wheel_bytes)
                 (download_dir / bundle_name).write_bytes(bundle_bytes)
+                (download_dir / checksums_name).write_bytes(checksums_bytes)
             elif command[1:4] == ["-m", "pip", "install"]:
                 executable = (
                     Path(command[0]).parents[1] / "bin" / "code-search-mcp"
@@ -216,6 +310,11 @@ class RealInstalledCIContractTests(unittest.TestCase):
                     create=True,
                     side_effect=resolve_tag,
                 ) as resolve,
+                mock.patch.object(
+                    helper,
+                    "verify_checksum_manifest",
+                    wraps=helper.verify_checksum_manifest,
+                ) as verify_manifest,
             ):
                 python, executable = helper.install_code_search(
                     install,
@@ -226,8 +325,13 @@ class RealInstalledCIContractTests(unittest.TestCase):
 
         resolve.assert_called_once_with(
             "redacted-org/code-search",
-            "v0.2.0",
+            "v0.2.1",
             fetch_env,
+        )
+        verify_manifest.assert_called_once_with(
+            destination / "code-search-download" / checksums_name,
+            wheel_name,
+            hashlib.sha256(wheel_bytes).hexdigest(),
         )
         self.assertLess(events.index("tag"), events.index("download"))
         commands = [call[0] for call in calls]
@@ -266,6 +370,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertLess(attestation, pip_install)
         self.assertLess(pip_install, installed_provenance)
         self.assertEqual(environments[release_download], fetch_env)
+        self.assertIn(checksums_name, commands[release_download])
         self.assertEqual(environments[attestation], runtime_env)
         self.assertEqual(environments[pip_install], runtime_env)
         self.assertEqual(environments[installed_provenance], runtime_env)
@@ -389,6 +494,194 @@ class RealInstalledCIContractTests(unittest.TestCase):
 
         run.assert_not_called()
 
+    def test_graph_release_is_attested_before_extraction(self):
+        helper = load_helper()
+        archive_buffer = io.BytesIO()
+        binary_bytes = b"verified graph binary"
+        with tarfile.open(fileobj=archive_buffer, mode="w:gz") as archive:
+            entry = tarfile.TarInfo("codebase-memory-mcp")
+            entry.mode = 0o755
+            entry.size = len(binary_bytes)
+            archive.addfile(entry, io.BytesIO(binary_bytes))
+        archive_bytes = archive_buffer.getvalue()
+        archive_name = "codebase-memory-mcp-linux-amd64.tar.gz"
+        archive_sha256 = hashlib.sha256(archive_bytes).hexdigest()
+        checksums_name = "checksums.txt"
+        checksums_bytes = f"{archive_sha256}  {archive_name}\n".encode()
+        attestation_bundle_name = f"sha256:{archive_sha256}.jsonl"
+        install = {
+            "kind": "github-release",
+            "repository": "redacted-org/code-graph",
+            "tag": "v0.7.0-redacted.3",
+            "source_revision": "a" * 40,
+            "assets": {
+                "linux-amd64": {
+                    "name": archive_name,
+                    "sha256": archive_sha256,
+                }
+            },
+            "checksums": {
+                "name": checksums_name,
+                "sha256": hashlib.sha256(checksums_bytes).hexdigest(),
+            },
+            "attestation": {
+                "deny_self_hosted_runners": True,
+                "signer_workflow": (
+                    "redacted-org/code-graph/"
+                    ".github/workflows/release.yml"
+                ),
+                "source_ref": "refs/heads/main",
+            },
+        }
+        fetch_env = {"PATH": "/bin", "GH_TOKEN": "private-token"}
+        runtime_env = {"PATH": "/bin"}
+        calls = []
+        events = []
+
+        def emulate(command, *, env, cwd=None):
+            calls.append((command, env, cwd))
+            if command[:3] == ["gh", "release", "download"]:
+                events.append("download")
+                download_dir = Path(command[command.index("--dir") + 1])
+                download_dir.mkdir(parents=True, exist_ok=True)
+                (download_dir / archive_name).write_bytes(archive_bytes)
+                (download_dir / checksums_name).write_bytes(checksums_bytes)
+            elif command[:3] == ["gh", "attestation", "download"]:
+                events.append("attestation-download")
+                (Path(cwd) / attestation_bundle_name).write_text(
+                    '{"bundle":"downloaded"}\n',
+                    encoding="utf-8",
+                )
+            elif command[:3] == ["gh", "attestation", "verify"]:
+                events.append("attestation")
+
+        def resolve_tag(*_args, **_kwargs):
+            events.append("tag")
+            return "a" * 40
+
+        real_tarfile_open = helper.tarfile.open
+
+        def open_archive(*args, **kwargs):
+            events.append("extract")
+            return real_tarfile_open(*args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp)
+            with (
+                mock.patch.object(helper, "run", side_effect=emulate),
+                mock.patch.object(
+                    helper,
+                    "resolve_release_tag_commit",
+                    side_effect=resolve_tag,
+                ) as resolve,
+                mock.patch.object(
+                    helper,
+                    "verify_checksum_manifest",
+                    wraps=helper.verify_checksum_manifest,
+                ) as verify_manifest,
+                mock.patch.object(helper.platform, "system", return_value="Linux"),
+                mock.patch.object(helper.platform, "machine", return_value="x86_64"),
+                mock.patch.object(
+                    helper.tarfile,
+                    "open",
+                    side_effect=open_archive,
+                ),
+            ):
+                executable = helper.install_code_graph(
+                    install,
+                    destination,
+                    fetch_env,
+                    runtime_env,
+                )
+
+            self.assertEqual(executable.read_bytes(), binary_bytes)
+
+        resolve.assert_called_once_with(
+            "redacted-org/code-graph",
+            "v0.7.0-redacted.3",
+            fetch_env,
+        )
+        verify_manifest.assert_called_once_with(
+            destination / "code-graph-download" / checksums_name,
+            archive_name,
+            archive_sha256,
+        )
+        self.assertEqual(
+            events,
+            [
+                "tag",
+                "download",
+                "attestation-download",
+                "attestation",
+                "extract",
+            ],
+        )
+        commands = [call[0] for call in calls]
+        environments = [call[1] for call in calls]
+        release_download = next(
+            index
+            for index, command in enumerate(commands)
+            if command[:3] == ["gh", "release", "download"]
+        )
+        attestation = next(
+            index
+            for index, command in enumerate(commands)
+            if command[:3] == ["gh", "attestation", "verify"]
+        )
+        attestation_download = next(
+            index
+            for index, command in enumerate(commands)
+            if command[:3] == ["gh", "attestation", "download"]
+        )
+        self.assertEqual(environments[release_download], fetch_env)
+        self.assertEqual(environments[attestation_download], fetch_env)
+        self.assertEqual(environments[attestation], runtime_env)
+        self.assertIn(archive_name, commands[release_download])
+        self.assertIn(checksums_name, commands[release_download])
+        self.assertIn("--bundle", commands[attestation])
+        self.assertIn(attestation_bundle_name, commands[attestation])
+        for required in (
+            "--repo",
+            "redacted-org/code-graph",
+            "--signer-workflow",
+            "redacted-org/code-graph/.github/workflows/release.yml",
+            "--source-digest",
+            "a" * 40,
+            "--source-ref",
+            "refs/heads/main",
+            "--deny-self-hosted-runners",
+        ):
+            self.assertIn(required, commands[attestation])
+
+    def test_graph_release_rejects_tag_commit_mismatch_before_download(self):
+        helper = load_helper()
+        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        install = bom["components"]["code-graph"]["install"]
+
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch.object(
+                helper,
+                "resolve_release_tag_commit",
+                return_value="d" * 40,
+            ),
+            mock.patch.object(helper.platform, "system", return_value="Linux"),
+            mock.patch.object(helper.platform, "machine", return_value="x86_64"),
+            mock.patch.object(helper, "run") as run,
+            self.assertRaisesRegex(
+                helper.RealInstallError,
+                "tag source revision mismatch",
+            ),
+        ):
+            helper.install_code_graph(
+                install,
+                Path(tmp),
+                {"PATH": "/bin", "GH_TOKEN": "private-token"},
+                {"PATH": "/bin"},
+            )
+
+        run.assert_not_called()
+
     def test_readiness_evidence_output_rejects_paths_outside_runner_temp(self):
         helper = load_helper()
 
@@ -404,6 +697,60 @@ class RealInstalledCIContractTests(unittest.TestCase):
                     str(outside),
                     runner_temp,
                 )
+
+    def test_contract_capture_binds_exact_candidate_and_installed_servers(self):
+        helper = load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            candidate_bom = directory / "candidate-bom.json"
+            candidate_bom.write_text("{}\n", encoding="utf-8")
+            code_search = directory / "venv" / "bin" / "code-search-mcp"
+            code_graph = directory / "bin" / "codebase-memory-mcp"
+            output = directory / "evidence" / "contracts"
+            polluted_env = {
+                "PATH": os.environ.get("PATH", ""),
+                "AWS_SECRET_ACCESS_KEY": "must-not-leak",
+                "UNRELATED_CREDENTIAL": "must-not-leak",
+            }
+
+            def emulate(command, *, env, cwd=None):
+                self.assertTrue(output.parent.is_dir())
+                (output / "compatibility").mkdir(parents=True)
+                (output / "component-bom.json").write_text(
+                    "{}\n",
+                    encoding="utf-8",
+                )
+                for component in ("code-search", "code-graph"):
+                    (output / "compatibility" / f"{component}-tools.json").write_text(
+                        "{}\n",
+                        encoding="utf-8",
+                    )
+
+            with mock.patch.object(helper, "run", side_effect=emulate) as run:
+                helper.capture_installed_contract_evidence(
+                    candidate_bom,
+                    output,
+                    directory / "venv" / "bin" / "python",
+                    code_search,
+                    code_graph,
+                    polluted_env,
+                )
+
+            command = run.call_args.args[0]
+            self.assertEqual(
+                command[command.index("--component-bom") + 1],
+                str(candidate_bom),
+            )
+            self.assertEqual(
+                command[command.index("--output-dir") + 1],
+                str(output),
+            )
+            self.assertIn(f"code-search={code_search}", command)
+            self.assertIn(f"code-graph={code_graph}", command)
+            self.assertIn("--write", command)
+            called_env = run.call_args.kwargs["env"]
+            self.assertNotIn("AWS_SECRET_ACCESS_KEY", called_env)
+            self.assertNotIn("UNRELATED_CREDENTIAL", called_env)
 
     def test_failed_live_validation_does_not_publish_readiness_evidence(self):
         helper = load_helper()
@@ -427,6 +774,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
             ):
                 helper.validate_and_publish_live_evidence(
                     source,
+                    directory / "candidate-bom.json",
                     output,
                     directory / "venv" / "bin" / "python",
                     {"PATH": os.environ.get("PATH", "")},
@@ -447,13 +795,59 @@ class RealInstalledCIContractTests(unittest.TestCase):
             with mock.patch.object(helper, "run") as run:
                 helper.validate_and_publish_live_evidence(
                     source,
+                    directory / "candidate-bom.json",
                     output,
                     directory / "venv" / "bin" / "python",
                     {"PATH": os.environ.get("PATH", "")},
                 )
 
             run.assert_called_once()
+            command = run.call_args.args[0]
+            self.assertEqual(
+                command[command.index("--component-bom") + 1],
+                str(directory / "candidate-bom.json"),
+            )
             self.assertEqual(output.read_bytes(), evidence)
+
+    def test_live_validation_retains_runner_temp_without_credentials(self):
+        helper = load_helper()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            source = directory / "live-readiness-evidence.json"
+            output = directory / "artifact" / "readiness-evidence.json"
+            source.write_text('{"schema_version": 1}\n', encoding="utf-8")
+            runtime_env = {
+                "PATH": os.environ.get("PATH", ""),
+                "RUNNER_TEMP": str(directory),
+                "AWS_SECRET_ACCESS_KEY": "must-not-leak",
+                "OPENAI_API_KEY": "must-not-leak",
+                "UNRELATED_CREDENTIAL": "must-not-leak",
+                "SSH_AUTH_SOCK": "/tmp/credential-agent.sock",
+            }
+
+            with mock.patch.object(helper, "run") as run:
+                helper.validate_and_publish_live_evidence(
+                    source,
+                    directory / "candidate-bom.json",
+                    output,
+                    directory / "venv" / "bin" / "python",
+                    runtime_env,
+                )
+
+            called_env = run.call_args.kwargs["env"]
+            self.assertEqual(called_env["RUNNER_TEMP"], str(directory))
+            self.assertEqual(
+                called_env["CODE_INTEL_READINESS_EVIDENCE_OVERRIDE"],
+                str(source),
+            )
+            for secret_name in (
+                "AWS_SECRET_ACCESS_KEY",
+                "OPENAI_API_KEY",
+                "UNRELATED_CREDENTIAL",
+                "SSH_AUTH_SOCK",
+            ):
+                self.assertNotIn(secret_name, called_env)
 
     def test_requested_output_requires_live_readiness_evidence(self):
         helper = load_helper()
@@ -471,6 +865,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
             ):
                 helper.validate_and_publish_live_evidence(
                     None,
+                    directory / "candidate-bom.json",
                     output,
                     directory / "venv" / "bin" / "python",
                     {"PATH": os.environ.get("PATH", "")},
@@ -489,12 +884,17 @@ class RealInstalledCIContractTests(unittest.TestCase):
             python = destination / "venv" / "bin" / "python"
             code_search = destination / "venv" / "bin" / "code-search-mcp"
             code_graph = destination / "bin" / "codebase-memory-mcp"
+            candidate_bom = destination / "candidate-bom.json"
+            candidate_bom.write_text("{}\n", encoding="utf-8")
             runtime_env = {
                 "PATH": os.environ.get("PATH", ""),
                 "CODE_INTEL_LIVE_READINESS_EVIDENCE": "/attacker/supplied.json",
                 "VOYAGE_API_KEY": "must-not-reach-smoke",
                 "OPENAI_API_KEY": "must-not-reach-smoke",
                 "ANTHROPIC_API_KEY": "must-not-reach-smoke",
+                "AWS_SECRET_ACCESS_KEY": "must-not-reach-smoke",
+                "UNRELATED_CREDENTIAL": "must-not-reach-smoke",
+                "SSH_AUTH_SOCK": "/tmp/credential-agent.sock",
             }
             model = destination / "readiness-model"
 
@@ -517,6 +917,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 self.assertIsNone(
                     helper.generate_live_readiness_evidence(
                         blocked,
+                        candidate_bom,
                         destination,
                         python,
                         code_search,
@@ -529,6 +930,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
 
                 output = helper.generate_live_readiness_evidence(
                     ready,
+                    candidate_bom,
                     destination,
                     python,
                     code_search,
@@ -546,6 +948,10 @@ class RealInstalledCIContractTests(unittest.TestCase):
             self.assertIn(f"code-search={code_search}", command)
             self.assertIn(f"code-graph={code_graph}", command)
             self.assertEqual(
+                command[command.index("--component-bom") + 1],
+                str(candidate_bom),
+            )
+            self.assertEqual(
                 command[command.index("--local-model") + 1],
                 str(model),
             )
@@ -556,6 +962,9 @@ class RealInstalledCIContractTests(unittest.TestCase):
             self.assertNotIn("VOYAGE_API_KEY", called_env)
             self.assertNotIn("OPENAI_API_KEY", called_env)
             self.assertNotIn("ANTHROPIC_API_KEY", called_env)
+            self.assertNotIn("AWS_SECRET_ACCESS_KEY", called_env)
+            self.assertNotIn("UNRELATED_CREDENTIAL", called_env)
+            self.assertNotIn("SSH_AUTH_SOCK", called_env)
 
         helper_source = HELPER.read_text(encoding="utf-8")
         self.assertNotIn(

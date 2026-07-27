@@ -16,7 +16,28 @@ import tarfile
 import tempfile
 from pathlib import Path
 
+from component_descriptor import (
+    DescriptorError,
+    validate_install_descriptor_shape,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
+SUBPROCESS_ENV_ALLOWLIST = (
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TZ",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "REQUESTS_CA_BUNDLE",
+)
+RUNTIME_OPERATION_ENV_ALLOWLIST = (
+    *SUBPROCESS_ENV_ALLOWLIST,
+    "PYTHONUNBUFFERED",
+    "CODE_SEARCH_STORAGE",
+    "RUNNER_TEMP",
+)
 
 
 class RealInstallError(RuntimeError):
@@ -25,6 +46,15 @@ class RealInstallError(RuntimeError):
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--component-bom",
+        default=str(ROOT / "component-bom.json"),
+        help="exact candidate component BOM to install and validate",
+    )
+    parser.add_argument(
+        "--contract-evidence-output",
+        help="write captured installed-component contracts beneath RUNNER_TEMP",
+    )
     parser.add_argument(
         "--readiness-evidence-output",
         help="copy validated live readiness evidence to this RUNNER_TEMP path",
@@ -43,6 +73,19 @@ def resolve_readiness_evidence_output(
     runner_temp: Path,
 ) -> Path | None:
     """Resolve an optional evidence path without allowing RUNNER_TEMP escape."""
+    return resolve_runner_temp_output(
+        requested,
+        runner_temp,
+        "readiness evidence output",
+    )
+
+
+def resolve_runner_temp_output(
+    requested: str | None,
+    runner_temp: Path,
+    label: str,
+) -> Path | None:
+    """Resolve an optional output without allowing RUNNER_TEMP escape."""
     if requested is None:
         return None
     resolved_runner_temp = runner_temp.resolve()
@@ -50,9 +93,7 @@ def resolve_readiness_evidence_output(
     if output == resolved_runner_temp or not output.is_relative_to(
         resolved_runner_temp
     ):
-        raise RealInstallError(
-            "readiness evidence output must be beneath RUNNER_TEMP"
-        )
+        raise RealInstallError(f"{label} must be beneath RUNNER_TEMP")
     return output
 
 
@@ -85,27 +126,47 @@ def build_subprocess_environments(
     source: dict[str, str] | None = None,
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Separate authenticated fetches from secret-free build/runtime work."""
-    runtime_env = dict(os.environ if source is None else source)
-    runtime_env.pop("GH_TOKEN", None)
-    runtime_env.pop("GITHUB_TOKEN", None)
-    runtime_env.pop("CODE_INTEL_COMPONENT_TOKEN", None)
+    candidate = os.environ if source is None else source
+    runtime_env = allowlisted_runtime_environment(candidate)
     fetch_env = {**runtime_env, "GH_TOKEN": token}
     return fetch_env, runtime_env
 
 
-def load_bom() -> dict:
+def allowlisted_runtime_environment(
+    source: dict[str, str],
+) -> dict[str, str]:
+    """Copy only explicitly safe, non-credential runtime variables."""
+    runtime_env = {
+        name: source[name]
+        for name in RUNTIME_OPERATION_ENV_ALLOWLIST
+        if isinstance(source.get(name), str) and source[name]
+    }
+    return runtime_env
+
+
+def allowlisted_fetch_environment(source: dict[str, str]) -> dict[str, str]:
+    """Copy only transport variables and the explicit GitHub fetch token."""
+    fetch_env = allowlisted_runtime_environment(source)
+    token = source.get("GH_TOKEN")
+    if isinstance(token, str) and token:
+        fetch_env["GH_TOKEN"] = token
+    return fetch_env
+
+
+def load_bom(path: Path) -> dict:
     try:
-        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        bom = json.loads(path.read_text(encoding="utf-8"))
         components = bom["components"]
         search = components["code-search"]["install"]
         graph = components["code-graph"]["install"]
     except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
-        raise RealInstallError(f"component-bom.json is malformed: {exc}") from exc
+        raise RealInstallError(f"{path}: component BOM is malformed: {exc}") from exc
 
-    if search.get("kind") not in {"git", "github-release"} or graph.get(
-        "kind"
-    ) != "github-release":
-        raise RealInstallError("component-bom.json uses unsupported install kinds")
+    try:
+        validate_install_descriptor_shape("code-search", search)
+        validate_install_descriptor_shape("code-graph", graph)
+    except DescriptorError as exc:
+        raise RealInstallError(f"{path}: {exc}") from exc
     return bom
 
 
@@ -116,6 +177,7 @@ def build_readiness_model(
 ) -> Path:
     """Build a tiny deterministic local model with the installed dependency set."""
     model = destination / "readiness-model"
+    runtime_env = allowlisted_runtime_environment(runtime_env)
     run(
         [
             str(venv_python),
@@ -140,8 +202,55 @@ def build_readiness_model(
     return model
 
 
+def capture_installed_contract_evidence(
+    bom_path: Path,
+    output: Path,
+    venv_python: Path,
+    code_search: Path,
+    code_graph: Path,
+    runtime_env: dict[str, str],
+) -> None:
+    """Capture schemas from the installed executables under the exact BOM."""
+    if output.exists():
+        raise RealInstallError(
+            f"contract evidence output already exists: {output}"
+        )
+    try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise RealInstallError(
+            f"could not create contract evidence parent: {output.parent}"
+        ) from exc
+    run(
+        [
+            str(venv_python),
+            str(ROOT / "scripts" / "capture_component_contracts.py"),
+            "--component-bom",
+            str(bom_path),
+            "--server",
+            f"code-search={code_search}",
+            "--server",
+            f"code-graph={code_graph}",
+            "--output-dir",
+            str(output),
+            "--write",
+        ],
+        env=allowlisted_runtime_environment(runtime_env),
+    )
+    required = (
+        output / "component-bom.json",
+        output / "compatibility" / "code-search-tools.json",
+        output / "compatibility" / "code-graph-tools.json",
+    )
+    if any(not path.is_file() for path in required):
+        raise RealInstallError(
+            "component contract capture omitted required evidence files"
+        )
+
+
 def generate_live_readiness_evidence(
     bom: dict,
+    bom_path: Path,
     destination: Path,
     venv_python: Path,
     code_search: Path,
@@ -157,18 +266,7 @@ def generate_live_readiness_evidence(
         raise RealInstallError(f"unknown integrated readiness status: {status!r}")
 
     evidence = destination / "live-readiness-evidence.json"
-    smoke_env = dict(runtime_env)
-    for secret_name in (
-        "GH_TOKEN",
-        "GITHUB_TOKEN",
-        "CODE_INTEL_COMPONENT_TOKEN",
-        "CODE_INTEL_LIVE_READINESS_EVIDENCE",
-        "CODE_INTEL_READINESS_EVIDENCE_OVERRIDE",
-        "VOYAGE_API_KEY",
-        "OPENAI_API_KEY",
-        "ANTHROPIC_API_KEY",
-    ):
-        smoke_env.pop(secret_name, None)
+    smoke_env = allowlisted_runtime_environment(runtime_env)
     local_model = build_readiness_model(
         destination,
         venv_python,
@@ -179,7 +277,7 @@ def generate_live_readiness_evidence(
             str(venv_python),
             str(ROOT / "scripts" / "generate_live_readiness_evidence.py"),
             "--component-bom",
-            str(ROOT / "component-bom.json"),
+            str(bom_path),
             "--fixture",
             str(ROOT / "bench" / "e2e" / "target-repo"),
             "--server",
@@ -202,6 +300,7 @@ def generate_live_readiness_evidence(
 
 def validate_and_publish_live_evidence(
     live_evidence: Path | None,
+    bom_path: Path,
     readiness_evidence_output: Path | None,
     venv_python: Path,
     runtime_env: dict[str, str],
@@ -217,9 +316,11 @@ def validate_and_publish_live_evidence(
         [
             str(venv_python),
             str(ROOT / "scripts" / "validate_plugin.py"),
+            "--component-bom",
+            str(bom_path),
         ],
         env={
-            **runtime_env,
+            **allowlisted_runtime_environment(runtime_env),
             "CODE_INTEL_READINESS_EVIDENCE_OVERRIDE": str(live_evidence),
         },
     )
@@ -257,12 +358,86 @@ def verify_sha256(archive: Path, expected: str) -> None:
         )
 
 
+def verify_checksum_manifest(
+    manifest: Path,
+    artifact_name: str,
+    expected_sha256: str,
+) -> None:
+    """Require exactly one manifest entry binding the artifact name and digest."""
+    if (
+        not manifest.is_file()
+        or not isinstance(artifact_name, str)
+        or Path(artifact_name).name != artifact_name
+        or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+    ):
+        raise RealInstallError("checksum manifest inputs are invalid")
+    try:
+        lines = manifest.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RealInstallError(f"checksum manifest is unreadable: {exc}") from exc
+
+    matches: list[str] = []
+    for line in lines:
+        parsed = re.fullmatch(r"([0-9a-fA-F]{64})[ \t]+\*?(.+)", line)
+        if parsed is None:
+            if line.strip():
+                raise RealInstallError("checksum manifest contains a malformed entry")
+            continue
+        digest, name = parsed.groups()
+        if name == artifact_name:
+            matches.append(digest.lower())
+    if matches != [expected_sha256]:
+        raise RealInstallError(
+            "checksum manifest does not contain exactly one matching artifact entry"
+        )
+
+
+def download_attestation_bundle(
+    artifact_name: str,
+    artifact_sha256: str,
+    repository: str,
+    downloads: Path,
+    fetch_env: dict[str, str],
+) -> Path:
+    """Fetch the artifact's bundle with auth, then return its exact digest path."""
+    candidates = (
+        downloads / f"sha256:{artifact_sha256}.jsonl",
+        downloads / f"sha256-{artifact_sha256}.jsonl",
+    )
+    if any(path.exists() for path in candidates):
+        raise RealInstallError("attestation bundle path existed before download")
+    run(
+        [
+            "gh",
+            "attestation",
+            "download",
+            artifact_name,
+            "--repo",
+            repository,
+        ],
+        env=allowlisted_fetch_environment(fetch_env),
+        cwd=downloads,
+    )
+    matches = [
+        path
+        for path in candidates
+        if path.is_file() and path.stat().st_size > 0
+    ]
+    if len(matches) != 1:
+        raise RealInstallError(
+            "attestation download did not produce exactly one digest-bound bundle"
+        )
+    return matches[0]
+
+
 def install_code_search_git(
     install: dict,
     destination: Path,
     fetch_env: dict[str, str],
     runtime_env: dict[str, str],
 ) -> tuple[Path, Path]:
+    fetch_env = allowlisted_fetch_environment(fetch_env)
+    runtime_env = allowlisted_runtime_environment(runtime_env)
     repository = install.get("repository")
     revision = install.get("revision")
     if not isinstance(repository, str) or not isinstance(revision, str):
@@ -345,6 +520,7 @@ def release_asset(
 
 
 def github_api_json(endpoint: str, fetch_env: dict[str, str]) -> dict:
+    fetch_env = allowlisted_fetch_environment(fetch_env)
     completed = subprocess.run(
         ["gh", "api", "--method", "GET", endpoint],
         env=fetch_env,
@@ -408,6 +584,8 @@ def install_code_search_release(
     fetch_env: dict[str, str],
     runtime_env: dict[str, str],
 ) -> tuple[Path, Path]:
+    fetch_env = allowlisted_fetch_environment(fetch_env)
+    runtime_env = allowlisted_runtime_environment(runtime_env)
     repository = install.get("repository")
     tag = install.get("tag")
     source_revision = install.get("source_revision")
@@ -427,6 +605,11 @@ def install_code_search_release(
         component="code-search wheel",
         suffix=".whl",
     )
+    checksums_name, checksums_sha256 = release_asset(
+        install.get("checksums"),
+        component="code-search checksums",
+        suffix="",
+    )
     bundle_name, bundle_sha256 = release_asset(
         attestation.get("bundle"),
         component="code-search attestation bundle",
@@ -434,13 +617,18 @@ def install_code_search_release(
     )
     signer_workflow = attestation.get("signer_workflow")
     source_ref = attestation.get("source_ref")
+    version = tag.removeprefix("v")
     if (
-        signer_workflow
+        wheel_name != f"redacted_code_search-{version}-py3-none-any.whl"
+        or checksums_name != "SHA256SUMS"
+        or bundle_name != f"redacted_code_search-{version}-provenance.jsonl"
+        or signer_workflow
         != (
             "redacted-org/code-search/"
             ".github/workflows/release.yml"
         )
         or source_ref != "refs/heads/main"
+        or attestation.get("deny_self_hosted_runners") is not True
     ):
         raise RealInstallError("code-search attestation policy is invalid")
 
@@ -465,6 +653,8 @@ def install_code_search_release(
             wheel_name,
             "--pattern",
             bundle_name,
+            "--pattern",
+            checksums_name,
             "--dir",
             str(downloads),
             "--clobber",
@@ -473,8 +663,11 @@ def install_code_search_release(
     )
     wheel = downloads / wheel_name
     bundle = downloads / bundle_name
+    checksums = downloads / checksums_name
     verify_sha256(wheel, wheel_sha256)
     verify_sha256(bundle, bundle_sha256)
+    verify_sha256(checksums, checksums_sha256)
+    verify_checksum_manifest(checksums, wheel_name, wheel_sha256)
     run(
         [
             "gh",
@@ -586,13 +779,49 @@ def install_code_graph(
     install: dict,
     destination: Path,
     fetch_env: dict[str, str],
+    runtime_env: dict[str, str],
 ) -> Path:
+    fetch_env = allowlisted_fetch_environment(fetch_env)
+    runtime_env = allowlisted_runtime_environment(runtime_env)
     repository = install.get("repository")
     tag = install.get("tag")
-    if not isinstance(repository, str) or not isinstance(tag, str):
-        raise RealInstallError("code-graph BOM entry lacks repository/tag")
+    source_revision = install.get("source_revision")
+    attestation = install.get("attestation")
+    if (
+        repository != "redacted-org/code-graph"
+        or not isinstance(tag, str)
+        or re.fullmatch(r"v[0-9][0-9A-Za-z._+-]*", tag) is None
+        or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", source_revision or "")
+        is None
+        or not isinstance(attestation, dict)
+    ):
+        raise RealInstallError("code-graph release BOM metadata is invalid")
+    signer_workflow = attestation.get("signer_workflow")
+    source_ref = attestation.get("source_ref")
+    if (
+        signer_workflow
+        != "redacted-org/code-graph/.github/workflows/release.yml"
+        or source_ref != "refs/heads/main"
+        or attestation.get("deny_self_hosted_runners") is not True
+    ):
+        raise RealInstallError("code-graph attestation policy is invalid")
 
     asset_name, expected_sha256 = linux_asset(install)
+    checksums_name, checksums_sha256 = release_asset(
+        install.get("checksums"),
+        component="code-graph checksums",
+        suffix=".txt",
+    )
+    if checksums_name != "checksums.txt":
+        raise RealInstallError("code-graph checksums asset must be checksums.txt")
+
+    resolved_revision = resolve_release_tag_commit(repository, tag, fetch_env)
+    if resolved_revision != source_revision:
+        raise RealInstallError(
+            "code-graph tag source revision mismatch: "
+            f"expected {source_revision}, got {resolved_revision}"
+        )
+
     downloads = destination / "code-graph-download"
     downloads.mkdir()
     run(
@@ -605,6 +834,8 @@ def install_code_graph(
             repository,
             "--pattern",
             asset_name,
+            "--pattern",
+            checksums_name,
             "--dir",
             str(downloads),
             "--clobber",
@@ -612,7 +843,38 @@ def install_code_graph(
         env=fetch_env,
     )
     archive = downloads / asset_name
+    checksums = downloads / checksums_name
     verify_sha256(archive, expected_sha256)
+    verify_sha256(checksums, checksums_sha256)
+    verify_checksum_manifest(checksums, asset_name, expected_sha256)
+    bundle = download_attestation_bundle(
+        asset_name,
+        expected_sha256,
+        repository,
+        downloads,
+        fetch_env,
+    )
+    run(
+        [
+            "gh",
+            "attestation",
+            "verify",
+            asset_name,
+            "--bundle",
+            bundle.name,
+            "--repo",
+            repository,
+            "--signer-workflow",
+            signer_workflow,
+            "--source-digest",
+            source_revision,
+            "--source-ref",
+            source_ref,
+            "--deny-self-hosted-runners",
+        ],
+        env=runtime_env,
+        cwd=downloads,
+    )
 
     extracted = destination / "code-graph-extracted"
     extracted.mkdir()
@@ -640,11 +902,17 @@ def main(argv: list[str] | None = None) -> int:
             args.readiness_evidence_output,
             runner_temp,
         )
+        contract_evidence_output = resolve_runner_temp_output(
+            args.contract_evidence_output,
+            runner_temp,
+            "contract evidence output",
+        )
         fetch_env, runtime_env = build_subprocess_environments(token)
         os.environ.pop("GH_TOKEN", None)
         os.environ.pop("GITHUB_TOKEN", None)
         os.environ.pop("CODE_INTEL_COMPONENT_TOKEN", None)
-        bom = load_bom()
+        bom_path = Path(args.component_bom).resolve()
+        bom = load_bom(bom_path)
         runtime_env = {
             **runtime_env,
             "PYTHONUNBUFFERED": "1",
@@ -664,6 +932,7 @@ def main(argv: list[str] | None = None) -> int:
                 bom["components"]["code-graph"]["install"],
                 destination,
                 fetch_env,
+                runtime_env,
             )
             run(
                 [
@@ -678,8 +947,18 @@ def main(argv: list[str] | None = None) -> int:
                 ],
                 env=runtime_env,
             )
+            if contract_evidence_output is not None:
+                capture_installed_contract_evidence(
+                    bom_path,
+                    contract_evidence_output,
+                    venv_python,
+                    code_search,
+                    code_graph,
+                    runtime_env,
+                )
             live_evidence = generate_live_readiness_evidence(
                 bom,
+                bom_path,
                 destination,
                 venv_python,
                 code_search,
@@ -688,6 +967,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             validate_and_publish_live_evidence(
                 live_evidence,
+                bom_path,
                 readiness_evidence_output,
                 venv_python,
                 runtime_env,

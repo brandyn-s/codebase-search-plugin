@@ -13,6 +13,7 @@ from live_provenance import (
     build_provenance,
     load_json,
     load_jsonl,
+    validate_component_evidence,
 )
 
 
@@ -44,6 +45,10 @@ def main() -> int:
             "repository": target_manifest.get("repository"),
             "revision": target_manifest.get("revision"),
         }
+        validate_component_evidence(
+            args.component_bom,
+            args.component_evidence,
+        )
         provenance = build_provenance(
             output=args.output,
             run_id=run_id,

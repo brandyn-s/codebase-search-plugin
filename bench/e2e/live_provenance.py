@@ -47,6 +47,25 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def install_descriptor_sha256(install: object) -> str:
+    """Hash the complete install descriptor with the plugin's canonical JSON."""
+    if not isinstance(install, dict):
+        raise ProvenanceError("component install descriptor must be an object")
+    try:
+        canonical = json.dumps(
+            install,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ProvenanceError(
+            f"component install descriptor is not canonical JSON: {exc}"
+        ) from exc
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def load_json(path: Path) -> dict:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -279,7 +298,7 @@ def _validate_identity(component: str, identity: object) -> dict:
     return identity
 
 
-def _validate_components(bom_path: Path, evidence_path: Path) -> None:
+def validate_component_evidence(bom_path: Path, evidence_path: Path) -> None:
     bom = load_json(bom_path)
     readiness = bom.get("integrated_readiness")
     if not isinstance(readiness, dict) or readiness.get("status") != "ready":
@@ -305,6 +324,12 @@ def _validate_components(bom_path: Path, evidence_path: Path) -> None:
         .get("install", {})
         .get("tag"),
     }
+    expected_descriptors = {
+        component: install_descriptor_sha256(
+            components.get(component, {}).get("install")
+        )
+        for component in ("code-search", "code-graph")
+    }
 
     evidence = load_json(evidence_path)
     if (
@@ -328,6 +353,14 @@ def _validate_components(bom_path: Path, evidence_path: Path) -> None:
         ):
             raise ProvenanceError(
                 f"{component}: evidence version does not match component BOM"
+            )
+        if (
+            details.get("install_descriptor_sha256")
+            != expected_descriptors[component]
+        ):
+            raise ProvenanceError(
+                f"{component}: evidence install descriptor does not match "
+                "component BOM"
             )
         identities[component] = _validate_identity(
             component, details.get("index_identity")
@@ -458,5 +491,8 @@ def validate_live_provenance(
                 f"scored {name} path differs from the provenance artifact"
             )
     _validate_target(artifacts["target_manifest"], provenance.get("target"))
-    _validate_components(artifacts["component_bom"], artifacts["component_evidence"])
+    validate_component_evidence(
+        artifacts["component_bom"],
+        artifacts["component_evidence"],
+    )
     _validate_recording_artifacts(artifacts, run_id)

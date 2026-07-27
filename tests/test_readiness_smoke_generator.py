@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -23,6 +24,17 @@ GENERATOR_SPEC = importlib.util.spec_from_file_location(
 assert GENERATOR_SPEC is not None and GENERATOR_SPEC.loader is not None
 GENERATOR_MODULE = importlib.util.module_from_spec(GENERATOR_SPEC)
 GENERATOR_SPEC.loader.exec_module(GENERATOR_MODULE)
+
+
+def descriptor_sha256(install: dict) -> str:
+    canonical = json.dumps(
+        install,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 class ToolResultNormalizationTests(unittest.TestCase):
@@ -346,6 +358,25 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
             evidence["components"]["code-search"]["version"],
             "v0.2.0",
         )
+
+    def test_generator_binds_evidence_to_exact_install_descriptors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            completed, output, bom = self._run_generator(Path(tmp), "ready")
+
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stdout + completed.stderr,
+            )
+            evidence = json.loads(output.read_text(encoding="utf-8"))
+
+        for component in ("code-search", "code-graph"):
+            self.assertEqual(
+                evidence["components"][component]["install_descriptor_sha256"],
+                descriptor_sha256(
+                    bom["components"][component]["install"]
+                ),
+            )
 
     def test_blocked_bom_refuses_to_start_servers_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:

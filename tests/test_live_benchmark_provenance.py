@@ -63,6 +63,17 @@ def code_search_version(bom: dict) -> str:
     )
 
 
+def install_descriptor_sha256(bom: dict, component: str) -> str:
+    canonical = json.dumps(
+        bom["components"][component]["install"],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 class LiveBenchmarkProvenanceTests(unittest.TestCase):
     def _prepare_bundle(self, bundle: Path) -> dict[str, Path]:
         cases = bundle / "cases.jsonl"
@@ -149,11 +160,19 @@ class LiveBenchmarkProvenanceTests(unittest.TestCase):
             "components": {
                 "code-search": {
                     "version": code_search_version(bom),
+                    "install_descriptor_sha256": install_descriptor_sha256(
+                        bom,
+                        "code-search",
+                    ),
                     "index_ready": True,
                     "index_identity": identity("2026-07-26T20:00:00Z"),
                 },
                 "code-graph": {
                     "version": bom["components"]["code-graph"]["install"]["tag"],
+                    "install_descriptor_sha256": install_descriptor_sha256(
+                        bom,
+                        "code-graph",
+                    ),
                     "status": "ready",
                     "index_identity": identity("2026-07-26T20:00:01Z"),
                 },
@@ -291,6 +310,29 @@ class LiveBenchmarkProvenanceTests(unittest.TestCase):
         self.assertEqual(scored.returncode, 2, scored.stdout + scored.stderr)
         self.assertIn("artifact raw_mcp_transcript: file is missing", scored.stderr)
         self.assertNotIn("PROVENANCED LIVE MEASUREMENT", scored.stdout)
+
+    def test_copied_component_evidence_cannot_cover_another_install_descriptor(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._prepare_bundle(Path(tmp))
+            bom = json.loads(paths["bom"].read_text(encoding="utf-8"))
+            bom["components"]["code-graph"]["install"]["source_revision"] = (
+                "f" * 40
+            )
+            paths["bom"].write_text(
+                json.dumps(bom, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            recorded = self._record(paths)
+
+        self.assertEqual(
+            recorded.returncode,
+            2,
+            recorded.stdout + recorded.stderr,
+        )
+        self.assertIn("install descriptor", recorded.stderr)
 
     def test_live_recording_workflow_is_documented_without_a_grade_claim(self):
         documentation = (BENCH / "README.md").read_text(encoding="utf-8")

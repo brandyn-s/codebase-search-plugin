@@ -6,8 +6,10 @@
 
 $ErrorActionPreference = "Stop"
 $PluginDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$BinDir = Join-Path $PluginDir "bin"
-$VenvDir = Join-Path $PluginDir ".venv"
+$TargetBinDir = Join-Path $PluginDir "bin"
+$TargetVenvDir = Join-Path $PluginDir ".venv"
+$BinDir = $TargetBinDir
+$VenvDir = $TargetVenvDir
 $BomPath = Join-Path $PluginDir "component-bom.json"
 if (-not (Test-Path $BomPath)) {
     Write-Host "Error: tested component BOM not found: $BomPath" -ForegroundColor Red
@@ -74,8 +76,17 @@ $Bom = Get-Content -Raw -Path $BomPath | ConvertFrom-Json
 $CodeSearchInstall = $Bom.components.'code-search'.install
 $CodeSearchKind = $CodeSearchInstall.kind
 $CodeSearchRepository = $CodeSearchInstall.repository
-$GraphRepository = $Bom.components.'code-graph'.install.repository
-$ReleaseTag = $Bom.components.'code-graph'.install.tag
+$GraphInstall = $Bom.components.'code-graph'.install
+$GraphRepository = $GraphInstall.repository
+$ReleaseTag = $GraphInstall.tag
+$GraphSourceRevision = $GraphInstall.source_revision
+$GraphChecksums = $GraphInstall.checksums.name
+$GraphChecksumsSha256 = $GraphInstall.checksums.sha256
+$GraphSignerWorkflow = $GraphInstall.attestation.signer_workflow
+$GraphSourceRef = $GraphInstall.attestation.source_ref
+if ($GraphChecksums -ne "checksums.txt") {
+    throw "code-graph checksum manifest must be checksums.txt"
+}
 $ReadinessStatus = $Bom.integrated_readiness.status
 $ReadinessReason = $Bom.integrated_readiness.reason
 $AssetProperty = $Bom.components.'code-graph'.install.assets.PSObject.Properties[$AssetKey]
@@ -110,6 +121,43 @@ function Assert-Sha256 {
     }
 }
 
+function Assert-ChecksumManifest {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$ArtifactName,
+        [Parameter(Mandatory = $true)][string]$Expected
+    )
+
+    if (
+        -not (Test-Path -LiteralPath $Path -PathType Leaf) -or
+        [IO.Path]::GetFileName($ArtifactName) -ne $ArtifactName -or
+        $Expected -notmatch '^[0-9a-f]{64}$'
+    ) {
+        throw "checksum manifest inputs are invalid"
+    }
+    $MatchesForArtifact = @()
+    foreach ($Line in (Get-Content -LiteralPath $Path)) {
+        if ($Line -notmatch '^([0-9a-fA-F]{64})[ \t]+\*?(.+)$') {
+            if ($Line.Trim()) {
+                throw "checksum manifest contains a malformed entry"
+            }
+            continue
+        }
+        if ($Matches[2] -eq $ArtifactName) {
+            $MatchesForArtifact += $Matches[1].ToLowerInvariant()
+        }
+    }
+    if (
+        $MatchesForArtifact.Count -ne 1 -or
+        $MatchesForArtifact[0] -ne $Expected
+    ) {
+        throw (
+            "checksum manifest does not contain exactly one matching " +
+            "artifact entry"
+        )
+    }
+}
+
 function Assert-GitHubCliAuthenticated {
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
         throw "GitHub CLI is required for private code-search releases"
@@ -120,33 +168,54 @@ function Assert-GitHubCliAuthenticated {
     }
 }
 
-function Invoke-WithoutGitHubTokens {
+function Invoke-WithAllowedEnvironment {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$Operation
     )
 
-    $TokenNames = @(
-        "GH_TOKEN",
-        "GITHUB_TOKEN",
-        "CODE_INTEL_COMPONENT_TOKEN"
+    $AllowedEnvironmentNames = @(
+        "PATH",
+        "PATHEXT",
+        "SystemRoot",
+        "WINDIR",
+        "ComSpec",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TZ",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "REQUESTS_CA_BUNDLE"
     )
-    $SavedTokens = @{}
-    foreach ($Name in $TokenNames) {
-        $SavedTokens[$Name] = [Environment]::GetEnvironmentVariable(
-            $Name,
+    $SavedEnvironment = @{}
+    foreach (
+        $Entry in [Environment]::GetEnvironmentVariables(
             "Process"
-        )
-        Remove-Item -LiteralPath "Env:$Name" -ErrorAction SilentlyContinue
+        ).GetEnumerator()
+    ) {
+        $SavedEnvironment[[string]$Entry.Key] = [string]$Entry.Value
+        if ($AllowedEnvironmentNames -notcontains [string]$Entry.Key) {
+            Remove-Item `
+                -LiteralPath "Env:$([string]$Entry.Key)" `
+                -ErrorAction SilentlyContinue
+        }
     }
     try {
         & $Operation
     } finally {
-        foreach ($Name in $TokenNames) {
-            if ($null -eq $SavedTokens[$Name]) {
-                Remove-Item -LiteralPath "Env:$Name" -ErrorAction SilentlyContinue
-            } else {
-                Set-Item -LiteralPath "Env:$Name" -Value $SavedTokens[$Name]
-            }
+        foreach (
+            $Name in @(
+                [Environment]::GetEnvironmentVariables("Process").Keys
+            )
+        ) {
+            Remove-Item `
+                -LiteralPath "Env:$([string]$Name)" `
+                -ErrorAction SilentlyContinue
+        }
+        foreach ($Name in $SavedEnvironment.Keys) {
+            Set-Item `
+                -LiteralPath "Env:$Name" `
+                -Value $SavedEnvironment[$Name]
         }
     }
 }
@@ -200,6 +269,69 @@ function Resolve-ReleaseTagCommit {
     throw "GitHub annotated tag chain exceeds 16 objects"
 }
 
+$InstallStage = Join-Path $PluginDir (
+    ".install-staging.$PID.$([IO.Path]::GetRandomFileName())"
+)
+$RollbackBinDir = "$TargetBinDir.rollback.$PID"
+$RollbackVenvDir = "$TargetVenvDir.rollback.$PID"
+$InstallCommitted = $false
+$InstallPromoting = $false
+$HadTargetBin = $false
+$HadTargetVenv = $false
+$NewBinPromoted = $false
+$NewVenvPromoted = $false
+
+function Restore-PreviousInstallation {
+    Write-Host "Restoring previous installation..." -ForegroundColor Yellow
+    if ($script:InstallPromoting) {
+        if ($script:NewBinPromoted) {
+            Remove-Item `
+                -LiteralPath $script:TargetBinDir `
+                -Recurse `
+                -Force `
+                -ErrorAction SilentlyContinue
+        }
+        if ($script:NewVenvPromoted) {
+            Remove-Item `
+                -LiteralPath $script:TargetVenvDir `
+                -Recurse `
+                -Force `
+                -ErrorAction SilentlyContinue
+        }
+        if ($script:HadTargetBin -and (Test-Path $script:RollbackBinDir)) {
+            Move-Item `
+                -LiteralPath $script:RollbackBinDir `
+                -Destination $script:TargetBinDir
+        }
+        if ($script:HadTargetVenv -and (Test-Path $script:RollbackVenvDir)) {
+            Move-Item `
+                -LiteralPath $script:RollbackVenvDir `
+                -Destination $script:TargetVenvDir
+        }
+    }
+    Remove-Item `
+        -LiteralPath $script:InstallStage `
+        -Recurse `
+        -Force `
+        -ErrorAction SilentlyContinue
+}
+
+New-Item -ItemType Directory -Path $InstallStage | Out-Null
+$BinDir = Join-Path $InstallStage "bin"
+$VenvDir = $TargetVenvDir
+
+try {
+if (
+    (Test-Path -LiteralPath $RollbackBinDir) -or
+    (Test-Path -LiteralPath $RollbackVenvDir)
+) {
+    throw "rollback path already exists; refusing installation"
+}
+$InstallPromoting = $true
+if (Test-Path -LiteralPath $TargetVenvDir) {
+    Move-Item -LiteralPath $TargetVenvDir -Destination $RollbackVenvDir
+    $HadTargetVenv = $true
+}
 # ------------------------------------------------------------------
 # 2. Install code-search (Python, exact Git revision or release wheel)
 # ------------------------------------------------------------------
@@ -211,6 +343,7 @@ if (-not (Test-Path $BinDir)) {
 
 if (-not (Test-Path $VenvDir)) {
     Write-Host "  Creating virtual environment..."
+    $NewVenvPromoted = $true
     & $Python -m venv $VenvDir
 }
 
@@ -233,7 +366,7 @@ switch ($CodeSearchKind) {
             exit $PipExitCode
         }
         try {
-            Invoke-WithoutGitHubTokens {
+            Invoke-WithAllowedEnvironment {
                 & $VenvPython (Join-Path $PluginDir "scripts\verify_code_search_revision.py") `
                     $CodeSearchRef `
                     --repository $CodeSearchRepository
@@ -256,12 +389,15 @@ switch ($CodeSearchKind) {
         $CodeSearchWheelSha256 = $CodeSearchInstall.asset.sha256
         $CodeSearchBundle = $CodeSearchInstall.attestation.bundle.name
         $CodeSearchBundleSha256 = $CodeSearchInstall.attestation.bundle.sha256
+        $CodeSearchChecksums = $CodeSearchInstall.checksums.name
+        $CodeSearchChecksumsSha256 = $CodeSearchInstall.checksums.sha256
         $CodeSearchSignerWorkflow = $CodeSearchInstall.attestation.signer_workflow
         $CodeSearchSourceRef = $CodeSearchInstall.attestation.source_ref
         $CodeSearchDownloadDir = Join-Path $BinDir ".code-search-download"
         New-Item -ItemType Directory -Path $CodeSearchDownloadDir -Force | Out-Null
         $CodeSearchWheelPath = Join-Path $CodeSearchDownloadDir $CodeSearchWheel
         $CodeSearchBundlePath = Join-Path $CodeSearchDownloadDir $CodeSearchBundle
+        $CodeSearchChecksumsPath = Join-Path $CodeSearchDownloadDir $CodeSearchChecksums
 
         try {
             Assert-GitHubCliAuthenticated
@@ -280,6 +416,7 @@ switch ($CodeSearchKind) {
                 --repo $CodeSearchRepository `
                 --pattern $CodeSearchWheel `
                 --pattern $CodeSearchBundle `
+                --pattern $CodeSearchChecksums `
                 --dir $CodeSearchDownloadDir `
                 --clobber
             if ($LASTEXITCODE -ne 0) {
@@ -294,11 +431,19 @@ switch ($CodeSearchKind) {
                 -Path $CodeSearchBundlePath `
                 -Expected $CodeSearchBundleSha256 `
                 -Label $CodeSearchBundle
+            Assert-Sha256 `
+                -Path $CodeSearchChecksumsPath `
+                -Expected $CodeSearchChecksumsSha256 `
+                -Label $CodeSearchChecksums
+            Assert-ChecksumManifest `
+                -Path $CodeSearchChecksumsPath `
+                -ArtifactName $CodeSearchWheel `
+                -Expected $CodeSearchWheelSha256
 
             Write-Host "  Verifying offline build provenance..."
             Push-Location $CodeSearchDownloadDir
             try {
-                Invoke-WithoutGitHubTokens {
+                Invoke-WithAllowedEnvironment {
                     & gh attestation verify $CodeSearchWheel `
                         --bundle $CodeSearchBundle `
                         --repo $CodeSearchRepository `
@@ -315,7 +460,7 @@ switch ($CodeSearchKind) {
             }
 
             Write-Host "  Installing the verified local redacted-code-search wheel..."
-            Invoke-WithoutGitHubTokens {
+            Invoke-WithAllowedEnvironment {
                 & $VenvPip install --quiet --force-reinstall $CodeSearchWheelPath
                 if ($LASTEXITCODE -ne 0) {
                     throw "code-search wheel install exited with status $LASTEXITCODE"
@@ -332,7 +477,10 @@ switch ($CodeSearchKind) {
             Write-Host "Error: code-search release installation failed: $_" -ForegroundColor Red
             exit 1
         }
-        Remove-Item -LiteralPath $CodeSearchWheelPath, $CodeSearchBundlePath
+        Remove-Item -LiteralPath `
+            $CodeSearchWheelPath, `
+            $CodeSearchBundlePath, `
+            $CodeSearchChecksumsPath
         Remove-Item -LiteralPath $CodeSearchDownloadDir -ErrorAction SilentlyContinue
     }
     default {
@@ -351,52 +499,121 @@ Write-Host "[3/5] Installing code-graph (structural analysis)..." -ForegroundCol
 
 Write-Host "  Tested release: $ReleaseTag"
 
-$DownloadUrl = "https://github.com/${GraphRepository}/releases/download/${ReleaseTag}/${AssetName}"
-$ZipPath = Join-Path $BinDir $AssetName
+$GraphDownloadDir = Join-Path $BinDir ".code-graph-download"
+New-Item -ItemType Directory -Path $GraphDownloadDir -Force | Out-Null
+$ZipPath = Join-Path $GraphDownloadDir $AssetName
+$GraphChecksumsPath = Join-Path $GraphDownloadDir $GraphChecksums
 
 Write-Host "  Downloading code-graph $ReleaseTag for $Platform-$Arch..."
 try {
-    $GhAuthenticated = $false
-    if (Get-Command gh -ErrorAction SilentlyContinue) {
-        & gh auth status --hostname github.com *> $null
-        $GhAuthenticated = $LASTEXITCODE -eq 0
+    Assert-GitHubCliAuthenticated
+    $ResolvedGraphRevision = Resolve-ReleaseTagCommit `
+        -Repository $GraphRepository `
+        -Tag $ReleaseTag
+    if ($ResolvedGraphRevision -ne $GraphSourceRevision) {
+        throw (
+            "code-graph tag source revision mismatch: " +
+            "expected $GraphSourceRevision, got $ResolvedGraphRevision"
+        )
     }
-    if ($GhAuthenticated) {
-        Write-Host "  Using authenticated GitHub CLI download."
-        & gh release download $ReleaseTag `
-            --repo $GraphRepository `
-            --pattern $AssetName `
-            --dir $BinDir `
-            --clobber
-        if ($LASTEXITCODE -ne 0) {
-            throw "gh release download exited with status $LASTEXITCODE"
-        }
-    } else {
-        Write-Host "  Using public release URL fallback (authenticated gh or GH_TOKEN is required for private assets)."
-        Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
+    & gh release download $ReleaseTag `
+        --repo $GraphRepository `
+        --pattern $AssetName `
+        --pattern $GraphChecksums `
+        --dir $GraphDownloadDir `
+        --clobber
+    if ($LASTEXITCODE -ne 0) {
+        throw "gh release download exited with status $LASTEXITCODE"
     }
 } catch {
     Write-Host "Error: failed to download code-graph binary." -ForegroundColor Red
-    Write-Host "  URL: $DownloadUrl"
-    Write-Host "  For private releases, install gh and set GH_TOKEN with repository read access."
+    Write-Host "  Authenticate gh or set GH_TOKEN with repository read access."
     exit 1
 }
 
-# Verify the archive against the SHA-256 pinned in the tested BOM.
-Write-Host "  Verifying checksum..."
+# Verify the archive and release manifest against the tested BOM.
+Write-Host "  Verifying checksums and checksum manifest..."
 try {
     Assert-Sha256 `
         -Path $ZipPath `
         -Expected $ExpectedSha256.ToLowerInvariant() `
         -Label $AssetName
+    Assert-Sha256 `
+        -Path $GraphChecksumsPath `
+        -Expected $GraphChecksumsSha256 `
+        -Label $GraphChecksums
+    Assert-ChecksumManifest `
+        -Path $GraphChecksumsPath `
+        -ArtifactName $AssetName `
+        -Expected $ExpectedSha256.ToLowerInvariant()
 } catch {
     Write-Host "Error: SHA-256 verification failed for $AssetName`: $_" -ForegroundColor Red
     exit 1
 }
 Write-Host "  Checksum OK."
 
+$GraphAttestationCandidates = @(
+    (Join-Path $GraphDownloadDir "sha256`:$($ExpectedSha256.ToLowerInvariant()).jsonl"),
+    (Join-Path $GraphDownloadDir "sha256-$($ExpectedSha256.ToLowerInvariant()).jsonl")
+)
+if ($GraphAttestationCandidates | Where-Object { Test-Path -LiteralPath $_ }) {
+    throw "code-graph attestation bundle path existed before download"
+}
+Push-Location $GraphDownloadDir
+try {
+    & gh attestation download $AssetName `
+        --repo $GraphRepository
+    if ($LASTEXITCODE -ne 0) {
+        throw "gh attestation download exited with status $LASTEXITCODE"
+    }
+} finally {
+    Pop-Location
+}
+$GraphAttestationBundles = @(
+    $GraphAttestationCandidates |
+        Where-Object {
+            Test-Path -LiteralPath $_ -PathType Leaf
+        } |
+        Where-Object {
+            (Get-Item -LiteralPath $_).Length -gt 0
+        }
+)
+if ($GraphAttestationBundles.Count -ne 1) {
+    throw (
+        "code-graph attestation download did not produce exactly one " +
+        "digest-bound bundle"
+    )
+}
+$GraphAttestationBundle = $GraphAttestationBundles[0]
+$GraphAttestationBundleName = [IO.Path]::GetFileName(
+    $GraphAttestationBundle
+)
+
+Write-Host "  Verifying code-graph build provenance..."
+Push-Location $GraphDownloadDir
+try {
+    Invoke-WithAllowedEnvironment {
+        & gh attestation verify $AssetName `
+            --bundle $GraphAttestationBundleName `
+            --repo $GraphRepository `
+            --signer-workflow $GraphSignerWorkflow `
+            --source-digest $GraphSourceRevision `
+            --source-ref $GraphSourceRef `
+            --deny-self-hosted-runners
+        if ($LASTEXITCODE -ne 0) {
+            throw "gh attestation verify exited with status $LASTEXITCODE"
+        }
+    }
+} finally {
+    Pop-Location
+}
+
 Expand-Archive -Path $ZipPath -DestinationPath $BinDir -Force
-Remove-Item $ZipPath
+Remove-Item -LiteralPath `
+    $ZipPath, `
+    $GraphChecksumsPath, `
+    $GraphAttestationBundle
+Remove-Item -LiteralPath $GraphDownloadDir -ErrorAction SilentlyContinue
 
 Write-Host "  code-graph installed."
 Write-Host ""
@@ -461,7 +678,7 @@ Write-Host "[5/5] Validating installed MCP tool contracts..." -ForegroundColor Y
 $CodeSearchMcp = Join-Path $VenvDir "Scripts\code-search-mcp.exe"
 $GraphMcp = Join-Path $BinDir $GraphBinary
 try {
-    Invoke-WithoutGitHubTokens {
+    Invoke-WithAllowedEnvironment {
         & $VenvPython (Join-Path $PluginDir "scripts\validate_installed.py") `
             --server "code-search=$CodeSearchMcp" `
             --server "code-graph=$GraphMcp"
@@ -477,6 +694,37 @@ try {
     exit 1
 }
 Write-Host ""
+
+Write-Host "Promoting validated installation..." -ForegroundColor Yellow
+if (Test-Path -LiteralPath $TargetBinDir) {
+    Move-Item -LiteralPath $TargetBinDir -Destination $RollbackBinDir
+    $HadTargetBin = $true
+}
+Move-Item -LiteralPath $BinDir -Destination $TargetBinDir
+$NewBinPromoted = $true
+$InstallCommitted = $true
+$InstallPromoting = $false
+} finally {
+    if (-not $InstallCommitted) {
+        Restore-PreviousInstallation
+    } else {
+        Remove-Item `
+            -LiteralPath $RollbackBinDir `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+        Remove-Item `
+            -LiteralPath $RollbackVenvDir `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+        Remove-Item `
+            -LiteralPath $InstallStage `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
+}
 
 # ------------------------------------------------------------------
 # Done

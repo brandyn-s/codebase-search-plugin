@@ -16,24 +16,77 @@ HELPER = ROOT / "scripts" / "validate_real_installed.py"
 EXPECTED_ASSETS = {
     "darwin-amd64": {
         "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-        "sha256": "5f7588f847a22a8602ccce355f7279c0bdf50808d184a5b6c082bf1b42a2e341",
+        "sha256": "c2f522c905b696b804b99cd8bf72604d73a1a3afe5308fe35cd1825282e3f5a9",
     },
     "darwin-arm64": {
         "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-        "sha256": "8ad13c146c54a12ea14de1fd82a4cfd1224af149c086cea27a7ab6ca88ffc23b",
+        "sha256": "cfc867909d5164e0ca96d8c34432c708c86b07740841ac1a5fabb9ef5cc9f36a",
     },
     "linux-amd64": {
         "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-        "sha256": "d23da061459f65d8f4a1fae0d906245d1bbb9cc37998836944397b9f8a791df8",
+        "sha256": "8d198e7d0e8b40fa7ce904152751804f8543a2c0cbfdaa6295f0a3997fd023b8",
     },
     "linux-arm64": {
         "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-        "sha256": "48dff8f5f602d84ea7359187211ea7d98b1c3d1102aec8220fc3d38c6174b649",
+        "sha256": "97a634fe4fef1601df0cd49df65416aeccf95f4da6f258d06f96d0b749eb0ba2",
     },
     "windows-amd64": {
         "name": "codebase-memory-mcp-windows-amd64.zip",
-        "sha256": "3a850b7c311d114aa93012702e838c8d3da7b75ac1afdfb980c4b33e3e18b129",
+        "sha256": "be4f406e8aac40e3dd52550e2a4f31f90033678469e05fedb347431e1f9dac48",
     },
+}
+
+EXPECTED_GRAPH_INSTALL = {
+    "assets": EXPECTED_ASSETS,
+    "attestation": {
+        "deny_self_hosted_runners": True,
+        "signer_workflow": (
+            "redacted-org/code-graph/.github/workflows/release.yml"
+        ),
+        "source_ref": "refs/heads/main",
+    },
+    "checksums": {
+        "name": "checksums.txt",
+        "sha256": (
+            "4712e6c113a79559929a40e596c10415caa8fd2be3307c1f70de04bc9d8db0fc"
+        ),
+    },
+    "kind": "github-release",
+    "repository": "redacted-org/code-graph",
+    "source_revision": "5145b02f7238f41dae2892a4fafcb545f78064d8",
+    "tag": "v0.7.0-redacted.3",
+}
+
+EXPECTED_SEARCH_INSTALL = {
+    "asset": {
+        "name": "redacted_code_search-0.2.1-py3-none-any.whl",
+        "sha256": (
+            "567d4caabdd3b5446bcaa789afc7104fb8cce142ff69d7fc8f1294398532e7e9"
+        ),
+    },
+    "attestation": {
+        "bundle": {
+            "name": "redacted_code_search-0.2.1-provenance.jsonl",
+            "sha256": (
+                "b30e5c121d11e7dda02e4d31d7b3e1d0db12b8d6b0de6b4f596f0b6a98228330"
+            ),
+        },
+        "deny_self_hosted_runners": True,
+        "signer_workflow": (
+            "redacted-org/code-search/.github/workflows/release.yml"
+        ),
+        "source_ref": "refs/heads/main",
+    },
+    "checksums": {
+        "name": "SHA256SUMS",
+        "sha256": (
+            "127a9ebb80cd14e0820c6244fdaec06a07f7408d03859333cfc2302ad987624a"
+        ),
+    },
+    "kind": "github-release",
+    "repository": "redacted-org/code-search",
+    "source_revision": "b7d6f84d139899955027ed428ad1a86f9d28a127",
+    "tag": "v0.2.1",
 }
 
 
@@ -47,11 +100,19 @@ def load_helper():
 
 
 class ComponentAssetChecksumTests(unittest.TestCase):
-    def test_bom_pins_every_supported_asset_name_and_sha256(self):
+    def test_bom_pins_exact_code_search_release_descriptor(self):
+        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            bom["components"]["code-search"]["install"],
+            EXPECTED_SEARCH_INSTALL,
+        )
+
+    def test_bom_pins_exact_code_graph_release_descriptor(self):
         bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
         graph_install = bom["components"]["code-graph"]["install"]
 
-        self.assertEqual(graph_install["assets"], EXPECTED_ASSETS)
+        self.assertEqual(graph_install, EXPECTED_GRAPH_INSTALL)
 
     def test_ci_helper_fails_closed_for_missing_invalid_and_mismatched_digest(self):
         helper = load_helper()
@@ -72,7 +133,45 @@ class ComponentAssetChecksumTests(unittest.TestCase):
                 "2130f976dae862442a2e3ec8090d052b7e75320e58d8c374ec137c228637dcbf",
             )
 
-    def test_installers_authenticate_when_possible_and_never_skip_verification(self):
+    def test_ci_helper_requires_one_exact_checksum_manifest_entry(self):
+        helper = load_helper()
+        artifact_name = "component.tar.gz"
+        artifact_digest = "a" * 64
+
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "checksums.txt"
+
+            manifest.write_text(
+                f"{artifact_digest}  {artifact_name}\n",
+                encoding="utf-8",
+            )
+            helper.verify_checksum_manifest(
+                manifest,
+                artifact_name,
+                artifact_digest,
+            )
+
+            for contents in (
+                "",
+                f"{artifact_digest}  copied-{artifact_name}\n",
+                f"{'b' * 64}  {artifact_name}\n",
+                (
+                    f"{artifact_digest}  {artifact_name}\n"
+                    f"{artifact_digest}  {artifact_name}\n"
+                ),
+            ):
+                manifest.write_text(contents, encoding="utf-8")
+                with self.assertRaisesRegex(
+                    helper.RealInstallError,
+                    "checksum manifest",
+                ):
+                    helper.verify_checksum_manifest(
+                        manifest,
+                        artifact_name,
+                        artifact_digest,
+                    )
+
+    def test_graph_installers_fail_closed_and_attest_before_extraction(self):
         shell = (ROOT / "install.sh").read_text(encoding="utf-8")
         powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
 
@@ -80,16 +179,61 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             self.assertIn("GH_TOKEN", installer)
             self.assertIn("gh release download", installer)
             self.assertIn("assets", installer)
+            self.assertIn("checksums", installer)
+            self.assertIn("source_revision", installer)
+            self.assertIn("signer_workflow", installer)
+            self.assertIn("source_ref", installer)
+            self.assertIn("--deny-self-hosted-runners", installer)
             self.assertIn("checksum mismatch", installer)
-            self.assertNotIn("checksums.txt", installer)
+            self.assertIn("checksums.txt", installer)
             self.assertNotIn("skipping verification", installer)
+            self.assertNotIn("public release URL fallback", installer)
 
         self.assertIn("sha256sum", shell)
         self.assertIn("shasum", shell)
-        self.assertIn("public release URL fallback", shell)
         self.assertIn("Get-FileHash", powershell)
-        self.assertIn("Invoke-WebRequest", powershell)
-        self.assertIn("public release URL fallback", powershell)
+        self.assertNotIn("Invoke-WebRequest", powershell)
+
+        shell_graph = shell.split(
+            "[3/5] Installing code-graph (structural analysis)...",
+            1,
+        )[1].split("[4/5] Creating launcher scripts...", 1)[0]
+        powershell_graph = powershell.split(
+            "[3/5] Installing code-graph (structural analysis)...",
+            1,
+        )[1].split("[4/5] Creating launcher scripts", 1)[0]
+        for graph, resolver, checksum_verifier, extraction in (
+            (
+                shell_graph,
+                "resolve_release_tag_commit",
+                "verify_checksum_manifest",
+                "tar xzf",
+            ),
+            (
+                powershell_graph,
+                "Resolve-ReleaseTagCommit",
+                "Assert-ChecksumManifest",
+                "Expand-Archive",
+            ),
+        ):
+            self.assertIn(resolver, graph)
+            self.assertIn(checksum_verifier, graph)
+            self.assertIn("gh attestation download", graph)
+            self.assertIn("gh attestation verify", graph)
+            self.assertIn("--bundle", graph)
+            self.assertLess(graph.index(resolver), graph.index("gh release download"))
+            self.assertLess(
+                graph.index(checksum_verifier),
+                graph.index("gh attestation download"),
+            )
+            self.assertLess(
+                graph.index("gh attestation download"),
+                graph.index("gh attestation verify"),
+            )
+            self.assertLess(
+                graph.index("gh attestation verify"),
+                graph.index(extraction),
+            )
 
     def test_installers_verify_release_wheel_offline_before_install(
         self,
@@ -103,6 +247,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
                 "source_revision",
                 "attestation",
                 "bundle",
+                "checksums",
                 "signer_workflow",
                 "source_ref",
                 "gh auth status",
@@ -121,6 +266,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             ):
                 self.assertIn(required, installer)
 
+            self.assertIn("checksum manifest", installer)
             self.assertNotIn("gh release verify-asset", installer)
             self.assertNotIn("release membership", installer)
             self.assertLess(
@@ -139,6 +285,32 @@ class ComponentAssetChecksumTests(unittest.TestCase):
                 installer.index("--force-reinstall"),
                 installer.index("verify_code_search_wheel.py"),
             )
+
+        shell_release = shell.split("github-release)", 1)[1].split(";;", 1)[0]
+        powershell_release = powershell.split('"github-release" {', 1)[1].split(
+            "\n    default {",
+            1,
+        )[0]
+        self.assertIn("CODE_SEARCH_CHECKSUMS", shell_release)
+        self.assertIn("verify_checksum_manifest", shell_release)
+        self.assertLess(
+            shell_release.index("gh release download"),
+            shell_release.index("verify_checksum_manifest"),
+        )
+        self.assertLess(
+            shell_release.index("verify_checksum_manifest"),
+            shell_release.index("gh attestation verify"),
+        )
+        self.assertIn("CodeSearchChecksums", powershell_release)
+        self.assertIn("Assert-ChecksumManifest", powershell_release)
+        self.assertLess(
+            powershell_release.index("gh release download"),
+            powershell_release.index("Assert-ChecksumManifest"),
+        )
+        self.assertLess(
+            powershell_release.index("Assert-ChecksumManifest"),
+            powershell_release.index("gh attestation verify"),
+        )
 
     def test_release_wheel_promotion_and_token_scope_are_documented(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -164,7 +336,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         self.assertNotIn("release membership", combined)
         self.assertIn("production BOM pins code-search release", readme)
         self.assertIn(
-            "code-search/releases/tag/v0.2.0",
+            "code-search/releases/tag/v0.2.1",
             readme,
         )
         self.assertIn("`install.kind: github-release`", readme)
@@ -174,15 +346,26 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             "authenticated GitHub fetch/tag-resolution commands",
             normalized_readme,
         )
+        prerequisites = readme.split("## Prerequisites", 1)[1].split(
+            "### Manual install",
+            1,
+        )[0]
+        normalized_prerequisites = " ".join(prerequisites.split())
+        self.assertIn(
+            "both private component repositories",
+            normalized_prerequisites,
+        )
+        self.assertNotIn("curl", prerequisites)
+        self.assertIn("`tar`", prerequisites)
         self.assertNotIn(
             "only to authenticated `gh` clone/download commands",
             normalized_readme,
         )
 
-    def test_powershell_release_install_strips_and_restores_github_tokens(self):
+    def test_installers_allowlist_post_download_child_environments(self):
         powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
         function_match = re.search(
-            r"(?ms)^function Invoke-WithoutGitHubTokens \{.*?^\}",
+            r"(?ms)^function Invoke-WithAllowedEnvironment \{.*?^\}",
             powershell,
         )
         self.assertIsNotNone(function_match)
@@ -191,20 +374,20 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             1,
         )[0]
         self.assertGreaterEqual(
-            release_branch.count("Invoke-WithoutGitHubTokens"),
+            release_branch.count("Invoke-WithAllowedEnvironment"),
             2,
         )
         self.assertRegex(
             release_branch,
             re.compile(
-                r"Invoke-WithoutGitHubTokens\s*\{\s*"
+                r"Invoke-WithAllowedEnvironment\s*\{\s*"
                 r"& gh attestation verify",
             ),
         )
         self.assertRegex(
             release_branch,
             re.compile(
-                r"Invoke-WithoutGitHubTokens\s*\{"
+                r"Invoke-WithAllowedEnvironment\s*\{"
                 r".*?& \$VenvPip install"
                 r".*?verify_code_search_wheel\.py",
                 re.DOTALL,
@@ -213,7 +396,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         self.assertRegex(
             powershell,
             re.compile(
-                r"Invoke-WithoutGitHubTokens\s*\{\s*"
+                r"Invoke-WithAllowedEnvironment\s*\{\s*"
                 r"& \$VenvPython .*?validate_installed\.py",
             ),
         )
@@ -222,16 +405,37 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             "[5/5] Validating installed MCP tool contracts...",
             1,
         )[1]
-        self.assertIn(
-            "env -u GH_TOKEN -u GITHUB_TOKEN -u CODE_INTEL_COMPONENT_TOKEN",
-            final_validation,
+        self.assertIn("run_with_allowed_environment", final_validation)
+        graph_extraction = shell.split(
+            'if [ "$EXT" = "tar.gz" ]; then',
+            1,
+        )[1].split("fi", 1)[0]
+        self.assertRegex(
+            graph_extraction,
+            re.compile(
+                r"run_with_allowed_environment\s+"
+                r"tar xzf",
+            ),
         )
-        for token_name in (
+        self.assertRegex(
+            graph_extraction,
+            re.compile(
+                r"run_with_allowed_environment\s+"
+                r"unzip -qo",
+            ),
+        )
+        self.assertIn("env -i", shell)
+        for secret_name in (
             "GH_TOKEN",
             "GITHUB_TOKEN",
             "CODE_INTEL_COMPONENT_TOKEN",
+            "AWS_SECRET_ACCESS_KEY",
+            "OPENAI_API_KEY",
+            "UNRELATED_CREDENTIAL",
+            "SSH_AUTH_SOCK",
         ):
-            self.assertIn(token_name, function_match.group())
+            self.assertNotIn(secret_name, function_match.group())
+        self.assertIn('"PATH"', function_match.group())
 
         pwsh = shutil.which("pwsh")
         if pwsh is None:
@@ -240,11 +444,19 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             function_match.group()
             + "\n"
             + r"""
-$Names = @("GH_TOKEN", "GITHUB_TOKEN", "CODE_INTEL_COMPONENT_TOKEN")
+$Names = @(
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "CODE_INTEL_COMPONENT_TOKEN",
+    "AWS_SECRET_ACCESS_KEY",
+    "OPENAI_API_KEY",
+    "UNRELATED_CREDENTIAL",
+    "SSH_AUTH_SOCK"
+)
 foreach ($Name in $Names) {
     [Environment]::SetEnvironmentVariable($Name, "sentinel-$Name", "Process")
 }
-Invoke-WithoutGitHubTokens {
+Invoke-WithAllowedEnvironment {
     foreach ($Name in $Names) {
         if ($null -ne [Environment]::GetEnvironmentVariable($Name, "Process")) {
             throw "$Name leaked into secret-free operation"
@@ -259,7 +471,7 @@ foreach ($Name in $Names) {
     }
 }
 try {
-    Invoke-WithoutGitHubTokens {
+    Invoke-WithAllowedEnvironment {
         foreach ($Name in $Names) {
             if ($null -ne [Environment]::GetEnvironmentVariable($Name, "Process")) {
                 throw "$Name leaked into failing secret-free operation"
@@ -298,6 +510,25 @@ Write-Output "token-isolation-ok"
             completed.stdout + completed.stderr,
         )
         self.assertIn("token-isolation-ok", completed.stdout)
+
+    def test_installers_preserve_previous_install_until_staging_validates(self):
+        shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+        powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+
+        for installer in (shell, powershell):
+            self.assertIn(".install-staging", installer)
+            self.assertIn(".rollback", installer)
+            self.assertIn("Restoring previous installation", installer)
+            self.assertIn("Promoting validated installation", installer)
+            self.assertLess(
+                installer.index(
+                    "[5/5] Validating installed MCP tool contracts..."
+                ),
+                installer.index("Promoting validated installation"),
+            )
+
+        self.assertIn("trap rollback_install EXIT", shell)
+        self.assertIn("finally", powershell)
 
     def test_powershell_tag_resolution_peels_annotated_tags(self):
         powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")

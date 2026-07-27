@@ -6,6 +6,7 @@ Run locally with:  python3 scripts/validate_plugin.py
 Exits non-zero (printing each problem) if anything is malformed. Uses only the
 standard library so it runs anywhere without extra dependencies.
 """
+import argparse
 import json
 import hashlib
 import os
@@ -14,7 +15,27 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from component_descriptor import (
+    DescriptorError,
+    install_descriptor_sha256,
+    validate_install_descriptor_shape,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--component-bom",
+        default="component-bom.json",
+        help="exact candidate component BOM to validate",
+    )
+    return parser.parse_args(argv)
+
+
+ARGS = parse_args()
+COMPONENT_BOM_INPUT = ARGS.component_bom
 errors: list[str] = []
 TOOL_REFERENCE = re.compile(r"mcp__code-(search|graph)__([A-Za-z0-9_]+)")
 COMPONENT_FOR_PREFIX = {"search": "code-search", "graph": "code-graph"}
@@ -33,6 +54,11 @@ CODE_SEARCH_RELEASE_SIGNER_WORKFLOW = (
     "redacted-org/code-search/.github/workflows/release.yml"
 )
 CODE_SEARCH_RELEASE_SOURCE_REF = "refs/heads/main"
+CODE_GRAPH_RELEASE_REPOSITORY = "redacted-org/code-graph"
+CODE_GRAPH_RELEASE_SIGNER_WORKFLOW = (
+    "redacted-org/code-graph/.github/workflows/release.yml"
+)
+CODE_GRAPH_RELEASE_SOURCE_REF = "refs/heads/main"
 REQUIRED_IDENTITY_FIELDS = [
     "repository_id",
     "checkout_id",
@@ -65,7 +91,7 @@ READINESS_REQUIREMENTS = {
     },
     "readiness_evidence": {
         "schema_version": 1,
-        "component_versions_match_bom": True,
+        "component_install_descriptors_match_bom": True,
         "checkout_unchanged": True,
     },
 }
@@ -90,6 +116,11 @@ def safe_release_asset_name(value, suffix: str) -> bool:
 
 
 def validate_code_search_install(install: dict) -> None:
+    try:
+        validate_install_descriptor_shape("code-search", install)
+    except DescriptorError as exc:
+        errors.append(f"component-bom.json: {exc}")
+        return
     kind = install.get("kind")
     if kind == "git":
         if install.get("repository") != CODE_SEARCH_GIT_REPOSITORY:
@@ -137,6 +168,10 @@ def validate_code_search_install(install: dict) -> None:
         )
 
     asset = install.get("asset")
+    release_version = tag[1:] if isinstance(tag, str) and tag.startswith("v") else ""
+    expected_wheel_name = (
+        f"redacted_code_search-{release_version}-py3-none-any.whl"
+    )
     if not isinstance(asset, dict):
         errors.append(
             "component-bom.json: code-search.install.asset must be an object"
@@ -150,6 +185,11 @@ def validate_code_search_install(install: dict) -> None:
                 "component-bom.json: code-search release asset must be a "
                 "safe redacted_code_search wheel filename"
             )
+        elif name != expected_wheel_name:
+            errors.append(
+                "component-bom.json: code-search wheel filename must encode "
+                f"the release tag exactly ({expected_wheel_name})"
+            )
         sha256 = asset.get("sha256")
         if not isinstance(sha256, str) or re.fullmatch(
             r"[0-9a-f]{64}", sha256
@@ -157,6 +197,26 @@ def validate_code_search_install(install: dict) -> None:
             errors.append(
                 "component-bom.json: code-search release asset sha256 must "
                 "be 64 lowercase hex characters"
+            )
+
+    checksums = install.get("checksums")
+    if not isinstance(checksums, dict):
+        errors.append(
+            "component-bom.json: code-search.install.checksums must be an object"
+        )
+    else:
+        if checksums.get("name") != "SHA256SUMS":
+            errors.append(
+                "component-bom.json: code-search checksums name must be "
+                "SHA256SUMS"
+            )
+        checksums_sha256 = checksums.get("sha256")
+        if not isinstance(checksums_sha256, str) or re.fullmatch(
+            r"[0-9a-f]{64}", checksums_sha256
+        ) is None:
+            errors.append(
+                "component-bom.json: code-search checksums sha256 must be "
+                "64 lowercase hex characters"
             )
 
     attestation = install.get("attestation")
@@ -179,6 +239,13 @@ def validate_code_search_install(install: dict) -> None:
                 "component-bom.json: code-search attestation bundle name "
                 "must be a safe JSONL filename"
             )
+        elif bundle_name != (
+            f"redacted_code_search-{release_version}-provenance.jsonl"
+        ):
+            errors.append(
+                "component-bom.json: code-search attestation bundle must "
+                "encode the release tag exactly"
+            )
         bundle_sha256 = bundle.get("sha256")
         if not isinstance(bundle_sha256, str) or re.fullmatch(
             r"[0-9a-f]{64}", bundle_sha256
@@ -198,6 +265,87 @@ def validate_code_search_install(install: dict) -> None:
         errors.append(
             "component-bom.json: code-search attestation source_ref must "
             f"be {CODE_SEARCH_RELEASE_SOURCE_REF}"
+        )
+    if attestation.get("deny_self_hosted_runners") is not True:
+        errors.append(
+            "component-bom.json: code-search attestation "
+            "deny_self_hosted_runners must be true"
+        )
+
+
+def validate_code_graph_install(install: dict) -> None:
+    try:
+        validate_install_descriptor_shape("code-graph", install)
+    except DescriptorError as exc:
+        errors.append(f"component-bom.json: {exc}")
+        return
+    if install.get("kind") != "github-release":
+        errors.append(
+            "component-bom.json: code-graph.install.kind must be github-release"
+        )
+    if install.get("repository") != CODE_GRAPH_RELEASE_REPOSITORY:
+        errors.append(
+            "component-bom.json: code-graph release repository must be "
+            f"{CODE_GRAPH_RELEASE_REPOSITORY}"
+        )
+    tag = install.get("tag")
+    if (
+        not isinstance(tag, str)
+        or re.fullmatch(r"v[0-9][0-9A-Za-z._+-]*", tag) is None
+    ):
+        errors.append(
+            "component-bom.json: code-graph.install.tag must be a safe "
+            "version tag beginning with v"
+        )
+    source_revision = install.get("source_revision")
+    if not isinstance(source_revision, str) or re.fullmatch(
+        r"[0-9a-f]{40}|[0-9a-f]{64}", source_revision
+    ) is None:
+        errors.append(
+            "component-bom.json: code-graph.install.source_revision must be "
+            "a full lowercase Git object ID"
+        )
+
+    checksums = install.get("checksums")
+    if not isinstance(checksums, dict):
+        errors.append(
+            "component-bom.json: code-graph.install.checksums must be an object"
+        )
+    else:
+        if checksums.get("name") != "checksums.txt":
+            errors.append(
+                "component-bom.json: code-graph checksums name must be "
+                "checksums.txt"
+            )
+        checksums_sha256 = checksums.get("sha256")
+        if not isinstance(checksums_sha256, str) or re.fullmatch(
+            r"[0-9a-f]{64}", checksums_sha256
+        ) is None:
+            errors.append(
+                "component-bom.json: code-graph checksums sha256 must be "
+                "64 lowercase hex characters"
+            )
+
+    attestation = install.get("attestation")
+    if not isinstance(attestation, dict):
+        errors.append(
+            "component-bom.json: code-graph.install.attestation must be an object"
+        )
+        return
+    if attestation.get("signer_workflow") != CODE_GRAPH_RELEASE_SIGNER_WORKFLOW:
+        errors.append(
+            "component-bom.json: code-graph attestation signer_workflow "
+            f"must be {CODE_GRAPH_RELEASE_SIGNER_WORKFLOW}"
+        )
+    if attestation.get("source_ref") != CODE_GRAPH_RELEASE_SOURCE_REF:
+        errors.append(
+            "component-bom.json: code-graph attestation source_ref must be "
+            f"{CODE_GRAPH_RELEASE_SOURCE_REF}"
+        )
+    if attestation.get("deny_self_hosted_runners") is not True:
+        errors.append(
+            "component-bom.json: code-graph attestation "
+            "deny_self_hosted_runners must be true"
         )
 
 
@@ -250,7 +398,7 @@ for skill in skill_files:
             errors.append(f"{rel}: frontmatter missing '{key}'")
 
 # Tested component BOM and tool-schema snapshots.
-bom = load_json("component-bom.json", ("schema_version", "components"))
+bom = load_json(COMPONENT_BOM_INPUT, ("schema_version", "components"))
 snapshots: dict[str, dict] = {}
 if bom:
     if (
@@ -284,6 +432,8 @@ if bom:
                 continue
             if component == "code-search":
                 validate_code_search_install(install)
+            elif component == "code-graph":
+                validate_code_graph_install(install)
             snapshot = load_json(
                 snapshot_rel,
                 (
@@ -336,6 +486,22 @@ if bom:
                     f"{snapshot_rel}: source kind does not match BOM "
                     f"{component} install kind"
                 )
+            try:
+                expected_descriptor_sha256 = install_descriptor_sha256(install)
+            except DescriptorError as exc:
+                errors.append(
+                    f"component-bom.json: {component} install descriptor "
+                    f"cannot be canonicalized ({exc})"
+                )
+            else:
+                if (
+                    snapshot_source.get("install_descriptor_sha256")
+                    != expected_descriptor_sha256
+                ):
+                    errors.append(
+                        f"{snapshot_rel}: source install descriptor does not "
+                        f"match BOM {component} install descriptor"
+                    )
 
             if component == "code-graph":
                 assets = install.get("assets")
@@ -723,6 +889,12 @@ if snapshots:
                 )
                 for component in ("code-search", "code-graph")
             }
+            expected_descriptor_hashes = {
+                component: install_descriptor_sha256(
+                    bom["components"][component]["install"]
+                )
+                for component in ("code-search", "code-graph")
+            }
             for component, expected_version in expected_versions.items():
                 component_evidence = evidence_components.get(component)
                 if not isinstance(component_evidence, dict):
@@ -732,6 +904,15 @@ if snapshots:
                 elif component_evidence.get("version") != expected_version:
                     errors.append(
                         f"{evidence_label}: {component} version does not match the BOM"
+                    )
+                if (
+                    isinstance(component_evidence, dict)
+                    and component_evidence.get("install_descriptor_sha256")
+                    != expected_descriptor_hashes[component]
+                ):
+                    errors.append(
+                        f"{evidence_label}: {component} install descriptor "
+                        "does not match the BOM"
                     )
 
             search_evidence = evidence_components.get("code-search", {})

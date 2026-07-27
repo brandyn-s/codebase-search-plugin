@@ -3,6 +3,7 @@
   "checkout_unchanged": true,
   "components": {
     "code-graph": {
+      "install_descriptor_sha256": "adc21fd704e54686157488d82b25570ad7cb98ac03b9d45427b516a9c3d2b8e2",
       "index_identity": {
         "captured_at": "2026-07-27T05:33:37Z",
         "checkout_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
@@ -13,9 +14,10 @@
         "source_revision": "65ed864fc73456428583b9bd7dcf3271095b0f21"
       },
       "status": "ready",
-      "version": "v0.7.0-redacted.2"
+      "version": "v0.7.0-redacted.3"
     },
     "code-search": {
+      "install_descriptor_sha256": "bc12fa687965a7aebeb19e1435df08bda12f08a72643fc606b81a33338983e79",
       "completion": {
         "chunks_added": 10,
         "error": null,
@@ -35,7 +37,7 @@
         "source_revision": "65ed864fc73456428583b9bd7dcf3271095b0f21"
       },
       "index_ready": true,
-      "version": "v0.2.0"
+      "version": "v0.2.1"
     }
   },
   "evidence_mode": "promotion-candidate",

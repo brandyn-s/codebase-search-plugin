@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,17 @@ FAKE_SERVER = ROOT / "tests" / "fixtures" / "fake_mcp_server.py"
 RELEASE_INSTALL_FIXTURE = (
     ROOT / "tests" / "fixtures" / "code-search-release-install.json"
 )
+
+
+def descriptor_sha256(install: dict) -> str:
+    canonical = json.dumps(
+        install,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def load_capture_module():
@@ -168,10 +180,25 @@ class CaptureComponentContractsTests(unittest.TestCase):
                 ).read_text(encoding="utf-8")
             )
 
-        self.assertEqual(search["source"], {"kind": "git", "version": "a" * 40})
+        self.assertEqual(
+            search["source"],
+            {
+                "install_descriptor_sha256": descriptor_sha256(
+                    proposed_bom["components"]["code-search"]["install"]
+                ),
+                "kind": "git",
+                "version": "a" * 40,
+            },
+        )
         self.assertEqual(
             graph["source"],
-            {"kind": "github-release", "version": "v9.9.9-test"},
+            {
+                "install_descriptor_sha256": descriptor_sha256(
+                    proposed_bom["components"]["code-graph"]["install"]
+                ),
+                "kind": "github-release",
+                "version": "v9.9.9-test",
+            },
         )
         self.assertEqual(list(search["tools"]), sorted(search["tools"]))
         self.assertEqual(list(graph["tools"]), sorted(graph["tools"]))
@@ -243,10 +270,6 @@ class CaptureComponentContractsTests(unittest.TestCase):
             candidate["behavioral_claim"] = True
             for details in candidate["components"].values():
                 details["behavioral_claim"] = True
-                details["install"]["behavioral_claim"] = True
-            candidate["components"]["code-graph"]["install"]["assets"][
-                "linux-amd64"
-            ]["behavioral_claim"] = True
             candidate["components"]["code-search"]["tested_capabilities"][
                 "outputs"
             ]["semantic_index_ready"] = True
@@ -299,20 +322,6 @@ class CaptureComponentContractsTests(unittest.TestCase):
         self.assertNotIn(
             "behavioral_claim", proposed_bom["components"]["code-search"]
         )
-        self.assertNotIn(
-            "behavioral_claim",
-            proposed_bom["components"]["code-search"]["install"],
-        )
-        self.assertNotIn(
-            "behavioral_claim",
-            proposed_bom["components"]["code-graph"]["install"],
-        )
-        self.assertNotIn(
-            "behavioral_claim",
-            proposed_bom["components"]["code-graph"]["install"]["assets"][
-                "linux-amd64"
-            ],
-        )
         self.assertFalse(
             search["tested_capabilities"]["outputs"]["semantic_index_ready"]
         )
@@ -358,8 +367,137 @@ class CaptureComponentContractsTests(unittest.TestCase):
         )
         self.assertEqual(
             search_snapshot["source"],
-            {"kind": "github-release", "version": "v0.0.0"},
+            {
+                "install_descriptor_sha256": descriptor_sha256(
+                    captured_bom["components"]["code-search"]["install"]
+                ),
+                "kind": "github-release",
+                "version": "v0.0.0",
+            },
         )
+
+    def test_capture_preserves_code_graph_release_descriptor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            candidate_bom = self._candidate_bom(directory)
+            candidate = json.loads(candidate_bom.read_text(encoding="utf-8"))
+            code_search = self._wrapper(directory, "code-search")
+            code_graph = self._wrapper(directory, "code-graph")
+            output = directory / "captured"
+
+            completed = self._run(
+                candidate_bom=candidate_bom,
+                code_search=code_search,
+                code_graph=code_graph,
+                output=output,
+                write=True,
+            )
+
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stdout + completed.stderr,
+            )
+            captured_bom = json.loads(
+                (output / "component-bom.json").read_text(encoding="utf-8")
+            )
+            graph_snapshot = json.loads(
+                (
+                    output / "compatibility" / "code-graph-tools.json"
+                ).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(
+            captured_bom["components"]["code-graph"]["install"],
+            candidate["components"]["code-graph"]["install"],
+        )
+        self.assertEqual(
+            graph_snapshot["source"],
+            {
+                "install_descriptor_sha256": descriptor_sha256(
+                    captured_bom["components"]["code-graph"]["install"]
+                ),
+                "kind": "github-release",
+                "version": "v9.9.9-test",
+            },
+        )
+
+    def test_capture_rejects_unknown_install_descriptor_fields(self):
+        capture = load_capture_module()
+        base = json.loads(
+            (ROOT / "component-bom.json").read_text(encoding="utf-8")
+        )
+        descriptor_paths = {
+            "search install": ("components", "code-search", "install"),
+            "search asset": (
+                "components",
+                "code-search",
+                "install",
+                "asset",
+            ),
+            "search attestation": (
+                "components",
+                "code-search",
+                "install",
+                "attestation",
+            ),
+            "search bundle": (
+                "components",
+                "code-search",
+                "install",
+                "attestation",
+                "bundle",
+            ),
+            "search checksums": (
+                "components",
+                "code-search",
+                "install",
+                "checksums",
+            ),
+            "graph install": ("components", "code-graph", "install"),
+            "graph asset": (
+                "components",
+                "code-graph",
+                "install",
+                "assets",
+                "linux-amd64",
+            ),
+            "graph attestation": (
+                "components",
+                "code-graph",
+                "install",
+                "attestation",
+            ),
+            "graph checksums": (
+                "components",
+                "code-graph",
+                "install",
+                "checksums",
+            ),
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            for label, path_parts in descriptor_paths.items():
+                with self.subTest(label=label):
+                    candidate = json.loads(json.dumps(base))
+                    target = candidate
+                    for part in path_parts:
+                        target = target[part]
+                    target["unexpected_policy"] = True
+                    candidate_path = directory / (
+                        label.replace(" ", "-") + ".json"
+                    )
+                    candidate_path.write_text(
+                        json.dumps(candidate),
+                        encoding="utf-8",
+                    )
+
+                    with self.assertRaisesRegex(
+                        capture.CaptureError,
+                        "keys must exactly match",
+                    ):
+                        capture._load_candidate(candidate_path)
 
     def test_capture_rejects_weakened_code_search_release_policy(self):
         capture = load_capture_module()

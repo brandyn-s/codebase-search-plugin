@@ -20,6 +20,11 @@ import shutil
 import sys
 import tempfile
 
+from component_descriptor import (
+    DescriptorError,
+    install_descriptor_sha256,
+    validate_install_descriptor_shape,
+)
 from validate_installed import ContractError, list_tools, parse_servers
 
 
@@ -37,6 +42,10 @@ CODE_SEARCH_RELEASE_SIGNER_WORKFLOW = (
 )
 CODE_SEARCH_RELEASE_SOURCE_REF = "refs/heads/main"
 CODE_GRAPH_REPOSITORY = "redacted-org/code-graph"
+CODE_GRAPH_RELEASE_SIGNER_WORKFLOW = (
+    "redacted-org/code-graph/.github/workflows/release.yml"
+)
+CODE_GRAPH_RELEASE_SOURCE_REF = "refs/heads/main"
 GRAPH_ASSET_NAMES = {
     "darwin-amd64": "codebase-memory-mcp-darwin-amd64.tar.gz",
     "darwin-arm64": "codebase-memory-mcp-darwin-arm64.tar.gz",
@@ -81,7 +90,7 @@ READINESS_REQUIREMENTS = {
     },
     "readiness_evidence": {
         "schema_version": 1,
-        "component_versions_match_bom": True,
+        "component_install_descriptors_match_bom": True,
         "checkout_unchanged": True,
     },
 }
@@ -168,6 +177,10 @@ def _source_for(component: str, details: dict) -> dict[str, str]:
     install = details.get("install")
     if not isinstance(install, dict):
         raise CaptureError(f"{component}: missing install object")
+    try:
+        validate_install_descriptor_shape(component, install)
+    except DescriptorError as exc:
+        raise CaptureError(f"{component}: {exc}") from exc
     if component == "code-search":
         kind = install.get("kind")
         if kind == "git":
@@ -193,41 +206,8 @@ def _source_for(component: str, details: dict) -> dict[str, str]:
                 "code-search: install kind must be git or github-release"
             )
     else:
-        if install.get("kind") != "github-release":
-            raise CaptureError("code-graph: install kind must be github-release")
-        if install.get("repository") != CODE_GRAPH_REPOSITORY:
-            raise CaptureError(f"code-graph: repository must be {CODE_GRAPH_REPOSITORY}")
+        _validate_code_graph_release(install)
         version = install.get("tag")
-        if (
-            not isinstance(version, str)
-            or not version
-            or version.strip() != version
-            or any(ord(character) < 32 for character in version)
-        ):
-            raise CaptureError("code-graph: tag must be a non-empty safe string")
-        assets = install.get("assets")
-        if not isinstance(assets, dict) or set(assets) != set(GRAPH_ASSET_NAMES):
-            raise CaptureError(
-                "code-graph: assets must exactly match "
-                + ", ".join(sorted(GRAPH_ASSET_NAMES))
-            )
-        for platform, expected_name in GRAPH_ASSET_NAMES.items():
-            asset = assets.get(platform)
-            if not isinstance(asset, dict):
-                raise CaptureError(f"code-graph: asset {platform} must be an object")
-            if asset.get("name") != expected_name:
-                raise CaptureError(
-                    f"code-graph: asset {platform} name must be {expected_name}"
-                )
-            digest = asset.get("sha256")
-            if (
-                not isinstance(digest, str)
-                or LOWER_HEX_SHA256.fullmatch(digest) is None
-            ):
-                raise CaptureError(
-                    f"code-graph: asset {platform} sha256 must be 64 lowercase "
-                    "hex characters"
-                )
         kind = "github-release"
     return {"kind": kind, "version": version}
 
@@ -268,15 +248,27 @@ def _validate_code_search_release(install: dict) -> None:
             "40-character lowercase hex commit"
         )
     asset = install.get("asset")
+    release_version = tag[1:] if isinstance(tag, str) and tag.startswith("v") else ""
     if (
         not isinstance(asset, dict)
         or not _safe_asset_name(asset.get("name"), ".whl")
-        or not asset["name"].startswith("redacted_code_search-")
+        or asset["name"]
+        != f"redacted_code_search-{release_version}-py3-none-any.whl"
         or not isinstance(asset.get("sha256"), str)
         or LOWER_HEX_SHA256.fullmatch(asset["sha256"]) is None
     ):
         raise CaptureError(
             "code-search: release asset must name a safe wheel and pinned SHA-256"
+        )
+    checksums = install.get("checksums")
+    if (
+        not isinstance(checksums, dict)
+        or checksums.get("name") != "SHA256SUMS"
+        or not isinstance(checksums.get("sha256"), str)
+        or LOWER_HEX_SHA256.fullmatch(checksums["sha256"]) is None
+    ):
+        raise CaptureError(
+            "code-search: checksums must name SHA256SUMS with a pinned SHA-256"
         )
     attestation = install.get("attestation")
     bundle = (
@@ -284,7 +276,8 @@ def _validate_code_search_release(install: dict) -> None:
     )
     if (
         not isinstance(bundle, dict)
-        or not _safe_asset_name(bundle.get("name"), ".jsonl")
+        or bundle.get("name")
+        != f"redacted_code_search-{release_version}-provenance.jsonl"
         or not isinstance(bundle.get("sha256"), str)
         or LOWER_HEX_SHA256.fullmatch(bundle["sha256"]) is None
     ):
@@ -304,6 +297,88 @@ def _validate_code_search_release(install: dict) -> None:
             "code-search: attestation source_ref must be "
             f"{CODE_SEARCH_RELEASE_SOURCE_REF}"
         )
+    if attestation.get("deny_self_hosted_runners") is not True:
+        raise CaptureError(
+            "code-search: attestation deny_self_hosted_runners must be true"
+        )
+
+
+def _validate_code_graph_release(install: dict) -> None:
+    if install.get("kind") != "github-release":
+        raise CaptureError("code-graph: install kind must be github-release")
+    if install.get("repository") != CODE_GRAPH_REPOSITORY:
+        raise CaptureError(
+            f"code-graph: repository must be {CODE_GRAPH_REPOSITORY}"
+        )
+    tag = install.get("tag")
+    if (
+        not isinstance(tag, str)
+        or re.fullmatch(r"v[0-9][0-9A-Za-z._+-]*", tag) is None
+    ):
+        raise CaptureError(
+            "code-graph: release tag must be a safe version beginning with v"
+        )
+    source_revision = install.get("source_revision")
+    if (
+        not isinstance(source_revision, str)
+        or LOWER_HEX_COMMIT.fullmatch(source_revision) is None
+    ):
+        raise CaptureError(
+            "code-graph: source_revision must be a full 40-character "
+            "lowercase hex commit"
+        )
+
+    assets = install.get("assets")
+    if not isinstance(assets, dict) or set(assets) != set(GRAPH_ASSET_NAMES):
+        raise CaptureError(
+            "code-graph: assets must exactly match "
+            + ", ".join(sorted(GRAPH_ASSET_NAMES))
+        )
+    for platform, expected_name in GRAPH_ASSET_NAMES.items():
+        asset = assets.get(platform)
+        if not isinstance(asset, dict):
+            raise CaptureError(f"code-graph: asset {platform} must be an object")
+        if asset.get("name") != expected_name:
+            raise CaptureError(
+                f"code-graph: asset {platform} name must be {expected_name}"
+            )
+        digest = asset.get("sha256")
+        if (
+            not isinstance(digest, str)
+            or LOWER_HEX_SHA256.fullmatch(digest) is None
+        ):
+            raise CaptureError(
+                f"code-graph: asset {platform} sha256 must be 64 lowercase "
+                "hex characters"
+            )
+
+    checksums = install.get("checksums")
+    if (
+        not isinstance(checksums, dict)
+        or checksums.get("name") != "checksums.txt"
+        or not isinstance(checksums.get("sha256"), str)
+        or LOWER_HEX_SHA256.fullmatch(checksums["sha256"]) is None
+    ):
+        raise CaptureError(
+            "code-graph: checksums must name checksums.txt with a pinned SHA-256"
+        )
+    attestation = install.get("attestation")
+    if not isinstance(attestation, dict):
+        raise CaptureError("code-graph: attestation must be an object")
+    if attestation.get("signer_workflow") != CODE_GRAPH_RELEASE_SIGNER_WORKFLOW:
+        raise CaptureError(
+            "code-graph: attestation signer_workflow must be "
+            f"{CODE_GRAPH_RELEASE_SIGNER_WORKFLOW}"
+        )
+    if attestation.get("source_ref") != CODE_GRAPH_RELEASE_SOURCE_REF:
+        raise CaptureError(
+            "code-graph: attestation source_ref must be "
+            f"{CODE_GRAPH_RELEASE_SOURCE_REF}"
+        )
+    if attestation.get("deny_self_hosted_runners") is not True:
+        raise CaptureError(
+            "code-graph: attestation deny_self_hosted_runners must be true"
+        )
 
 
 def _schema_fingerprint(schema: dict) -> str:
@@ -320,47 +395,9 @@ def _schema_fingerprint(schema: dict) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
-def _normalized_install(component: str, details: dict) -> dict:
-    install = details["install"]
-    if component == "code-search":
-        if install["kind"] == "github-release":
-            return {
-                "kind": install["kind"],
-                "repository": install["repository"],
-                "tag": install["tag"],
-                "source_revision": install["source_revision"],
-                "asset": {
-                    "name": install["asset"]["name"],
-                    "sha256": install["asset"]["sha256"],
-                },
-                "attestation": {
-                    "bundle": {
-                        "name": install["attestation"]["bundle"]["name"],
-                        "sha256": install["attestation"]["bundle"]["sha256"],
-                    },
-                    "signer_workflow": install["attestation"][
-                        "signer_workflow"
-                    ],
-                    "source_ref": install["attestation"]["source_ref"],
-                },
-            }
-        return {
-            "kind": install["kind"],
-            "repository": install["repository"],
-            "revision": install["revision"],
-        }
-    return {
-        "kind": install["kind"],
-        "repository": install["repository"],
-        "tag": install["tag"],
-        "assets": {
-            platform: {
-                "name": install["assets"][platform]["name"],
-                "sha256": install["assets"][platform]["sha256"],
-            }
-            for platform in sorted(GRAPH_ASSET_NAMES)
-        },
-    }
+def _install_descriptor_copy(details: dict) -> dict:
+    """Preserve every validated descriptor field in captured evidence."""
+    return deepcopy(details["install"])
 
 
 def _captured_tools(component: str, live_tools: list[dict]) -> dict[str, dict]:
@@ -482,6 +519,7 @@ def _capture(
 
     for component in sorted(COMPONENTS):
         details = candidate["components"][component]
+        captured_install = _install_descriptor_copy(details)
         tools = _captured_tools(
             component,
             list_tools(servers[component], timeout, env=runtime_env),
@@ -491,13 +529,18 @@ def _capture(
             "component": component,
             "fingerprint": FINGERPRINT,
             "schema_version": 1,
-            "source": _source_for(component, details),
+            "source": {
+                **_source_for(component, details),
+                "install_descriptor_sha256": install_descriptor_sha256(
+                    captured_install
+                ),
+            },
             "tested_capabilities": capabilities,
             "tools": tools,
         }
         snapshots[component] = snapshot
         proposed_bom["components"][component] = {
-            "install": _normalized_install(component, details),
+            "install": captured_install,
             "schema_snapshot": str(SNAPSHOT_PATHS[component]),
             "tested_capabilities": capabilities,
         }

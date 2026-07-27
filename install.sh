@@ -8,8 +8,10 @@
 set -e
 
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-BIN_DIR="$PLUGIN_DIR/bin"
-VENV_DIR="$PLUGIN_DIR/.venv"
+TARGET_BIN_DIR="$PLUGIN_DIR/bin"
+TARGET_VENV_DIR="$PLUGIN_DIR/.venv"
+BIN_DIR="$TARGET_BIN_DIR"
+VENV_DIR="$TARGET_VENV_DIR"
 BOM_FILE="$PLUGIN_DIR/component-bom.json"
 
 echo "=== Codebase Search Plugin Installer ==="
@@ -81,6 +83,25 @@ GRAPH_REPOSITORY=$("$PYTHON" -c \
 RELEASE_TAG=$("$PYTHON" -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["tag"])' \
     "$BOM_FILE")
+GRAPH_SOURCE_REVISION=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["source_revision"])' \
+    "$BOM_FILE")
+GRAPH_CHECKSUMS=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["checksums"]["name"])' \
+    "$BOM_FILE")
+GRAPH_CHECKSUMS_SHA256=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["checksums"]["sha256"])' \
+    "$BOM_FILE")
+GRAPH_SIGNER_WORKFLOW=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["attestation"]["signer_workflow"])' \
+    "$BOM_FILE")
+GRAPH_SOURCE_REF=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["attestation"]["source_ref"])' \
+    "$BOM_FILE")
+if [ "$GRAPH_CHECKSUMS" != "checksums.txt" ]; then
+    echo "Error: code-graph checksum manifest must be checksums.txt." >&2
+    exit 1
+fi
 ASSET_KEY="${PLATFORM}-${ARCH}"
 ASSET_NAME=$("$PYTHON" -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["assets"][sys.argv[2]]["name"])' \
@@ -130,6 +151,61 @@ verify_sha256() {
         rm -f "$file"
         return 1
     fi
+}
+
+verify_checksum_manifest() {
+    local manifest="$1"
+    local artifact_name="$2"
+    local expected="$3"
+
+    "$PYTHON" - "$manifest" "$artifact_name" "$expected" <<'PY'
+import pathlib
+import re
+import sys
+
+manifest = pathlib.Path(sys.argv[1])
+artifact_name = sys.argv[2]
+expected = sys.argv[3]
+if (
+    not manifest.is_file()
+    or pathlib.Path(artifact_name).name != artifact_name
+    or re.fullmatch(r"[0-9a-f]{64}", expected) is None
+):
+    raise SystemExit("Error: checksum manifest inputs are invalid")
+matches = []
+try:
+    lines = manifest.read_text(encoding="utf-8").splitlines()
+except (OSError, UnicodeDecodeError) as exc:
+    raise SystemExit(f"Error: checksum manifest is unreadable: {exc}")
+for line in lines:
+    parsed = re.fullmatch(r"([0-9a-fA-F]{64})[ \t]+\*?(.+)", line)
+    if parsed is None:
+        if line.strip():
+            raise SystemExit("Error: checksum manifest contains a malformed entry")
+        continue
+    digest, name = parsed.groups()
+    if name == artifact_name:
+        matches.append(digest.lower())
+if matches != [expected]:
+    raise SystemExit(
+        "Error: checksum manifest does not contain exactly one matching artifact entry"
+    )
+PY
+}
+
+run_with_allowed_environment() {
+    local -a allowed_environment
+    local name
+
+    allowed_environment=("PATH=$PATH")
+    for name in \
+        LANG LC_ALL LC_CTYPE TZ \
+        SSL_CERT_FILE SSL_CERT_DIR REQUESTS_CA_BUNDLE; do
+        if [ -n "${!name:-}" ]; then
+            allowed_environment+=("$name=${!name}")
+        fi
+    done
+    env -i "${allowed_environment[@]}" "$@"
 }
 
 require_authenticated_gh() {
@@ -187,6 +263,57 @@ resolve_release_tag_commit() {
     return 1
 }
 
+INSTALL_COMMITTED=0
+INSTALL_PROMOTING=0
+HAD_TARGET_BIN=0
+HAD_TARGET_VENV=0
+NEW_BIN_PROMOTED=0
+NEW_VENV_PROMOTED=0
+ROLLBACK_BIN_DIR="$PLUGIN_DIR/.bin.rollback.$$"
+ROLLBACK_VENV_DIR="$PLUGIN_DIR/.venv.rollback.$$"
+INSTALL_STAGE=""
+
+rollback_install() {
+    local exit_code=$?
+
+    set +e
+    if [ "$INSTALL_COMMITTED" -ne 1 ]; then
+        if [ "$INSTALL_PROMOTING" -eq 1 ]; then
+            echo "Restoring previous installation..." >&2
+            if [ "$NEW_BIN_PROMOTED" -eq 1 ]; then
+                rm -rf "$TARGET_BIN_DIR"
+            fi
+            if [ "$NEW_VENV_PROMOTED" -eq 1 ]; then
+                rm -rf "$TARGET_VENV_DIR"
+            fi
+            if [ "$HAD_TARGET_BIN" -eq 1 ] && [ -e "$ROLLBACK_BIN_DIR" ]; then
+                mv "$ROLLBACK_BIN_DIR" "$TARGET_BIN_DIR"
+            fi
+            if [ "$HAD_TARGET_VENV" -eq 1 ] && [ -e "$ROLLBACK_VENV_DIR" ]; then
+                mv "$ROLLBACK_VENV_DIR" "$TARGET_VENV_DIR"
+            fi
+        fi
+        if [ -n "$INSTALL_STAGE" ] && [ -e "$INSTALL_STAGE" ]; then
+            rm -rf "$INSTALL_STAGE"
+        fi
+    fi
+    return "$exit_code"
+}
+
+INSTALL_STAGE=$(mktemp -d "$PLUGIN_DIR/.install-staging.XXXXXX")
+BIN_DIR="$INSTALL_STAGE/bin"
+VENV_DIR="$TARGET_VENV_DIR"
+trap rollback_install EXIT
+if [ -e "$ROLLBACK_BIN_DIR" ] || [ -e "$ROLLBACK_VENV_DIR" ]; then
+    echo "Error: rollback path already exists; refusing installation." >&2
+    exit 1
+fi
+INSTALL_PROMOTING=1
+if [ -e "$TARGET_VENV_DIR" ]; then
+    mv "$TARGET_VENV_DIR" "$ROLLBACK_VENV_DIR"
+    HAD_TARGET_VENV=1
+fi
+
 # ------------------------------------------------------------------
 # 2. Install code-search (Python, exact Git revision or release wheel)
 # ------------------------------------------------------------------
@@ -195,6 +322,7 @@ mkdir -p "$BIN_DIR"
 
 if [ ! -d "$VENV_DIR" ]; then
     echo "  Creating virtual environment..."
+    NEW_VENV_PROMOTED=1
     "$PYTHON" -m venv "$VENV_DIR"
 fi
 
@@ -202,9 +330,11 @@ fi
 if [ -f "$VENV_DIR/bin/pip" ]; then
     VENV_PIP="$VENV_DIR/bin/pip"
     VENV_PYTHON="$VENV_DIR/bin/python"
+    CODE_SEARCH_MCP="$VENV_DIR/bin/code-search-mcp"
 elif [ -f "$VENV_DIR/Scripts/pip.exe" ]; then
     VENV_PIP="$VENV_DIR/Scripts/pip"
     VENV_PYTHON="$VENV_DIR/Scripts/python"
+    CODE_SEARCH_MCP="$VENV_DIR/Scripts/code-search-mcp.exe"
 else
     echo "Error: Could not find pip in venv"
     exit 1
@@ -218,7 +348,7 @@ case "$CODE_SEARCH_KIND" in
         echo "  Installing redacted-code-search from GitHub..."
         "$VENV_PIP" install --quiet \
             "redacted-code-search @ git+${CODE_SEARCH_REPOSITORY}@${CODE_SEARCH_REF}"
-        env -u GH_TOKEN -u GITHUB_TOKEN -u CODE_INTEL_COMPONENT_TOKEN \
+        run_with_allowed_environment \
             "$VENV_PYTHON" "$PLUGIN_DIR/scripts/verify_code_search_revision.py" \
                 "$CODE_SEARCH_REF" \
                 --repository "$CODE_SEARCH_REPOSITORY"
@@ -241,6 +371,12 @@ case "$CODE_SEARCH_KIND" in
             "$BOM_FILE")
         CODE_SEARCH_BUNDLE_SHA256=$("$PYTHON" -c \
             'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["attestation"]["bundle"]["sha256"])' \
+            "$BOM_FILE")
+        CODE_SEARCH_CHECKSUMS=$("$PYTHON" -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["checksums"]["name"])' \
+            "$BOM_FILE")
+        CODE_SEARCH_CHECKSUMS_SHA256=$("$PYTHON" -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["checksums"]["sha256"])' \
             "$BOM_FILE")
         CODE_SEARCH_SIGNER_WORKFLOW=$("$PYTHON" -c \
             'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["attestation"]["signer_workflow"])' \
@@ -266,6 +402,7 @@ case "$CODE_SEARCH_KIND" in
             --repo "$CODE_SEARCH_REPOSITORY" \
             --pattern "$CODE_SEARCH_WHEEL" \
             --pattern "$CODE_SEARCH_BUNDLE" \
+            --pattern "$CODE_SEARCH_CHECKSUMS" \
             --dir "$CODE_SEARCH_DOWNLOAD_DIR" \
             --clobber
 
@@ -277,11 +414,19 @@ case "$CODE_SEARCH_KIND" in
             "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_BUNDLE" \
             "$CODE_SEARCH_BUNDLE_SHA256" \
             "$CODE_SEARCH_BUNDLE"
+        verify_sha256 \
+            "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_CHECKSUMS" \
+            "$CODE_SEARCH_CHECKSUMS_SHA256" \
+            "$CODE_SEARCH_CHECKSUMS"
+        verify_checksum_manifest \
+            "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_CHECKSUMS" \
+            "$CODE_SEARCH_WHEEL" \
+            "$CODE_SEARCH_WHEEL_SHA256"
 
         echo "  Verifying offline build provenance..."
         (
             cd "$CODE_SEARCH_DOWNLOAD_DIR"
-            env -u GH_TOKEN -u GITHUB_TOKEN -u CODE_INTEL_COMPONENT_TOKEN \
+            run_with_allowed_environment \
                 gh attestation verify "$CODE_SEARCH_WHEEL" \
                 --bundle "$CODE_SEARCH_BUNDLE" \
                 --repo "$CODE_SEARCH_REPOSITORY" \
@@ -292,17 +437,18 @@ case "$CODE_SEARCH_KIND" in
         )
 
         echo "  Installing the verified local redacted-code-search wheel..."
-        env -u GH_TOKEN -u GITHUB_TOKEN -u CODE_INTEL_COMPONENT_TOKEN \
+        run_with_allowed_environment \
             "$VENV_PIP" install --quiet --force-reinstall \
             "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_WHEEL"
-        env -u GH_TOKEN -u GITHUB_TOKEN -u CODE_INTEL_COMPONENT_TOKEN \
+        run_with_allowed_environment \
             "$VENV_PYTHON" "$PLUGIN_DIR/scripts/verify_code_search_wheel.py" \
             "$CODE_SEARCH_TAG" \
             --asset-name "$CODE_SEARCH_WHEEL" \
             --sha256 "$CODE_SEARCH_WHEEL_SHA256"
         rm -f \
             "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_WHEEL" \
-            "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_BUNDLE"
+            "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_BUNDLE" \
+            "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_CHECKSUMS"
         rmdir "$CODE_SEARCH_DOWNLOAD_DIR" 2>/dev/null || true
         ;;
     *)
@@ -321,47 +467,103 @@ echo "[3/5] Installing code-graph (structural analysis)..."
 
 echo "  Tested release: $RELEASE_TAG"
 
-DOWNLOAD_URL="https://github.com/${GRAPH_REPOSITORY}/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
-
-echo "  Downloading code-graph ${RELEASE_TAG} for ${PLATFORM}-${ARCH}..."
-if command -v gh &>/dev/null && \
-    gh auth status --hostname github.com >/dev/null 2>&1; then
-    echo "  Using authenticated GitHub CLI download."
-    if ! gh release download "$RELEASE_TAG" \
-        --repo "$GRAPH_REPOSITORY" \
-        --pattern "$ASSET_NAME" \
-        --dir "$BIN_DIR" \
-        --clobber; then
-        echo "Error: authenticated code-graph download failed." >&2
-        exit 1
-    fi
-else
-    echo "  Using public release URL fallback (authenticated gh or GH_TOKEN is required for private assets)."
-    if ! curl -fSL "$DOWNLOAD_URL" -o "$BIN_DIR/$ASSET_NAME"; then
-        echo "Error: public code-graph download failed." >&2
-        echo "  URL: $DOWNLOAD_URL" >&2
-        echo "  For private releases, install gh and export GH_TOKEN with repository read access." >&2
-        exit 1
-    fi
+GRAPH_DOWNLOAD_DIR="$BIN_DIR/.code-graph-download"
+mkdir -p "$GRAPH_DOWNLOAD_DIR"
+require_authenticated_gh
+RESOLVED_GRAPH_REVISION=$(resolve_release_tag_commit \
+    "$GRAPH_REPOSITORY" \
+    "$RELEASE_TAG")
+if [ "$RESOLVED_GRAPH_REVISION" != "$GRAPH_SOURCE_REVISION" ]; then
+    echo "Error: code-graph tag source revision mismatch." >&2
+    echo "  expected: $GRAPH_SOURCE_REVISION" >&2
+    echo "  actual:   $RESOLVED_GRAPH_REVISION" >&2
+    exit 1
 fi
+echo "  Downloading code-graph ${RELEASE_TAG} for ${PLATFORM}-${ARCH}..."
+gh release download "$RELEASE_TAG" \
+    --repo "$GRAPH_REPOSITORY" \
+    --pattern "$ASSET_NAME" \
+    --pattern "$GRAPH_CHECKSUMS" \
+    --dir "$GRAPH_DOWNLOAD_DIR" \
+    --clobber
 
-if [ ! -f "$BIN_DIR/$ASSET_NAME" ]; then
+if [ ! -f "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" ]; then
     echo "Error: failed to download code-graph binary." >&2
     exit 1
 fi
 
-# Verify the archive against the SHA-256 pinned in the tested BOM.
-echo "  Verifying checksum..."
+# Verify the archive and release manifest against the tested BOM.
+echo "  Verifying checksums and checksum manifest..."
 EXPECTED_SHA256=$(printf '%s' "$EXPECTED_SHA256" | tr '[:upper:]' '[:lower:]')
-verify_sha256 "$BIN_DIR/$ASSET_NAME" "$EXPECTED_SHA256" "$ASSET_NAME"
+verify_sha256 \
+    "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" \
+    "$EXPECTED_SHA256" \
+    "$ASSET_NAME"
+verify_sha256 \
+    "$GRAPH_DOWNLOAD_DIR/$GRAPH_CHECKSUMS" \
+    "$GRAPH_CHECKSUMS_SHA256" \
+    "$GRAPH_CHECKSUMS"
+verify_checksum_manifest \
+    "$GRAPH_DOWNLOAD_DIR/$GRAPH_CHECKSUMS" \
+    "$ASSET_NAME" \
+    "$EXPECTED_SHA256"
 echo "  Checksum OK."
 
-if [ "$EXT" = "tar.gz" ]; then
-    tar xzf "$BIN_DIR/$ASSET_NAME" -C "$BIN_DIR"
-else
-    unzip -qo "$BIN_DIR/$ASSET_NAME" -d "$BIN_DIR"
+GRAPH_ATTESTATION_BUNDLE_COLON="$GRAPH_DOWNLOAD_DIR/sha256:${EXPECTED_SHA256}.jsonl"
+GRAPH_ATTESTATION_BUNDLE_DASH="$GRAPH_DOWNLOAD_DIR/sha256-${EXPECTED_SHA256}.jsonl"
+if [ -e "$GRAPH_ATTESTATION_BUNDLE_COLON" ] || \
+    [ -e "$GRAPH_ATTESTATION_BUNDLE_DASH" ]; then
+    echo "Error: code-graph attestation bundle path existed before download." >&2
+    exit 1
 fi
-rm -f "$BIN_DIR/$ASSET_NAME"
+(
+    cd "$GRAPH_DOWNLOAD_DIR"
+    gh attestation download "$ASSET_NAME" \
+        --repo "$GRAPH_REPOSITORY"
+)
+GRAPH_ATTESTATION_BUNDLE=""
+for candidate in \
+    "$GRAPH_ATTESTATION_BUNDLE_COLON" \
+    "$GRAPH_ATTESTATION_BUNDLE_DASH"; do
+    if [ -s "$candidate" ]; then
+        if [ -n "$GRAPH_ATTESTATION_BUNDLE" ]; then
+            echo "Error: multiple code-graph attestation bundles were downloaded." >&2
+            exit 1
+        fi
+        GRAPH_ATTESTATION_BUNDLE="$candidate"
+    fi
+done
+if [ -z "$GRAPH_ATTESTATION_BUNDLE" ]; then
+    echo "Error: code-graph attestation download produced no digest-bound bundle." >&2
+    exit 1
+fi
+GRAPH_ATTESTATION_BUNDLE_NAME=$(basename "$GRAPH_ATTESTATION_BUNDLE")
+
+echo "  Verifying code-graph build provenance..."
+(
+    cd "$GRAPH_DOWNLOAD_DIR"
+    run_with_allowed_environment \
+        gh attestation verify "$ASSET_NAME" \
+        --bundle "$GRAPH_ATTESTATION_BUNDLE_NAME" \
+        --repo "$GRAPH_REPOSITORY" \
+        --signer-workflow "$GRAPH_SIGNER_WORKFLOW" \
+        --source-digest "$GRAPH_SOURCE_REVISION" \
+        --source-ref "$GRAPH_SOURCE_REF" \
+        --deny-self-hosted-runners
+)
+
+if [ "$EXT" = "tar.gz" ]; then
+    run_with_allowed_environment tar xzf \
+        "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" -C "$BIN_DIR"
+else
+    run_with_allowed_environment unzip -qo \
+        "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" -d "$BIN_DIR"
+fi
+rm -f \
+    "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" \
+    "$GRAPH_DOWNLOAD_DIR/$GRAPH_CHECKSUMS" \
+    "$GRAPH_ATTESTATION_BUNDLE"
+rmdir "$GRAPH_DOWNLOAD_DIR" 2>/dev/null || true
 chmod +x "$BIN_DIR/$GRAPH_BINARY" 2>/dev/null || true
 
 echo "  code-graph installed."
@@ -394,11 +596,24 @@ echo ""
 # 5. Verify the installed MCP contracts
 # ------------------------------------------------------------------
 echo "[5/5] Validating installed MCP tool contracts..."
-env -u GH_TOKEN -u GITHUB_TOKEN -u CODE_INTEL_COMPONENT_TOKEN \
+run_with_allowed_environment \
     "$VENV_PYTHON" "$PLUGIN_DIR/scripts/validate_installed.py" \
-        --server "code-search=$BIN_DIR/run-code-search" \
+        --server "code-search=$CODE_SEARCH_MCP" \
         --server "code-graph=$BIN_DIR/$GRAPH_BINARY"
 echo ""
+
+echo "Promoting validated installation..."
+if [ -e "$TARGET_BIN_DIR" ]; then
+    mv "$TARGET_BIN_DIR" "$ROLLBACK_BIN_DIR"
+    HAD_TARGET_BIN=1
+fi
+mv "$BIN_DIR" "$TARGET_BIN_DIR"
+NEW_BIN_PROMOTED=1
+INSTALL_COMMITTED=1
+INSTALL_PROMOTING=0
+rm -rf "$ROLLBACK_BIN_DIR" "$ROLLBACK_VENV_DIR"
+rmdir "$INSTALL_STAGE"
+trap - EXIT
 
 # ------------------------------------------------------------------
 # Done

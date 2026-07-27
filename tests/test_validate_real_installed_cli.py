@@ -10,7 +10,7 @@ HELPER = ROOT / "scripts" / "validate_real_installed.py"
 
 
 class ValidateRealInstalledCLITests(unittest.TestCase):
-    def test_help_documents_readiness_evidence_output(self):
+    def test_help_documents_candidate_bom_and_evidence_outputs(self):
         completed = subprocess.run(
             [sys.executable, str(HELPER), "--help"],
             cwd=ROOT,
@@ -20,6 +20,8 @@ class ValidateRealInstalledCLITests(unittest.TestCase):
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("--component-bom", completed.stdout)
+        self.assertIn("--contract-evidence-output", completed.stdout)
         self.assertIn("--readiness-evidence-output", completed.stdout)
 
 

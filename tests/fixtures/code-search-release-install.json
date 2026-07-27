@@ -5,11 +5,16 @@
   },
   "attestation": {
     "bundle": {
-      "name": "redacted_code_search-0.0.0-py3-none-any.whl.jsonl",
+      "name": "redacted_code_search-0.0.0-provenance.jsonl",
       "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
+    "deny_self_hosted_runners": true,
     "signer_workflow": "redacted-org/code-search/.github/workflows/release.yml",
     "source_ref": "refs/heads/main"
+  },
+  "checksums": {
+    "name": "SHA256SUMS",
+    "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
   },
   "kind": "github-release",
   "repository": "redacted-org/code-search",

@@ -23,6 +23,14 @@ import tempfile
 import threading
 import time
 
+try:
+    from component_descriptor import DescriptorError, install_descriptor_sha256
+except ModuleNotFoundError:  # Imported as scripts.generate_live_readiness_evidence.
+    from scripts.component_descriptor import (
+        DescriptorError,
+        install_descriptor_sha256,
+    )
+
 
 IDENTITY_FIELDS = (
     "repository_id",
@@ -639,8 +647,13 @@ def run_smoke(
             search_version = search_install["tag"]
         else:
             raise KeyError("unsupported code-search install kind")
-        graph_version = components["code-graph"]["install"]["tag"]
-    except (KeyError, TypeError) as exc:
+        graph_install = components["code-graph"]["install"]
+        graph_version = graph_install["tag"]
+        descriptor_hashes = {
+            "code-search": install_descriptor_sha256(search_install),
+            "code-graph": install_descriptor_sha256(graph_install),
+        }
+    except (DescriptorError, KeyError, TypeError) as exc:
         raise SmokeError("component BOM versions are malformed") from exc
 
     if os.path.lexists(output):
@@ -838,6 +851,9 @@ def run_smoke(
             "components": {
                 "code-search": {
                     "version": search_version,
+                    "install_descriptor_sha256": descriptor_hashes[
+                        "code-search"
+                    ],
                     "completion": {
                         field: completion[field]
                         for field in COMPLETION_EVIDENCE_FIELDS
@@ -848,6 +864,9 @@ def run_smoke(
                 },
                 "code-graph": {
                     "version": graph_version,
+                    "install_descriptor_sha256": descriptor_hashes[
+                        "code-graph"
+                    ],
                     "status": "ready",
                     "index_identity": graph_identity,
                 },

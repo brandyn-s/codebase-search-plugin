@@ -42,6 +42,65 @@ class StaticPluginValidationTests(unittest.TestCase):
             check=False,
         )
 
+    def test_validator_reads_the_explicit_candidate_bom_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            candidate = checkout / "candidate-bom.json"
+            candidate.write_text('{"not": "a component BOM"}\n', encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/validate_plugin.py",
+                    "--component-bom",
+                    str(candidate),
+                ],
+                cwd=checkout,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertEqual(
+            completed.returncode,
+            1,
+            completed.stdout + completed.stderr,
+        )
+        self.assertIn("candidate-bom.json", completed.stdout)
+
+    def _rebind_component_descriptor(
+        self,
+        checkout: Path,
+        component: str,
+    ) -> None:
+        bom_path = checkout / "component-bom.json"
+        bom = json.loads(bom_path.read_text(encoding="utf-8"))
+        install = bom["components"][component]["install"]
+        digest = hashlib.sha256(
+            json.dumps(
+                install,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        snapshot_path = (
+            checkout / "compatibility" / f"{component}-tools.json"
+        )
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        snapshot["source"]["install_descriptor_sha256"] = digest
+        snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+        evidence_path = (
+            checkout / "compatibility" / "readiness-evidence.json"
+        )
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        evidence["components"][component][
+            "install_descriptor_sha256"
+        ] = digest
+        evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
     def _rewrite_tool_schema(
         self,
         checkout: Path,
@@ -163,6 +222,15 @@ class StaticPluginValidationTests(unittest.TestCase):
             )
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
             snapshot["source"] = {
+                "install_descriptor_sha256": hashlib.sha256(
+                    json.dumps(
+                        bom["components"]["code-search"]["install"],
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                        allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest(),
                 "kind": "github-release",
                 "version": "v0.0.0",
             }
@@ -173,11 +241,145 @@ class StaticPluginValidationTests(unittest.TestCase):
             )
             evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
             evidence["components"]["code-search"]["version"] = "v0.0.0"
+            evidence["components"]["code-search"][
+                "install_descriptor_sha256"
+            ] = snapshot["source"]["install_descriptor_sha256"]
             evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
 
             completed = self._run_validator(checkout)
 
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+
+    def test_validator_rejects_snapshot_from_different_install_descriptor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            bom_path = checkout / "component-bom.json"
+            bom = json.loads(bom_path.read_text(encoding="utf-8"))
+            bom["components"]["code-search"]["install"]["source_revision"] = (
+                "f" * 40
+            )
+            bom_path.write_text(json.dumps(bom), encoding="utf-8")
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(
+            completed.returncode,
+            1,
+            completed.stdout + completed.stderr,
+        )
+        self.assertIn("install descriptor", completed.stdout)
+
+    def test_validator_rejects_unknown_install_descriptor_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            bom_path = checkout / "component-bom.json"
+            bom = json.loads(bom_path.read_text(encoding="utf-8"))
+            bom["components"]["code-search"]["install"]["attestation"][
+                "unexpected_policy"
+            ] = True
+            bom_path.write_text(json.dumps(bom), encoding="utf-8")
+            self._rebind_component_descriptor(checkout, "code-search")
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(
+            completed.returncode,
+            1,
+            completed.stdout + completed.stderr,
+        )
+        self.assertIn("keys must exactly match", completed.stdout)
+
+    def test_validator_rejects_weakened_search_artifact_policy(self):
+        def wrong_wheel(install: dict) -> None:
+            install["asset"]["name"] = (
+                "redacted_code_search-9.9.9-py3-none-any.whl"
+            )
+
+        def missing_checksums(install: dict) -> None:
+            install.pop("checksums")
+
+        def wrong_bundle(install: dict) -> None:
+            install["attestation"]["bundle"]["name"] = "other.jsonl"
+
+        def allow_self_hosted(install: dict) -> None:
+            install["attestation"]["deny_self_hosted_runners"] = False
+
+        mutations = {
+            "mislabeled wheel": (wrong_wheel, "wheel"),
+            "missing checksums": (missing_checksums, "checksums"),
+            "mislabeled provenance": (wrong_bundle, "bundle"),
+            "self-hosted provenance": (
+                allow_self_hosted,
+                "deny_self_hosted_runners",
+            ),
+        }
+        for label, (mutate, expected) in mutations.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                checkout = Path(tmp)
+                self._copy_checkout(checkout)
+                bom_path = checkout / "component-bom.json"
+                bom = json.loads(bom_path.read_text(encoding="utf-8"))
+                mutate(bom["components"]["code-search"]["install"])
+                bom_path.write_text(json.dumps(bom), encoding="utf-8")
+                self._rebind_component_descriptor(checkout, "code-search")
+
+                completed = self._run_validator(checkout)
+
+            self.assertEqual(
+                completed.returncode,
+                1,
+                completed.stdout + completed.stderr,
+            )
+            self.assertIn(expected, completed.stdout)
+
+    def test_validator_rejects_weakened_graph_artifact_policy(self):
+        def wrong_revision(install: dict) -> None:
+            install["source_revision"] = "not-a-commit"
+
+        def missing_checksums(install: dict) -> None:
+            install.pop("checksums")
+
+        def wrong_signer(install: dict) -> None:
+            install["attestation"]["signer_workflow"] = (
+                "redacted-org/code-graph/.github/workflows/other.yml"
+            )
+
+        def wrong_source_ref(install: dict) -> None:
+            install["attestation"]["source_ref"] = "refs/tags/copied"
+
+        def allow_self_hosted(install: dict) -> None:
+            install["attestation"]["deny_self_hosted_runners"] = False
+
+        mutations = {
+            "wrong source revision": (wrong_revision, "source_revision"),
+            "missing checksums": (missing_checksums, "checksums"),
+            "wrong signer": (wrong_signer, "signer_workflow"),
+            "wrong source ref": (wrong_source_ref, "source_ref"),
+            "self-hosted provenance": (
+                allow_self_hosted,
+                "deny_self_hosted_runners",
+            ),
+        }
+        for label, (mutate, expected) in mutations.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                checkout = Path(tmp)
+                self._copy_checkout(checkout)
+                bom_path = checkout / "component-bom.json"
+                bom = json.loads(bom_path.read_text(encoding="utf-8"))
+                mutate(bom["components"]["code-graph"]["install"])
+                bom_path.write_text(json.dumps(bom), encoding="utf-8")
+                self._rebind_component_descriptor(checkout, "code-graph")
+
+                completed = self._run_validator(checkout)
+
+            self.assertEqual(
+                completed.returncode,
+                1,
+                completed.stdout + completed.stderr,
+            )
+            self.assertIn(expected, completed.stdout)
 
     def test_validator_rejects_weakened_code_search_release_policy(self):
         mutations = {
