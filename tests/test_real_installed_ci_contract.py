@@ -188,6 +188,103 @@ class RealInstalledCIContractTests(unittest.TestCase):
         helper_source = HELPER.read_text(encoding="utf-8")
         self.assertNotIn('"git", "-C", str(source), "fetch"', helper_source)
 
+    def test_runtime_home_is_isolated_beneath_runner_temp(self):
+        helper = load_helper()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runner_temp = Path(tmp).resolve()
+            fetch_env, runtime_env = helper.build_subprocess_environments(
+                "private-token",
+                {
+                    "PATH": os.environ.get("PATH", ""),
+                    "RUNNER_TEMP": str(runner_temp),
+                    "HOME": "/home/ambient-runner",
+                    "GH_TOKEN": "ambient-token",
+                    "AWS_SECRET_ACCESS_KEY": "must-not-leak",
+                },
+            )
+
+            self.assertNotIn("HOME", fetch_env)
+            self.assertNotIn("HOME", runtime_env)
+
+            isolated = helper.build_isolated_runtime_environment(
+                runtime_env,
+                runner_temp,
+            )
+            isolated_home = Path(isolated["HOME"]).resolve()
+            isolated_storage = Path(isolated["CODE_SEARCH_STORAGE"]).resolve()
+            self.assertTrue(isolated_home.is_relative_to(runner_temp))
+            self.assertTrue(isolated_storage.is_relative_to(runner_temp))
+            self.assertEqual(isolated_home.name, "home")
+            self.assertEqual(isolated_storage.name, "code-search-storage")
+            self.assertEqual(isolated_home.parent, isolated_storage.parent)
+            self.assertTrue(isolated_home.is_dir())
+            self.assertTrue(isolated_storage.is_dir())
+            self.assertNotIn("GH_TOKEN", isolated)
+            self.assertNotIn("AWS_SECRET_ACCESS_KEY", isolated)
+
+            round_trip = helper.allowlisted_runtime_environment(isolated)
+            self.assertEqual(round_trip["HOME"], str(isolated_home))
+            self.assertEqual(round_trip["RUNNER_TEMP"], str(runner_temp))
+
+    def test_runtime_paths_reject_symlink_file_and_escape_targets(self):
+        helper = load_helper()
+
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            tempfile.TemporaryDirectory() as outside_tmp,
+        ):
+            runner_temp = Path(tmp).resolve()
+            outside = Path(outside_tmp).resolve()
+            outside_home = outside / "home"
+            outside_storage = outside / "storage"
+            outside_home.mkdir()
+            outside_storage.mkdir()
+            linked_home = runner_temp / "linked-home"
+            linked_storage = runner_temp / "linked-storage"
+            linked_home.symlink_to(outside_home, target_is_directory=True)
+            linked_storage.symlink_to(outside_storage, target_is_directory=True)
+            regular_file = runner_temp / "not-a-directory"
+            regular_file.write_text("not a directory\n", encoding="utf-8")
+
+            sanitized = helper.allowlisted_runtime_environment(
+                {
+                    "PATH": os.environ.get("PATH", ""),
+                    "RUNNER_TEMP": str(runner_temp),
+                    "HOME": str(linked_home),
+                    "CODE_SEARCH_STORAGE": str(linked_storage),
+                }
+            )
+            self.assertNotIn("HOME", sanitized)
+            self.assertNotIn("CODE_SEARCH_STORAGE", sanitized)
+
+            file_sanitized = helper.allowlisted_runtime_environment(
+                {
+                    "PATH": os.environ.get("PATH", ""),
+                    "RUNNER_TEMP": str(runner_temp),
+                    "HOME": str(regular_file),
+                    "CODE_SEARCH_STORAGE": str(regular_file),
+                }
+            )
+            self.assertNotIn("HOME", file_sanitized)
+            self.assertNotIn("CODE_SEARCH_STORAGE", file_sanitized)
+
+            with (
+                mock.patch.object(
+                    helper.tempfile,
+                    "mkdtemp",
+                    return_value=str(outside),
+                ),
+                self.assertRaisesRegex(
+                    helper.RealInstallError,
+                    "escaped RUNNER_TEMP",
+                ),
+            ):
+                helper.build_isolated_runtime_environment(
+                    {"PATH": os.environ.get("PATH", "")},
+                    runner_temp,
+                )
+
     def test_pull_request_merge_gate_is_stable_and_fail_closed(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("pull_request:", workflow)

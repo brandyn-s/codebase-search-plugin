@@ -34,6 +34,7 @@ SUBPROCESS_ENV_ALLOWLIST = (
 )
 RUNTIME_OPERATION_ENV_ALLOWLIST = (
     *SUBPROCESS_ENV_ALLOWLIST,
+    "HOME",
     "PYTHONUNBUFFERED",
     "CODE_SEARCH_STORAGE",
     "RUNNER_TEMP",
@@ -132,6 +133,39 @@ def build_subprocess_environments(
     return fetch_env, runtime_env
 
 
+def build_isolated_runtime_environment(
+    source: dict[str, str],
+    runner_temp: Path,
+) -> dict[str, str]:
+    """Provide secret-free writable state without inheriting the runner home."""
+    resolved_runner_temp = runner_temp.resolve()
+    created_runtime_root = Path(
+        tempfile.mkdtemp(
+            prefix="code-intel-runtime-",
+            dir=resolved_runner_temp,
+        )
+    )
+    runtime_root = created_runtime_root.resolve()
+    if (
+        runtime_root == resolved_runner_temp
+        or not runtime_root.is_relative_to(resolved_runner_temp)
+        or created_runtime_root.is_symlink()
+        or not runtime_root.is_dir()
+    ):
+        raise RealInstallError("isolated runtime root escaped RUNNER_TEMP")
+    runtime_home = runtime_root / "home"
+    code_search_storage = runtime_root / "code-search-storage"
+    for directory in (runtime_home, code_search_storage):
+        directory.mkdir(mode=0o700, parents=False, exist_ok=False)
+    return {
+        **allowlisted_runtime_environment(source),
+        "RUNNER_TEMP": str(resolved_runner_temp),
+        "HOME": str(runtime_home),
+        "CODE_SEARCH_STORAGE": str(code_search_storage),
+        "PYTHONUNBUFFERED": "1",
+    }
+
+
 def allowlisted_runtime_environment(
     source: dict[str, str],
 ) -> dict[str, str]:
@@ -141,6 +175,24 @@ def allowlisted_runtime_environment(
         for name in RUNTIME_OPERATION_ENV_ALLOWLIST
         if isinstance(source.get(name), str) and source[name]
     }
+    runner_temp = runtime_env.get("RUNNER_TEMP")
+    for name in ("HOME", "CODE_SEARCH_STORAGE"):
+        candidate = runtime_env.get(name)
+        if not candidate:
+            continue
+        if not runner_temp:
+            runtime_env.pop(name, None)
+            continue
+        unresolved_candidate = Path(candidate)
+        resolved_candidate = unresolved_candidate.resolve()
+        resolved_runner_temp = Path(runner_temp).resolve()
+        if (
+            unresolved_candidate.is_symlink()
+            or not resolved_candidate.is_dir()
+            or resolved_candidate == resolved_runner_temp
+            or not resolved_candidate.is_relative_to(resolved_runner_temp)
+        ):
+            runtime_env.pop(name, None)
     return runtime_env
 
 
@@ -879,11 +931,10 @@ def main(argv: list[str] | None = None) -> int:
         os.environ.pop("CODE_INTEL_COMPONENT_TOKEN", None)
         bom_path = Path(args.component_bom).resolve()
         bom = load_bom(bom_path)
-        runtime_env = {
-            **runtime_env,
-            "PYTHONUNBUFFERED": "1",
-            "CODE_SEARCH_STORAGE": str(runner_temp / "code-search-storage"),
-        }
+        runtime_env = build_isolated_runtime_environment(
+            runtime_env,
+            runner_temp,
+        )
         with tempfile.TemporaryDirectory(
             prefix="codebase-search-real-contract-", dir=runner_temp
         ) as temporary:
