@@ -215,8 +215,8 @@ For code-graph, use release
 [`v0.7.0-redacted.3`](https://github.com/redacted-org/code-graph/releases/tag/v0.7.0-redacted.3).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
-archive manifest entry; use authenticated `gh attestation download` to fetch
-the archive's digest-named bundle; then run secret-free
+archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
+the path and SHA-256 pinned by the BOM; then run secret-free
 `gh attestation verify --bundle` with the pinned repository, release workflow,
 source digest, `refs/heads/main`, and GitHub-hosted-runner policy. Extract only
 after every check passes. Configure the two verified MCP server paths manually
@@ -262,11 +262,14 @@ as an attested build artifact downloaded from that pinned release; the checks
 do not cryptographically prove its placement there. Its separately
 checksum-pinned offline attestation bundle is passed directly to
 `gh attestation verify`; no online Attestations API lookup is used, so the
-search verification does not need `Attestations: read`. Code-graph verification
-uses the online attestation API only to download a digest-named bundle and
-therefore requires `Attestations: read`; verification then runs offline without
-the token. Both policies bind the build to the pinned source commit, release
-workflow, `refs/heads/main`, and GitHub-hosted runners.
+search verification does not need `Attestations: read`. Code-graph uses an
+operator-fetched canonical bundle vendored under `compatibility/attestations/`;
+the graph descriptor pins its repository-relative path and SHA-256, and static
+validation rejects a missing, modified, or release-mismatched bundle. The
+bundle covers all five immutable platform archives, so runtime verification is
+also offline and does not need `Attestations: read`. Both policies bind the
+build to the pinned source commit, release workflow, `refs/heads/main`, and
+GitHub-hosted runners.
 
 There is currently no repository secret fallback. If the secret is absent,
 the trusted job intentionally fails; do not skip or weaken this validation.

@@ -392,44 +392,6 @@ def verify_checksum_manifest(
         )
 
 
-def download_attestation_bundle(
-    artifact_name: str,
-    artifact_sha256: str,
-    repository: str,
-    downloads: Path,
-    fetch_env: dict[str, str],
-) -> Path:
-    """Fetch the artifact's bundle with auth, then return its exact digest path."""
-    candidates = (
-        downloads / f"sha256:{artifact_sha256}.jsonl",
-        downloads / f"sha256-{artifact_sha256}.jsonl",
-    )
-    if any(path.exists() for path in candidates):
-        raise RealInstallError("attestation bundle path existed before download")
-    run(
-        [
-            "gh",
-            "attestation",
-            "download",
-            artifact_name,
-            "--repo",
-            repository,
-        ],
-        env=allowlisted_fetch_environment(fetch_env),
-        cwd=downloads,
-    )
-    matches = [
-        path
-        for path in candidates
-        if path.is_file() and path.stat().st_size > 0
-    ]
-    if len(matches) != 1:
-        raise RealInstallError(
-            "attestation download did not produce exactly one digest-bound bundle"
-        )
-    return matches[0]
-
-
 def install_code_search_git(
     install: dict,
     destination: Path,
@@ -798,13 +760,24 @@ def install_code_graph(
         raise RealInstallError("code-graph release BOM metadata is invalid")
     signer_workflow = attestation.get("signer_workflow")
     source_ref = attestation.get("source_ref")
+    bundle = attestation.get("bundle")
+    expected_bundle_path = (
+        f"compatibility/attestations/code-graph-{tag}-provenance.jsonl"
+    )
+    bundle_path = bundle.get("path") if isinstance(bundle, dict) else None
+    bundle_sha256 = bundle.get("sha256") if isinstance(bundle, dict) else None
     if (
         signer_workflow
         != "redacted-org/code-graph/.github/workflows/release.yml"
         or source_ref != "refs/heads/main"
         or attestation.get("deny_self_hosted_runners") is not True
+        or bundle_path != expected_bundle_path
+        or not isinstance(bundle_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", bundle_sha256) is None
     ):
         raise RealInstallError("code-graph attestation policy is invalid")
+    vendored_bundle = ROOT / bundle_path
+    verify_sha256(vendored_bundle, bundle_sha256)
 
     asset_name, expected_sha256 = linux_asset(install)
     checksums_name, checksums_sha256 = release_asset(
@@ -847,13 +820,6 @@ def install_code_graph(
     verify_sha256(archive, expected_sha256)
     verify_sha256(checksums, checksums_sha256)
     verify_checksum_manifest(checksums, asset_name, expected_sha256)
-    bundle = download_attestation_bundle(
-        asset_name,
-        expected_sha256,
-        repository,
-        downloads,
-        fetch_env,
-    )
     run(
         [
             "gh",
@@ -861,7 +827,7 @@ def install_code_graph(
             "verify",
             asset_name,
             "--bundle",
-            bundle.name,
+            str(vendored_bundle),
             "--repo",
             repository,
             "--signer-workflow",

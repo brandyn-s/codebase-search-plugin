@@ -25,6 +25,10 @@
           }
         },
         "attestation": {
+          "bundle": {
+            "path": "compatibility/attestations/code-graph-v0.7.0-redacted.3-provenance.jsonl",
+            "sha256": "c5a7dbd0fc0c36702fe6e5e820439566380b6cfaadf35e758888625c12d88945"
+          },
           "deny_self_hosted_runners": true,
           "signer_workflow": "redacted-org/code-graph/.github/workflows/release.yml",
           "source_ref": "refs/heads/main"

@@ -332,6 +332,37 @@ def validate_code_graph_install(install: dict) -> None:
             "component-bom.json: code-graph.install.attestation must be an object"
         )
         return
+    bundle = attestation.get("bundle")
+    expected_bundle_path = (
+        f"compatibility/attestations/code-graph-{tag}-provenance.jsonl"
+    )
+    bundle_path = bundle.get("path") if isinstance(bundle, dict) else None
+    bundle_sha256 = bundle.get("sha256") if isinstance(bundle, dict) else None
+    if bundle_path != expected_bundle_path:
+        errors.append(
+            "component-bom.json: code-graph attestation bundle path must be "
+            f"{expected_bundle_path}"
+        )
+    elif (
+        not isinstance(bundle_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", bundle_sha256) is None
+    ):
+        errors.append(
+            "component-bom.json: code-graph attestation bundle sha256 must "
+            "be 64 lowercase hex characters"
+        )
+    else:
+        vendored_bundle = ROOT / bundle_path
+        if not vendored_bundle.is_file() or vendored_bundle.is_symlink():
+            errors.append(
+                "component-bom.json: code-graph attestation bundle is missing "
+                "or is not a regular repository file"
+            )
+        elif hashlib.sha256(vendored_bundle.read_bytes()).hexdigest() != bundle_sha256:
+            errors.append(
+                "component-bom.json: code-graph attestation bundle sha256 "
+                "does not match the vendored file"
+            )
     if attestation.get("signer_workflow") != CODE_GRAPH_RELEASE_SIGNER_WORKFLOW:
         errors.append(
             "component-bom.json: code-graph attestation signer_workflow "

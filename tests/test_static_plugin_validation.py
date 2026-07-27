@@ -206,6 +206,50 @@ class StaticPluginValidationTests(unittest.TestCase):
         self.assertIn("linux-amd64", completed.stdout)
         self.assertIn("sha256", completed.stdout.lower())
 
+    def test_validator_rejects_missing_vendored_graph_attestation_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            bundle = (
+                checkout
+                / "compatibility"
+                / "attestations"
+                / "code-graph-v0.7.0-redacted.3-provenance.jsonl"
+            )
+            bundle.unlink()
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(
+            completed.returncode,
+            1,
+            completed.stdout + completed.stderr,
+        )
+        self.assertIn("attestation bundle", completed.stdout)
+        self.assertIn("missing", completed.stdout)
+
+    def test_validator_rejects_modified_vendored_graph_attestation_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            bundle = (
+                checkout
+                / "compatibility"
+                / "attestations"
+                / "code-graph-v0.7.0-redacted.3-provenance.jsonl"
+            )
+            bundle.write_text('{"tampered":true}\n', encoding="utf-8")
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(
+            completed.returncode,
+            1,
+            completed.stdout + completed.stderr,
+        )
+        self.assertIn("attestation bundle", completed.stdout)
+        self.assertIn("sha256", completed.stdout.lower())
+
     def test_validator_accepts_pinned_code_search_release_wheel(self):
         with tempfile.TemporaryDirectory() as tmp:
             checkout = Path(tmp)

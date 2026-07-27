@@ -124,12 +124,18 @@ def validate_install_descriptor_shape(component: str, install: object) -> None:
             install["attestation"],
             frozenset(
                 {
+                    "bundle",
                     "signer_workflow",
                     "source_ref",
                     "deny_self_hosted_runners",
                 }
             ),
             "code-graph attestation",
+        )
+        _require_exact_keys(
+            install["attestation"]["bundle"],
+            frozenset({"path", "sha256"}),
+            "code-graph attestation bundle",
         )
         _require_exact_keys(
             install["checksums"],

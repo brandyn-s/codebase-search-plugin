@@ -65,3 +65,15 @@ Promotion is one reviewed change: flip the production BOM descriptor, capture
 fresh schema contracts from the installed candidate, regenerate candidate
 readiness evidence, and run trusted live validation. A tag, wheel, checksum,
 bundle, or snapshot update on its own is not a valid promotion.
+
+## Code-graph release provenance
+
+The code-graph descriptor pins every platform archive, `checksums.txt`, and an
+operator-fetched provenance bundle vendored at a release-specific repository
+path. That bundle is itself SHA-256-bound by the complete install descriptor
+and contains the release and build-provenance statements covering all five
+immutable archives. Static validation rejects a missing, modified, symlinked,
+or release-mismatched bundle. Installers and trusted validation pass it to
+`gh attestation verify --bundle` without an online Attestations API lookup,
+then extract only after the exact repository, signer workflow, source commit,
+`refs/heads/main`, and GitHub-hosted-runner policy all verify.

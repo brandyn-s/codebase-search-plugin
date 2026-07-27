@@ -78,6 +78,12 @@ class CaptureComponentContractsTests(unittest.TestCase):
             "revision": "a" * 40,
         }
         bom["components"]["code-graph"]["install"]["tag"] = "v9.9.9-test"
+        bom["components"]["code-graph"]["install"]["attestation"]["bundle"][
+            "path"
+        ] = (
+            "compatibility/attestations/"
+            "code-graph-v9.9.9-test-provenance.jsonl"
+        )
         path = directory / "candidate-bom.json"
         path.write_text(json.dumps(bom), encoding="utf-8")
         return path
@@ -525,6 +531,19 @@ class CaptureComponentContractsTests(unittest.TestCase):
                     mutated[field] = value
                 with self.assertRaises(capture.CaptureError):
                     capture._validate_code_search_release(mutated)
+
+    def test_capture_rejects_unbound_code_graph_attestation_bundle(self):
+        capture = load_capture_module()
+        bom = json.loads(
+            (ROOT / "component-bom.json").read_text(encoding="utf-8")
+        )
+        install = bom["components"]["code-graph"]["install"]
+        install["attestation"]["bundle"]["path"] = (
+            "compatibility/attestations/copied-provenance.jsonl"
+        )
+
+        with self.assertRaisesRegex(capture.CaptureError, "bundle"):
+            capture._validate_code_graph_release(install)
 
     def test_rejects_malformed_duplicate_and_empty_tool_lists(self):
         with tempfile.TemporaryDirectory() as tmp:

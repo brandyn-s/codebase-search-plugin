@@ -92,6 +92,12 @@ GRAPH_CHECKSUMS=$("$PYTHON" -c \
 GRAPH_CHECKSUMS_SHA256=$("$PYTHON" -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["checksums"]["sha256"])' \
     "$BOM_FILE")
+GRAPH_ATTESTATION_BUNDLE_PATH=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["attestation"]["bundle"]["path"])' \
+    "$BOM_FILE")
+GRAPH_ATTESTATION_BUNDLE_SHA256=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["attestation"]["bundle"]["sha256"])' \
+    "$BOM_FILE")
 GRAPH_SIGNER_WORKFLOW=$("$PYTHON" -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["attestation"]["signer_workflow"])' \
     "$BOM_FILE")
@@ -102,6 +108,12 @@ if [ "$GRAPH_CHECKSUMS" != "checksums.txt" ]; then
     echo "Error: code-graph checksum manifest must be checksums.txt." >&2
     exit 1
 fi
+EXPECTED_GRAPH_ATTESTATION_BUNDLE_PATH="compatibility/attestations/code-graph-${RELEASE_TAG}-provenance.jsonl"
+if [ "$GRAPH_ATTESTATION_BUNDLE_PATH" != "$EXPECTED_GRAPH_ATTESTATION_BUNDLE_PATH" ]; then
+    echo "Error: code-graph attestation bundle path does not match the tested release." >&2
+    exit 1
+fi
+GRAPH_ATTESTATION_BUNDLE="$PLUGIN_DIR/$GRAPH_ATTESTATION_BUNDLE_PATH"
 ASSET_KEY="${PLATFORM}-${ARCH}"
 ASSET_NAME=$("$PYTHON" -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-graph"]["install"]["assets"][sys.argv[2]]["name"])' \
@@ -148,7 +160,6 @@ verify_sha256() {
         echo "Error: checksum mismatch for $label" >&2
         echo "  expected: $expected" >&2
         echo "  actual:   $actual" >&2
-        rm -f "$file"
         return 1
     fi
 }
@@ -509,42 +520,17 @@ verify_checksum_manifest \
     "$EXPECTED_SHA256"
 echo "  Checksum OK."
 
-GRAPH_ATTESTATION_BUNDLE_COLON="$GRAPH_DOWNLOAD_DIR/sha256:${EXPECTED_SHA256}.jsonl"
-GRAPH_ATTESTATION_BUNDLE_DASH="$GRAPH_DOWNLOAD_DIR/sha256-${EXPECTED_SHA256}.jsonl"
-if [ -e "$GRAPH_ATTESTATION_BUNDLE_COLON" ] || \
-    [ -e "$GRAPH_ATTESTATION_BUNDLE_DASH" ]; then
-    echo "Error: code-graph attestation bundle path existed before download." >&2
-    exit 1
-fi
-(
-    cd "$GRAPH_DOWNLOAD_DIR"
-    gh attestation download "$ASSET_NAME" \
-        --repo "$GRAPH_REPOSITORY"
-)
-GRAPH_ATTESTATION_BUNDLE=""
-for candidate in \
-    "$GRAPH_ATTESTATION_BUNDLE_COLON" \
-    "$GRAPH_ATTESTATION_BUNDLE_DASH"; do
-    if [ -s "$candidate" ]; then
-        if [ -n "$GRAPH_ATTESTATION_BUNDLE" ]; then
-            echo "Error: multiple code-graph attestation bundles were downloaded." >&2
-            exit 1
-        fi
-        GRAPH_ATTESTATION_BUNDLE="$candidate"
-    fi
-done
-if [ -z "$GRAPH_ATTESTATION_BUNDLE" ]; then
-    echo "Error: code-graph attestation download produced no digest-bound bundle." >&2
-    exit 1
-fi
-GRAPH_ATTESTATION_BUNDLE_NAME=$(basename "$GRAPH_ATTESTATION_BUNDLE")
+verify_sha256 \
+    "$GRAPH_ATTESTATION_BUNDLE" \
+    "$GRAPH_ATTESTATION_BUNDLE_SHA256" \
+    "$GRAPH_ATTESTATION_BUNDLE_PATH"
 
 echo "  Verifying code-graph build provenance..."
 (
     cd "$GRAPH_DOWNLOAD_DIR"
     run_with_allowed_environment \
         gh attestation verify "$ASSET_NAME" \
-        --bundle "$GRAPH_ATTESTATION_BUNDLE_NAME" \
+        --bundle "$GRAPH_ATTESTATION_BUNDLE" \
         --repo "$GRAPH_REPOSITORY" \
         --signer-workflow "$GRAPH_SIGNER_WORKFLOW" \
         --source-digest "$GRAPH_SOURCE_REVISION" \
@@ -561,8 +547,7 @@ else
 fi
 rm -f \
     "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" \
-    "$GRAPH_DOWNLOAD_DIR/$GRAPH_CHECKSUMS" \
-    "$GRAPH_ATTESTATION_BUNDLE"
+    "$GRAPH_DOWNLOAD_DIR/$GRAPH_CHECKSUMS"
 rmdir "$GRAPH_DOWNLOAD_DIR" 2>/dev/null || true
 chmod +x "$BIN_DIR/$GRAPH_BINARY" 2>/dev/null || true
 

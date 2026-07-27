@@ -82,11 +82,26 @@ $ReleaseTag = $GraphInstall.tag
 $GraphSourceRevision = $GraphInstall.source_revision
 $GraphChecksums = $GraphInstall.checksums.name
 $GraphChecksumsSha256 = $GraphInstall.checksums.sha256
+$GraphAttestationBundleRelativePath = $GraphInstall.attestation.bundle.path
+$GraphAttestationBundleSha256 = $GraphInstall.attestation.bundle.sha256
 $GraphSignerWorkflow = $GraphInstall.attestation.signer_workflow
 $GraphSourceRef = $GraphInstall.attestation.source_ref
 if ($GraphChecksums -ne "checksums.txt") {
     throw "code-graph checksum manifest must be checksums.txt"
 }
+$ExpectedGraphAttestationBundleRelativePath = (
+    "compatibility/attestations/" +
+    "code-graph-$ReleaseTag-provenance.jsonl"
+)
+if (
+    $GraphAttestationBundleRelativePath -ne
+    $ExpectedGraphAttestationBundleRelativePath
+) {
+    throw "code-graph attestation bundle path does not match the tested release"
+}
+$GraphAttestationBundlePath = Join-Path `
+    $PluginDir `
+    $GraphAttestationBundleRelativePath
 $ReadinessStatus = $Bom.integrated_readiness.status
 $ReadinessReason = $Bom.integrated_readiness.reason
 $AssetProperty = $Bom.components.'code-graph'.install.assets.PSObject.Properties[$AssetKey]
@@ -116,7 +131,6 @@ function Assert-Sha256 {
     }
     $Actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($Actual -ne $Expected) {
-        Remove-Item -LiteralPath $Path -ErrorAction SilentlyContinue
         throw "checksum mismatch for $Label (expected $Expected, got $Actual)"
     }
 }
@@ -552,49 +566,22 @@ try {
 }
 Write-Host "  Checksum OK."
 
-$GraphAttestationCandidates = @(
-    (Join-Path $GraphDownloadDir "sha256`:$($ExpectedSha256.ToLowerInvariant()).jsonl"),
-    (Join-Path $GraphDownloadDir "sha256-$($ExpectedSha256.ToLowerInvariant()).jsonl")
-)
-if ($GraphAttestationCandidates | Where-Object { Test-Path -LiteralPath $_ }) {
-    throw "code-graph attestation bundle path existed before download"
-}
-Push-Location $GraphDownloadDir
 try {
-    & gh attestation download $AssetName `
-        --repo $GraphRepository
-    if ($LASTEXITCODE -ne 0) {
-        throw "gh attestation download exited with status $LASTEXITCODE"
-    }
-} finally {
-    Pop-Location
+    Assert-Sha256 `
+        -Path $GraphAttestationBundlePath `
+        -Expected $GraphAttestationBundleSha256 `
+        -Label $GraphAttestationBundleRelativePath
+} catch {
+    Write-Host "Error: graph attestation bundle verification failed: $_" -ForegroundColor Red
+    exit 1
 }
-$GraphAttestationBundles = @(
-    $GraphAttestationCandidates |
-        Where-Object {
-            Test-Path -LiteralPath $_ -PathType Leaf
-        } |
-        Where-Object {
-            (Get-Item -LiteralPath $_).Length -gt 0
-        }
-)
-if ($GraphAttestationBundles.Count -ne 1) {
-    throw (
-        "code-graph attestation download did not produce exactly one " +
-        "digest-bound bundle"
-    )
-}
-$GraphAttestationBundle = $GraphAttestationBundles[0]
-$GraphAttestationBundleName = [IO.Path]::GetFileName(
-    $GraphAttestationBundle
-)
 
 Write-Host "  Verifying code-graph build provenance..."
 Push-Location $GraphDownloadDir
 try {
     Invoke-WithAllowedEnvironment {
         & gh attestation verify $AssetName `
-            --bundle $GraphAttestationBundleName `
+            --bundle $GraphAttestationBundlePath `
             --repo $GraphRepository `
             --signer-workflow $GraphSignerWorkflow `
             --source-digest $GraphSourceRevision `
@@ -611,8 +598,7 @@ try {
 Expand-Archive -Path $ZipPath -DestinationPath $BinDir -Force
 Remove-Item -LiteralPath `
     $ZipPath, `
-    $GraphChecksumsPath, `
-    $GraphAttestationBundle
+    $GraphChecksumsPath
 Remove-Item -LiteralPath $GraphDownloadDir -ErrorAction SilentlyContinue
 
 Write-Host "  code-graph installed."

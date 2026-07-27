@@ -39,6 +39,15 @@ EXPECTED_ASSETS = {
 EXPECTED_GRAPH_INSTALL = {
     "assets": EXPECTED_ASSETS,
     "attestation": {
+        "bundle": {
+            "path": (
+                "compatibility/attestations/"
+                "code-graph-v0.7.0-redacted.3-provenance.jsonl"
+            ),
+            "sha256": (
+                "c5a7dbd0fc0c36702fe6e5e820439566380b6cfaadf35e758888625c12d88945"
+            ),
+        },
         "deny_self_hosted_runners": True,
         "signer_workflow": (
             "redacted-org/code-graph/.github/workflows/release.yml"
@@ -133,6 +142,17 @@ class ComponentAssetChecksumTests(unittest.TestCase):
                 "2130f976dae862442a2e3ec8090d052b7e75320e58d8c374ec137c228637dcbf",
             )
 
+    def test_installer_checksum_helpers_never_delete_vendored_inputs(self):
+        shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+        powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+        shell_helper = shell.split("verify_sha256() {", 1)[1].split("\n}", 1)[0]
+        powershell_helper = powershell.split(
+            "function Assert-Sha256 {", 1
+        )[1].split("\n}", 1)[0]
+
+        self.assertNotIn('rm -f "$file"', shell_helper)
+        self.assertNotIn("Remove-Item -LiteralPath $Path", powershell_helper)
+
     def test_ci_helper_requires_one_exact_checksum_manifest_entry(self):
         helper = load_helper()
         artifact_name = "component.tar.gz"
@@ -191,6 +211,8 @@ class ComponentAssetChecksumTests(unittest.TestCase):
 
         self.assertIn("sha256sum", shell)
         self.assertIn("shasum", shell)
+        self.assertIn('["attestation"]["bundle"]', shell)
+        self.assertIn(".attestation.bundle", powershell)
         self.assertIn("Get-FileHash", powershell)
         self.assertNotIn("Invoke-WebRequest", powershell)
 
@@ -218,22 +240,22 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         ):
             self.assertIn(resolver, graph)
             self.assertIn(checksum_verifier, graph)
-            self.assertIn("gh attestation download", graph)
+            self.assertNotIn("gh attestation download", graph)
             self.assertIn("gh attestation verify", graph)
             self.assertIn("--bundle", graph)
             self.assertLess(graph.index(resolver), graph.index("gh release download"))
             self.assertLess(
                 graph.index(checksum_verifier),
-                graph.index("gh attestation download"),
-            )
-            self.assertLess(
-                graph.index("gh attestation download"),
                 graph.index("gh attestation verify"),
             )
             self.assertLess(
                 graph.index("gh attestation verify"),
                 graph.index(extraction),
             )
+        self.assertIn("GRAPH_ATTESTATION_BUNDLE_PATH", shell_graph)
+        self.assertIn("GRAPH_ATTESTATION_BUNDLE_SHA256", shell_graph)
+        self.assertIn("$GraphAttestationBundlePath", powershell_graph)
+        self.assertIn("$GraphAttestationBundleSha256", powershell_graph)
 
     def test_installers_verify_release_wheel_offline_before_install(
         self,
@@ -334,6 +356,9 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             self.assertIn(required, combined)
         self.assertNotIn("gh release verify-asset", combined)
         self.assertNotIn("release membership", combined)
+        self.assertNotIn("gh attestation download", combined)
+        self.assertIn("operator-fetched", combined)
+        self.assertIn("vendored", combined)
         self.assertIn("production BOM pins code-search release", readme)
         self.assertIn(
             "code-search/releases/tag/v0.2.1",

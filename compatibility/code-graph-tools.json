@@ -7,7 +7,7 @@
   },
   "schema_version": 1,
   "source": {
-    "install_descriptor_sha256": "adc21fd704e54686157488d82b25570ad7cb98ac03b9d45427b516a9c3d2b8e2",
+    "install_descriptor_sha256": "0409f351bc6bdb0ffff2ac8cb5c5081eb1e8cb3a8f2c16a1f41813f031584d42",
     "kind": "github-release",
     "version": "v0.7.0-redacted.3"
   },

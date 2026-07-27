@@ -3,7 +3,7 @@
   "checkout_unchanged": true,
   "components": {
     "code-graph": {
-      "install_descriptor_sha256": "adc21fd704e54686157488d82b25570ad7cb98ac03b9d45427b516a9c3d2b8e2",
+      "install_descriptor_sha256": "0409f351bc6bdb0ffff2ac8cb5c5081eb1e8cb3a8f2c16a1f41813f031584d42",
       "index_identity": {
         "captured_at": "2026-07-27T05:33:37Z",
         "checkout_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",

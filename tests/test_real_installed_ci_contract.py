@@ -141,6 +141,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
         real_job = workflow.split("validate-installed-components:", 1)[1]
 
+        self.assertNotIn("attestations: read", workflow)
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("github.ref == 'refs/heads/main'", real_job)
         self.assertIn("github.event_name == 'push'", real_job)
@@ -494,7 +495,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
 
         run.assert_not_called()
 
-    def test_graph_release_is_attested_before_extraction(self):
+    def test_graph_release_uses_hash_bound_offline_attestation_before_extraction(self):
         helper = load_helper()
         archive_buffer = io.BytesIO()
         binary_bytes = b"verified graph binary"
@@ -508,7 +509,11 @@ class RealInstalledCIContractTests(unittest.TestCase):
         archive_sha256 = hashlib.sha256(archive_bytes).hexdigest()
         checksums_name = "checksums.txt"
         checksums_bytes = f"{archive_sha256}  {archive_name}\n".encode()
-        attestation_bundle_name = f"sha256:{archive_sha256}.jsonl"
+        attestation_bundle_bytes = b'{"bundle":"operator-fetched"}\n'
+        attestation_bundle_path = (
+            "compatibility/attestations/"
+            "code-graph-v0.7.0-redacted.3-provenance.jsonl"
+        )
         install = {
             "kind": "github-release",
             "repository": "redacted-org/code-graph",
@@ -525,6 +530,12 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 "sha256": hashlib.sha256(checksums_bytes).hexdigest(),
             },
             "attestation": {
+                "bundle": {
+                    "path": attestation_bundle_path,
+                    "sha256": hashlib.sha256(
+                        attestation_bundle_bytes
+                    ).hexdigest(),
+                },
                 "deny_self_hosted_runners": True,
                 "signer_workflow": (
                     "redacted-org/code-graph/"
@@ -547,10 +558,9 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 (download_dir / archive_name).write_bytes(archive_bytes)
                 (download_dir / checksums_name).write_bytes(checksums_bytes)
             elif command[:3] == ["gh", "attestation", "download"]:
-                events.append("attestation-download")
-                (Path(cwd) / attestation_bundle_name).write_text(
-                    '{"bundle":"downloaded"}\n',
-                    encoding="utf-8",
+                raise AssertionError(
+                    "regression: the release-only token cannot call the "
+                    "cross-repository Attestations API"
                 )
             elif command[:3] == ["gh", "attestation", "verify"]:
                 events.append("attestation")
@@ -567,8 +577,13 @@ class RealInstalledCIContractTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             destination = Path(tmp)
+            plugin_root = destination / "plugin"
+            bundle = plugin_root / attestation_bundle_path
+            bundle.parent.mkdir(parents=True)
+            bundle.write_bytes(attestation_bundle_bytes)
             with (
                 mock.patch.object(helper, "run", side_effect=emulate),
+                mock.patch.object(helper, "ROOT", plugin_root),
                 mock.patch.object(
                     helper,
                     "resolve_release_tag_commit",
@@ -611,7 +626,6 @@ class RealInstalledCIContractTests(unittest.TestCase):
             [
                 "tag",
                 "download",
-                "attestation-download",
                 "attestation",
                 "extract",
             ],
@@ -628,18 +642,16 @@ class RealInstalledCIContractTests(unittest.TestCase):
             for index, command in enumerate(commands)
             if command[:3] == ["gh", "attestation", "verify"]
         )
-        attestation_download = next(
-            index
-            for index, command in enumerate(commands)
-            if command[:3] == ["gh", "attestation", "download"]
-        )
         self.assertEqual(environments[release_download], fetch_env)
-        self.assertEqual(environments[attestation_download], fetch_env)
         self.assertEqual(environments[attestation], runtime_env)
+        self.assertNotIn(
+            ["gh", "attestation", "download"],
+            [command[:3] for command in commands],
+        )
         self.assertIn(archive_name, commands[release_download])
         self.assertIn(checksums_name, commands[release_download])
         self.assertIn("--bundle", commands[attestation])
-        self.assertIn(attestation_bundle_name, commands[attestation])
+        self.assertIn(str(bundle), commands[attestation])
         for required in (
             "--repo",
             "redacted-org/code-graph",

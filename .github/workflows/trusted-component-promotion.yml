@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  attestations: read
 
 concurrency:
   group: trusted-component-promotion-${{ github.ref }}

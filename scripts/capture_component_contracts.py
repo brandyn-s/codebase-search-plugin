@@ -365,6 +365,20 @@ def _validate_code_graph_release(install: dict) -> None:
     attestation = install.get("attestation")
     if not isinstance(attestation, dict):
         raise CaptureError("code-graph: attestation must be an object")
+    bundle = attestation.get("bundle")
+    expected_bundle_path = (
+        f"compatibility/attestations/code-graph-{tag}-provenance.jsonl"
+    )
+    if (
+        not isinstance(bundle, dict)
+        or bundle.get("path") != expected_bundle_path
+        or not isinstance(bundle.get("sha256"), str)
+        or LOWER_HEX_SHA256.fullmatch(bundle["sha256"]) is None
+    ):
+        raise CaptureError(
+            "code-graph: attestation bundle must name the tag-bound vendored "
+            "JSONL path with a pinned SHA-256"
+        )
     if attestation.get("signer_workflow") != CODE_GRAPH_RELEASE_SIGNER_WORKFLOW:
         raise CaptureError(
             "code-graph: attestation signer_workflow must be "
