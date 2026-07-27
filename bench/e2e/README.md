@@ -38,10 +38,9 @@ changing any target file invalidates live provenance.
 
 ## Live recording workflow
 
-No live result is bundled, and the current blocked component BOM cannot
-produce one. After a future BOM is readiness-approved, a trusted host runner
-must execute every case against `target-repo/` and save all of these artifacts
-in one isolated recording directory:
+No live benchmark result is bundled. With the current readiness-approved BOM,
+a trusted host runner can execute every case against `target-repo/` and must
+save all of these artifacts in one isolated recording directory:
 
 - the exact cases, thresholds, and readiness-approved component BOM;
 - version-matched component evidence with equal ready index identities;

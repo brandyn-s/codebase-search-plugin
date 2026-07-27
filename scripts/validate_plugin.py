@@ -105,7 +105,10 @@ for skill in skill_files:
         continue
     frontmatter = text[3:end]
     for key in ("name", "description"):
-        if not any(line.strip().startswith(f"{key}:") for line in frontmatter.splitlines()):
+        if not any(
+            line.strip().startswith(f"{key}:")
+            for line in frontmatter.splitlines()
+        ):
             errors.append(f"{rel}: frontmatter missing '{key}'")
 
 # Tested component BOM and tool-schema snapshots.
@@ -220,7 +223,8 @@ if bom:
                         ) is None:
                             errors.append(
                                 "component-bom.json: code-graph asset "
-                                f"{platform_key}.sha256 must be 64 lowercase hex characters"
+                                f"{platform_key}.sha256 must be 64 lowercase "
+                                "hex characters"
                             )
 
             tools = snapshot.get("tools")
@@ -473,14 +477,14 @@ if snapshots:
         evidence_rel = readiness.get("evidence")
         evidence = None
         evidence_label = str(evidence_rel)
+        evidence_override = os.environ.get(
+            "CODE_INTEL_READINESS_EVIDENCE_OVERRIDE", ""
+        ).strip()
         if not isinstance(evidence_rel, str) or not evidence_rel:
             errors.append(
                 "component-bom.json: ready status requires a readiness evidence path"
             )
         else:
-            evidence_override = os.environ.get(
-                "CODE_INTEL_READINESS_EVIDENCE_OVERRIDE", ""
-            ).strip()
             evidence_path_allowed = True
             if evidence_override:
                 evidence_path = Path(evidence_override).resolve()
@@ -536,6 +540,29 @@ if snapshots:
             ):
                 errors.append(
                     f"{evidence_label}: readiness evidence schema_version must be 1"
+                )
+            if (
+                evidence.get("producer")
+                != "scripts/generate_live_readiness_evidence.py:v2"
+            ):
+                errors.append(
+                    f"{evidence_label}: readiness evidence producer is invalid"
+                )
+            expected_evidence_mode = (
+                "ready-validation"
+                if evidence_override
+                else "promotion-candidate"
+            )
+            if evidence.get("evidence_mode") != expected_evidence_mode:
+                errors.append(
+                    f"{evidence_label}: evidence_mode must be "
+                    f"{expected_evidence_mode}"
+                )
+            expected_bom_status = "ready" if evidence_override else "blocked"
+            if evidence.get("bom_readiness_status") != expected_bom_status:
+                errors.append(
+                    f"{evidence_label}: bom_readiness_status must be "
+                    f"{expected_bom_status}"
                 )
             evidence_components = evidence.get("components")
             if not isinstance(evidence_components, dict):
@@ -602,7 +629,8 @@ if snapshots:
                 )
                 if not isinstance(identity, dict):
                     errors.append(
-                        f"{evidence_label}: {component} index_identity must be an object"
+                        f"{evidence_label}: {component} index_identity "
+                        "must be an object"
                     )
                     return None
                 if (

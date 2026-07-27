@@ -52,7 +52,10 @@ class IndexRepoSkillContractTests(unittest.TestCase):
         self.assertIn("Before starting either index", text)
         self.assertIn("do not start code-search", text.lower())
         self.assertIn("v0.7.0-redacted.2", compatibility)
-        self.assertIn("cannot satisfy identity readiness", compatibility)
+        self.assertIn(
+            "integrated readiness status is `ready`",
+            compatibility.lower(),
+        )
         self.assertIn("skip_report", compatibility)
 
     def test_preflight_requires_live_schemas_matching_the_bom_snapshot(self):
@@ -126,7 +129,51 @@ class IndexRepoSkillContractTests(unittest.TestCase):
             self.assertIn(final_gate, verification)
         self.assertNotIn("report a usable index", verification)
 
-    def test_graph_indexing_uses_actual_future_response_contract(self):
+    def test_final_statuses_are_bound_to_the_requested_targets(self):
+        text = SKILL.read_text(encoding="utf-8")
+        verification = text.split(
+            "6. Verify both engines independently after indexing:", 1
+        )[1].split(
+            "7. Only after both indexes and identities verify", 1
+        )[0]
+
+        for binding in (
+            "project_path == <resolved-root>",
+            "project == <graph-project>",
+            "root_path == <resolved-root>",
+            "Missing or different binding fields fail closed",
+        ):
+            self.assertIn(binding, verification)
+
+    def test_graph_completion_identity_is_verified_before_cross_engine_match(self):
+        text = SKILL.read_text(encoding="utf-8")
+        verification = text.split(
+            "6. Verify both engines independently after indexing:", 1
+        )[1].split(
+            "7. Only after both indexes and identities verify", 1
+        )[0]
+
+        completion_check = (
+            "First compare the graph completion identity with the final graph "
+            "identity"
+        )
+        cross_engine_check = (
+            "Only after that comparison passes, compare the final semantic "
+            "and graph identities"
+        )
+        self.assertIn(completion_check, verification)
+        self.assertIn(cross_engine_check, verification)
+        self.assertLess(
+            verification.index(completion_check),
+            verification.index(cross_engine_check),
+        )
+        self.assertIn(
+            "`repository_id`, `checkout_id`, `source_revision`, "
+            "`dirty_fingerprint`, and `index_generation`",
+            verification,
+        )
+
+    def test_graph_indexing_uses_actual_response_contract(self):
         text = SKILL.read_text(encoding="utf-8")
         graph_step = text.split(
             "5. Run **code-graph** indexing without mutating the checkout:", 1
@@ -137,10 +184,13 @@ class IndexRepoSkillContractTests(unittest.TestCase):
         for gate in (
             "MCP `isError` is absent or false",
             "error is absent, null, or empty",
+            '`status` is absent or exactly `"ready"`',
+            'explicit null, `"failed"`, `"degraded"`, or unknown',
             'identity_status == "captured"',
             "non-empty `project`",
         ):
             self.assertIn(gate, graph_step)
+        self.assertNotIn('status` is not `"degraded"`', graph_step)
         self.assertNotIn("success == true", graph_step)
 
 

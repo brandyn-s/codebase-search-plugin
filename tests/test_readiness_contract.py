@@ -3,6 +3,7 @@
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -31,23 +32,24 @@ EQUAL_IDENTITY_FIELDS = [
 CURRENT_SEARCH_CAPABILITIES = {
     "outputs": {
         "index_identity": {
-            "supported": False,
-            "schema_version": None,
-            "fields": [],
+            "supported": True,
+            "schema_version": 1,
+            "fields": REQUIRED_IDENTITY_FIELDS,
         },
-        "semantic_index_ready": False,
+        "semantic_index_ready": True,
     }
 }
 CURRENT_GRAPH_CAPABILITIES = {
     "inputs": {"index_repository.skip_report": True},
     "outputs": {
         "index_identity": {
-            "supported": False,
-            "schema_version": None,
-            "fields": [],
+            "supported": True,
+            "schema_version": 1,
+            "fields": REQUIRED_IDENTITY_FIELDS,
         },
-        "graph_status_ready": False,
+        "graph_status_ready": True,
     },
+    "side_effects": {"index_repository.writes_architecture_report": True},
 }
 READY_SEARCH_CAPABILITIES = {
     "outputs": {
@@ -111,12 +113,21 @@ class ReadinessContractTests(unittest.TestCase):
         ):
             shutil.copy2(ROOT / filename, checkout / filename)
 
-    def _run_validator(self, checkout: Path) -> subprocess.CompletedProcess:
+    def _run_validator(
+        self,
+        checkout: Path,
+        extra_environment: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess:
+        environment = dict(os.environ)
+        environment.pop("CODE_INTEL_READINESS_EVIDENCE_OVERRIDE", None)
+        if extra_environment:
+            environment.update(extra_environment)
         return subprocess.run(
             [sys.executable, "scripts/validate_plugin.py"],
             cwd=checkout,
             text=True,
             capture_output=True,
+            env=environment,
             check=False,
         )
 
@@ -200,6 +211,9 @@ class ReadinessContractTests(unittest.TestCase):
         graph_identity["captured_at"] = "2026-07-26T18:00:01Z"
         evidence = {
             "schema_version": 1,
+            "producer": "scripts/generate_live_readiness_evidence.py:v2",
+            "evidence_mode": "promotion-candidate",
+            "bom_readiness_status": "blocked",
             "components": {
                 "code-search": {
                     "version": bom["components"]["code-search"]["install"]["revision"],
@@ -250,7 +264,7 @@ class ReadinessContractTests(unittest.TestCase):
         mutator(evidence)
         self._write_json(path, evidence)
 
-    def test_current_snapshots_explicitly_attest_blocked_output_capabilities(self):
+    def test_current_snapshots_and_evidence_attest_integrated_readiness(self):
         bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
         expected = {
             "code-search": CURRENT_SEARCH_CAPABILITIES,
@@ -269,12 +283,19 @@ class ReadinessContractTests(unittest.TestCase):
             )
 
         readiness = bom["integrated_readiness"]
-        self.assertEqual(readiness["status"], "blocked")
+        self.assertEqual(readiness["status"], "ready")
         self.assertEqual(readiness["requires"], READINESS_REQUIREMENTS)
-        self.assertNotIn("evidence", readiness)
-        self.assertIn("output behavior", readiness["reason"].lower())
+        self.assertEqual(
+            readiness["evidence"],
+            "compatibility/readiness-evidence.json",
+        )
+        self.assertIn(
+            "committed promotion-candidate",
+            readiness["reason"].lower(),
+        )
+        self.assertIn("trusted post-merge ci", readiness["reason"].lower())
 
-    def test_valid_future_ready_fixture_passes_every_gate(self):
+    def test_valid_ready_fixture_passes_every_gate(self):
         with tempfile.TemporaryDirectory() as tmp:
             checkout = Path(tmp)
             self._copy_checkout(checkout)
@@ -282,6 +303,46 @@ class ReadinessContractTests(unittest.TestCase):
             completed = self._run_validator(checkout)
 
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+
+    def test_live_override_requires_ready_validation_mode_and_ready_bom_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            self._promote_to_valid_ready_fixture(checkout)
+            candidate_path = (
+                checkout / "compatibility" / "readiness-evidence.json"
+            )
+            live_path = checkout / "live-readiness-evidence.json"
+            live = json.loads(candidate_path.read_text(encoding="utf-8"))
+            live["evidence_mode"] = "ready-validation"
+            live["bom_readiness_status"] = "ready"
+            self._write_json(live_path, live)
+            environment = {
+                "RUNNER_TEMP": str(checkout),
+                "CODE_INTEL_READINESS_EVIDENCE_OVERRIDE": str(live_path),
+            }
+
+            completed = self._run_validator(checkout, environment)
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stdout + completed.stderr,
+            )
+
+            live["evidence_mode"] = "promotion-candidate"
+            self._write_json(live_path, live)
+            completed = self._run_validator(checkout, environment)
+            output = completed.stdout + completed.stderr
+            self.assertEqual(completed.returncode, 1, output)
+            self.assertIn("evidence_mode", output)
+
+            live["evidence_mode"] = "ready-validation"
+            live["bom_readiness_status"] = "blocked"
+            self._write_json(live_path, live)
+            completed = self._run_validator(checkout, environment)
+            output = completed.stdout + completed.stderr
+            self.assertEqual(completed.returncode, 1, output)
+            self.assertIn("bom_readiness_status", output)
 
     def test_unsafe_ready_promotions_are_rejected(self):
         def missing_identity_field(checkout: Path) -> None:
@@ -404,6 +465,28 @@ class ReadinessContractTests(unittest.TestCase):
                 ),
             )
 
+        def invalid_evidence_producer(checkout: Path) -> None:
+            self._mutate_evidence(
+                checkout,
+                lambda evidence: evidence.__setitem__("producer", "unknown"),
+            )
+
+        def invalid_evidence_mode(checkout: Path) -> None:
+            self._mutate_evidence(
+                checkout,
+                lambda evidence: evidence.__setitem__(
+                    "evidence_mode", "ready-validation"
+                ),
+            )
+
+        def invalid_evidence_bom_status(checkout: Path) -> None:
+            self._mutate_evidence(
+                checkout,
+                lambda evidence: evidence.__setitem__(
+                    "bom_readiness_status", "ready"
+                ),
+            )
+
         def weakened_requirements(checkout: Path) -> None:
             bom_path = checkout / "component-bom.json"
             bom = json.loads(bom_path.read_text(encoding="utf-8"))
@@ -464,6 +547,18 @@ class ReadinessContractTests(unittest.TestCase):
                 graph_evidence_not_ready,
                 "status",
             ),
+            "evidence producer invalid": (
+                invalid_evidence_producer,
+                "producer",
+            ),
+            "committed evidence mode invalid": (
+                invalid_evidence_mode,
+                "evidence_mode",
+            ),
+            "committed evidence BOM status invalid": (
+                invalid_evidence_bom_status,
+                "bom_readiness_status",
+            ),
             "requirements weakened": (weakened_requirements, "requires"),
         }
 
@@ -478,29 +573,42 @@ class ReadinessContractTests(unittest.TestCase):
                 self.assertEqual(completed.returncode, 1, output)
                 self.assertIn(expected_error, output)
 
-    def test_installers_and_docs_report_current_integrated_block(self):
+    def test_installers_and_docs_report_current_integrated_readiness(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        normalized_readme = " ".join(readme.split())
         compatibility = (ROOT / "compatibility" / "README.md").read_text(
             encoding="utf-8"
         )
         normalized_compatibility = " ".join(compatibility.split())
+        bom = json.loads(
+            (ROOT / "component-bom.json").read_text(encoding="utf-8")
+        )
         skill = (ROOT / "skills" / "index-repo" / "SKILL.md").read_text(
             encoding="utf-8"
         )
         shell = (ROOT / "install.sh").read_text(encoding="utf-8")
         powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
 
-        self.assertIn("INTEGRATED READINESS: BLOCKED", readme)
-        self.assertNotIn("This runs both semantic and structural indexing", readme)
-        self.assertIn(
-            "exposes an optional boolean `skip_report` input",
+        self.assertIn("INTEGRATED READINESS: READY", readme)
+        self.assertIn("This runs both semantic and structural indexing", readme)
+        self.assertIn("`voyage` maps to `voyage-4-large`", normalized_readme)
+        self.assertIn("CODE_GRAPH_SKIP_EMBEDDINGS", readme)
+        self.assertNotIn("code-graph is fully local", readme)
+        self.assertIn("promotion-candidate", normalized_compatibility)
+        self.assertIn("ready-validation", normalized_compatibility)
+        self.assertIn("do not independently prove", normalized_compatibility)
+        self.assertNotIn(
+            "using separately verified exact components",
             normalized_compatibility,
         )
-        self.assertIn("runtime behavior", normalized_compatibility)
-        self.assertIn("does not write", skill)
+        self.assertIn(
+            "trusted post-merge CI",
+            bom["integrated_readiness"]["reason"],
+        )
+        self.assertIn("current BOM attests", skill)
         for installer in (shell, powershell):
-            self.assertIn("INTEGRATED READINESS: BLOCKED", installer)
-            self.assertNotIn("3. Index a repo", installer)
+            self.assertIn("INTEGRATED READINESS: READY", installer)
+            self.assertIn("3. Index a repo", installer)
 
 
 if __name__ == "__main__":

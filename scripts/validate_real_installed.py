@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import json
+import argparse
 import hashlib
+import json
 import os
-from pathlib import Path
 import platform
 import re
 import shutil
@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -23,10 +23,37 @@ class RealInstallError(RuntimeError):
     """The real component installation cannot be validated safely."""
 
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--readiness-evidence-output",
+        help="copy validated live readiness evidence to this RUNNER_TEMP path",
+    )
+    return parser.parse_args(argv)
+
+
 def run(command: list[str], *, env: dict[str, str], cwd: Path | None = None) -> None:
     """Run one external command without logging secret-bearing environment values."""
     print("+ " + " ".join(command), flush=True)
     subprocess.run(command, cwd=cwd, env=env, check=True)
+
+
+def resolve_readiness_evidence_output(
+    requested: str | None,
+    runner_temp: Path,
+) -> Path | None:
+    """Resolve an optional evidence path without allowing RUNNER_TEMP escape."""
+    if requested is None:
+        return None
+    resolved_runner_temp = runner_temp.resolve()
+    output = Path(requested).resolve()
+    if output == resolved_runner_temp or not output.is_relative_to(
+        resolved_runner_temp
+    ):
+        raise RealInstallError(
+            "readiness evidence output must be beneath RUNNER_TEMP"
+        )
+    return output
 
 
 def require_environment() -> tuple[str, Path]:
@@ -79,6 +106,37 @@ def load_bom() -> dict:
     return bom
 
 
+def build_readiness_model(
+    destination: Path,
+    venv_python: Path,
+    runtime_env: dict[str, str],
+) -> Path:
+    """Build a tiny deterministic local model with the installed dependency set."""
+    model = destination / "readiness-model"
+    run(
+        [
+            str(venv_python),
+            str(ROOT / "scripts" / "build_readiness_model.py"),
+            "--output",
+            str(model),
+        ],
+        env={
+            **runtime_env,
+            "HF_HUB_OFFLINE": "1",
+            "TRANSFORMERS_OFFLINE": "1",
+            "TOKENIZERS_PARALLELISM": "false",
+        },
+    )
+    required = (
+        model / "modules.json",
+        model / "config_sentence_transformers.json",
+        model / "0_BoW" / "config.json",
+    )
+    if any(not path.is_file() for path in required):
+        raise RealInstallError("readiness model builder omitted required files")
+    return model
+
+
 def generate_live_readiness_evidence(
     bom: dict,
     destination: Path,
@@ -99,10 +157,20 @@ def generate_live_readiness_evidence(
     smoke_env = dict(runtime_env)
     for secret_name in (
         "GH_TOKEN",
+        "GITHUB_TOKEN",
         "CODE_INTEL_COMPONENT_TOKEN",
         "CODE_INTEL_LIVE_READINESS_EVIDENCE",
+        "CODE_INTEL_READINESS_EVIDENCE_OVERRIDE",
+        "VOYAGE_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
     ):
         smoke_env.pop(secret_name, None)
+    local_model = build_readiness_model(
+        destination,
+        venv_python,
+        smoke_env,
+    )
     run(
         [
             str(venv_python),
@@ -115,6 +183,8 @@ def generate_live_readiness_evidence(
             f"code-search={code_search}",
             "--server",
             f"code-graph={code_graph}",
+            "--local-model",
+            str(local_model),
             "--output",
             str(evidence),
         ],
@@ -127,12 +197,45 @@ def generate_live_readiness_evidence(
     return evidence
 
 
+def validate_and_publish_live_evidence(
+    live_evidence: Path | None,
+    readiness_evidence_output: Path | None,
+    venv_python: Path,
+    runtime_env: dict[str, str],
+) -> None:
+    """Validate freshly generated evidence before making it publishable."""
+    if live_evidence is None:
+        if readiness_evidence_output is not None:
+            raise RealInstallError(
+                "requested output requires live readiness evidence"
+            )
+        return
+    run(
+        [
+            str(venv_python),
+            str(ROOT / "scripts" / "validate_plugin.py"),
+        ],
+        env={
+            **runtime_env,
+            "CODE_INTEL_READINESS_EVIDENCE_OVERRIDE": str(live_evidence),
+        },
+    )
+    if readiness_evidence_output is not None:
+        readiness_evidence_output.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(live_evidence, readiness_evidence_output)
+
+
 def verify_sha256(archive: Path, expected: str) -> None:
     """Fail closed unless an existing archive matches a pinned SHA-256."""
     if not archive.is_file():
         raise RealInstallError(f"downloaded release asset is missing: {archive}")
-    if not isinstance(expected, str) or re.fullmatch(r"[0-9a-fA-F]{64}", expected) is None:
-        raise RealInstallError(f"pinned SHA-256 is missing or invalid for {archive.name}")
+    if (
+        not isinstance(expected, str)
+        or re.fullmatch(r"[0-9a-fA-F]{64}", expected) is None
+    ):
+        raise RealInstallError(
+            f"pinned SHA-256 is missing or invalid for {archive.name}"
+        )
 
     digest = hashlib.sha256()
     try:
@@ -229,7 +332,9 @@ def linux_asset(install: dict) -> tuple[str, str]:
     name = asset.get("name")
     sha256 = asset.get("sha256")
     if not isinstance(name, str) or not name:
-        raise RealInstallError(f"code-graph BOM asset name is missing for {platform_key}")
+        raise RealInstallError(
+            f"code-graph BOM asset name is missing for {platform_key}"
+        )
     if not isinstance(sha256, str):
         raise RealInstallError(
             f"code-graph BOM asset SHA-256 is missing for {platform_key}"
@@ -287,9 +392,14 @@ def install_code_graph(
     return executable
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     try:
         token, runner_temp = require_environment()
+        readiness_evidence_output = resolve_readiness_evidence_output(
+            args.readiness_evidence_output,
+            runner_temp,
+        )
         fetch_env, runtime_env = build_subprocess_environments(token)
         os.environ.pop("GH_TOKEN", None)
         os.environ.pop("CODE_INTEL_COMPONENT_TOKEN", None)
@@ -335,19 +445,12 @@ def main() -> int:
                 code_graph,
                 runtime_env,
             )
-            if live_evidence is not None:
-                run(
-                    [
-                        str(venv_python),
-                        str(ROOT / "scripts" / "validate_plugin.py"),
-                    ],
-                    env={
-                        **runtime_env,
-                        "CODE_INTEL_READINESS_EVIDENCE_OVERRIDE": str(
-                            live_evidence
-                        ),
-                    },
-                )
+            validate_and_publish_live_evidence(
+                live_evidence,
+                readiness_evidence_output,
+                venv_python,
+                runtime_env,
+            )
     except (RealInstallError, subprocess.CalledProcessError, tarfile.TarError) as exc:
         print(f"Real installed MCP validation FAILED: {exc}", file=sys.stderr)
         return 1

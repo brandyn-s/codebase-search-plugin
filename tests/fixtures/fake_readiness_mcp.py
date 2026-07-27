@@ -13,6 +13,7 @@ import sys
 
 
 COMPONENT = sys.argv[1]
+START_DIRECTORY = Path.cwd().resolve()
 INDEX_REPOSITORY_SCHEMA = {
     "type": "object",
     "properties": {
@@ -29,7 +30,12 @@ SEARCH_SCHEMAS = {
     "get_indexing_progress": {"type": "object", "properties": {}},
     "get_index_status": {
         "type": "object",
-        "properties": {"project_path": {"type": "string"}},
+        "properties": {
+            "project_path": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "default": None,
+            }
+        },
     },
 }
 GRAPH_SCHEMAS = {
@@ -42,6 +48,60 @@ GRAPH_SCHEMAS = {
 }
 repository: Path | None = None
 job_id = "readiness-smoke-job"
+BEHAVIOR = os.environ.get("FAKE_READINESS_BEHAVIOR", "")
+
+
+def isolated_runtime_is_valid() -> bool:
+    for name in (
+        "GH_TOKEN",
+        "CODE_INTEL_COMPONENT_TOKEN",
+        "VOYAGE_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+    ):
+        if os.environ.get(name):
+            return False
+    expected_values = {
+        "EMBEDDING_PROVIDER": "local",
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "RERANKER": "off",
+        "QUANTIZATION": "float32",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONHASHSEED": "0",
+        "TOKENIZERS_PARALLELISM": "false",
+    }
+    if any(os.environ.get(name) != value for name, value in expected_values.items()):
+        return False
+    try:
+        home = Path(os.environ["HOME"]).resolve()
+        user_profile = Path(os.environ["USERPROFILE"]).resolve()
+        model = Path(os.environ["LOCAL_EMBEDDING_MODEL"]).resolve()
+        isolated_paths = [
+            home,
+            Path(os.environ["XDG_CONFIG_HOME"]).resolve(),
+            Path(os.environ["XDG_CACHE_HOME"]).resolve(),
+            Path(os.environ["XDG_DATA_HOME"]).resolve(),
+            Path(os.environ["CODE_SEARCH_STORAGE"]).resolve(),
+            Path(os.environ["HF_HOME"]).resolve(),
+            Path(os.environ["TORCH_HOME"]).resolve(),
+            Path(os.environ["TMPDIR"]).resolve(),
+        ]
+    except (KeyError, OSError):
+        return False
+    if home != user_profile:
+        return False
+    if any(not path.is_dir() for path in isolated_paths):
+        return False
+    return all(
+        path.is_file()
+        for path in (
+            model / "modules.json",
+            model / "config_sentence_transformers.json",
+            model / "0_BoW" / "config.json",
+        )
+    )
 
 
 def response(request_id, result: dict) -> None:
@@ -52,17 +112,22 @@ def response(request_id, result: dict) -> None:
 
 
 def tool_result(request_id, payload: dict) -> None:
+    result = {
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps(payload, sort_keys=True),
+            }
+        ],
+        "isError": False,
+    }
+    if COMPONENT == "code-search":
+        result["structuredContent"] = {
+            "result": json.dumps(payload, sort_keys=True)
+        }
     response(
         request_id,
-        {
-            "content": [
-                {
-                    "type": "text",
-                    "text": json.dumps(payload, sort_keys=True),
-                }
-            ],
-            "isError": False,
-        },
+        result,
     )
 
 
@@ -94,6 +159,8 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
     global repository
     if COMPONENT == "code-search" and name == "index_directory":
         repository = Path(arguments["directory_path"])
+        if START_DIRECTORY != repository.resolve():
+            raise RuntimeError("server cwd must equal the indexed checkout")
         tool_result(
             request_id,
             {
@@ -123,6 +190,14 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
                     "success": True,
                     "index_ready": True,
                     "error": None,
+                    "directory": str(repository.resolve()),
+                    "storage_target": str(
+                        Path(os.environ["CODE_SEARCH_STORAGE"]).resolve()
+                    ),
+                    "files_added": 10,
+                    "chunks_added": 10,
+                    "pipeline_version": "fixture-pipeline-v1",
+                    "index_identity_status": "ready",
                 },
             },
         )
@@ -134,6 +209,11 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
         tool_result(
             request_id,
             {
+                "project_path": (
+                    "/wrong/search/project"
+                    if BEHAVIOR == "search-status-wrong-project"
+                    else str(repository.resolve())
+                ),
                 "index_ready": True,
                 "index_identity_status": "ready",
                 "error": None,
@@ -144,21 +224,41 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
         if arguments.get("skip_report") is not True:
             raise RuntimeError("skip_report must be true")
         repository = Path(arguments["repo_path"])
+        if START_DIRECTORY != repository.resolve():
+            raise RuntimeError("server cwd must equal the indexed checkout")
         tool_result(
             request_id,
             {
                 "error": None,
                 "project": repository.name,
+                **(
+                    {"status": "failed"}
+                    if BEHAVIOR == "graph-completion-failed"
+                    else {"status": None}
+                    if BEHAVIOR == "graph-completion-null"
+                    else {}
+                ),
                 "identity_status": "captured",
                 "index_identity": identity(),
             },
         )
     elif COMPONENT == "code-graph" and name == "index_status":
+        assert repository is not None
         tool_result(
             request_id,
             {
                 "status": "ready",
                 "error": None,
+                "project": (
+                    "wrong-graph-project"
+                    if BEHAVIOR == "graph-status-wrong-project"
+                    else repository.name
+                ),
+                "root_path": (
+                    "/wrong/graph/root"
+                    if BEHAVIOR == "graph-status-wrong-root"
+                    else str(repository.resolve())
+                ),
                 "identity_status": "captured",
                 "index_identity": identity(),
             },
@@ -178,7 +278,7 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
 def main() -> int:
     if COMPONENT not in {"code-search", "code-graph"}:
         return 2
-    if os.environ.get("GH_TOKEN") or os.environ.get("CODE_INTEL_COMPONENT_TOKEN"):
+    if not isolated_runtime_is_valid():
         return 3
     for raw_line in sys.stdin:
         message = json.loads(raw_line)

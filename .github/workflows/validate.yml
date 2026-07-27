@@ -46,8 +46,23 @@ jobs:
       - name: Shellcheck install.sh
         run: shellcheck install.sh
 
+      - name: Parse install.ps1 with PowerShell AST
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "install.ps1"),
+            [ref]$tokens,
+            [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.Message }
+            throw "install.ps1 failed PowerShell AST parsing"
+          }
+
   validate-installed-components:
-    name: Validate exact installed component schemas
+    name: Validate exact installed components and live readiness
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -69,7 +84,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install exact BOM components and validate real tools/list schemas
+      - name: Install exact BOM components and validate live readiness
         env:
           CODE_INTEL_COMPONENT_TOKEN: ${{ secrets.CODE_INTEL_COMPONENT_TOKEN }}
-        run: python3 scripts/validate_real_installed.py
+        run: >-
+          python3 scripts/validate_real_installed.py
+          --readiness-evidence-output
+          "$RUNNER_TEMP/code-intel-ready-validation/readiness-evidence.json"
+
+      - name: Upload trusted readiness evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: code-intel-ready-validation
+          path: ${{ runner.temp }}/code-intel-ready-validation/readiness-evidence.json
+          if-no-files-found: error
+          retention-days: 30

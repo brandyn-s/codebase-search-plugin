@@ -1,11 +1,13 @@
 # Codebase Search Plugin
 
-**INTEGRATED READINESS: BLOCKED**
+**INTEGRATED READINESS: READY**
 
-The exact components in the current BOM install and pass input-schema
-validation, but they cannot yet prove a coherent dual index. `/index-repo`
-therefore stops before either engine starts. Do not treat this revision as
-ready for integrated indexing or search.
+The current BOM declares the pinned components ready for coherent dual
+indexing. The committed `promotion-candidate` record is repository-controlled
+review input; on every trusted `main` revision, post-merge CI must install the
+exact pins and generate a fresh `ready-validation` record before that revision
+is accepted as runtime-validated. `/index-repo` is the integrated semantic and
+structural indexing workflow.
 
 ## Quick Start
 
@@ -19,16 +21,25 @@ bash install.sh            # Linux/Mac
 # pwsh install.ps1         # Windows (PowerShell)
 
 # 3. Set your embedding provider
-export EMBEDDING_PROVIDER="jina"            # local, free, no data leaves machine
-# OR
-export EMBEDDING_PROVIDER="voyage-context"  # best quality (needs API key)
+export EMBEDDING_PROVIDER="voyage"          # Voyage 4 Large (cloud)
 export VOYAGE_API_KEY="your-key"
+# OR, keep both indexes on-device
+unset VOYAGE_API_KEY
+export EMBEDDING_PROVIDER="jina"            # local code-search embeddings
+export CODE_GRAPH_SKIP_EMBEDDINGS=1         # disable graph cloud embeddings
 
 # 4. Install the plugin in Claude Code
 /install-plugin /path/to/codebase-search-plugin
 
-# Integrated indexing is BLOCKED for this BOM. Do not run /index-repo yet.
+# 5. Build and verify both indexes
+/index-repo /path/to/your/repo
 ```
+
+This runs both semantic and structural indexing, suppresses graph report
+writes, and verifies that both engines indexed the same unchanged checkout.
+`EMBEDDING_PROVIDER` controls code-search only. If code-graph inherits
+`VOYAGE_API_KEY`, it independently sends selected node and query text to
+Voyage unless `CODE_GRAPH_SKIP_EMBEDDINGS=1`.
 
 The install script:
 - Creates a Python venv inside the plugin directory and pip-installs code-search from GitHub
@@ -37,16 +48,16 @@ The install script:
 - Starts both installed stdio MCPs and rejects missing or schema-drifted tools before reporting success
 - No manual cloning, building, or path configuration needed
 
-> **Current compatibility block:** both pinned snapshots lack attested,
-> complete v1 `index_identity` outputs, and code-search lacks an attested
-> semantic `index_ready` output. The pinned graph release exposes
-> `skip_report`, but its runtime behavior and unchanged-checkout guarantee
-> still require separate readiness evidence. See `compatibility/README.md`.
+> **Current compatibility contract:** the BOM declares complete v1
+> `index_identity` outputs, semantic and graph readiness, and graph
+> `skip_report` support. The committed promotion candidate is supporting
+> review evidence, not a trusted run-specific attestation. Trusted post-merge
+> CI must reproduce readiness from the exact pins. See
+> `compatibility/README.md`.
 
 ## How It Works
 
-The intended ready-state design combines two different search technologies.
-The current BOM remains blocked as described above.
+The ready integrated design combines two different search technologies.
 
 ### Semantic Search (code-search)
 
@@ -63,7 +74,14 @@ The current BOM remains blocked as described above.
 
 **What it does:** Maps the *structure* of your code — which functions call which, what imports what, how modules connect. Answers questions about relationships and impact, not content.
 
-**How:** Tree-sitter parses your code into an AST, extracts symbols (functions, classes, routes, imports), and builds a knowledge graph stored in SQLite. Queries use a Cypher-like language to traverse call chains, find dead code, and calculate blast radius.
+**How:** Tree-sitter parses your code into an AST, extracts symbols (functions,
+classes, routes, imports), and builds a knowledge graph stored in SQLite. That
+structural extraction is local. When `VOYAGE_API_KEY` is present, code-graph
+also sends selected node text to Voyage during indexing and sends query text
+for embedding-backed graph searches. Set `CODE_GRAPH_SKIP_EMBEDDINGS=1` before
+launching the MCP to disable graph embedding generation. Queries use a
+Cypher-like language to traverse call chains, find dead code, and calculate
+blast radius.
 
 **When to use:**
 - "What calls processOrder?" — tracing call chains
@@ -87,34 +105,60 @@ You don't need to know which tool to use — the plugin decides based on your qu
 
 | Skill | Purpose |
 |-------|---------|
-| **`/index-repo`** | Fail closed for the current blocked BOM; future ready BOMs index both engines |
+| **`/index-repo`** | Index both engines and verify their readiness and checkout identities |
 | **`/code-explore`** | Ask natural language questions — auto-routes to the right search tool |
 
 ## Offline vs Online Embedding Models
 
 "Embedding" means converting code into numeric vectors for similarity search. The plugin supports both **online** (cloud API) and **offline** (local) models.
 
-### Online: Voyage AI (`voyage-context`)
+### Online: Voyage AI
 
-Your source code chunks are sent to Voyage AI's API (`api.voyageai.com`) over HTTPS. Voyage converts them to vectors and returns the vectors. Voyage does not store your code (per their data policy), but **your code does leave your machine** during indexing and every search query.
+For code-search, source chunks and search queries are sent to Voyage AI's API
+over HTTPS and returned as vectors. The pinned code-search revision exposes
+three distinct Voyage selectors:
 
-- Best quality (+24% on declarative config languages like Nix)
-- Requires internet connection and API key
+| Provider | Model | Current role |
+|----------|-------|--------------|
+| **`voyage`** | **`voyage-4-large`** | Default for code when `VOYAGE_API_KEY` is present |
+| `voyage-context` | `voyage-context-3` | Contextualized provider; auto-selected for documentation mode |
+| `voyage-code-3` | `voyage-code-3` | Separate legacy, non-default provider retained for older and TypeScript-specific workflows |
+
+`voyage` is not an alias for `voyage-code-3`. All three providers send code
+and query text off-device.
+
+- Requires internet connection and a Voyage API key
 - ~$0.06 per 1M tokens (~$2-5 to index a large monorepo)
 - Indexing speed limited by API rate limits (~5-10 min per 3K chunks)
 
-**Use when:** Quality matters most and your code is not restricted from leaving the network.
+Code-graph does not use `EMBEDDING_PROVIDER`, but it does independently use
+`VOYAGE_API_KEY` for optional node embeddings during indexing and for
+embedding-backed graph queries. Its default Voyage model is separate from
+code-search's provider mapping. `CODE_GRAPH_SKIP_EMBEDDINGS=1` prevents graph
+node-embedding generation even if the key is present; remove the key from the
+MCP environment to prevent all graph Voyage calls, including query embedding.
+
+**Use cloud embeddings only when:** Your code and query text are permitted to
+leave the machine.
 
 ### Offline: Jina Code Embeddings (`jina`)
 
-A 494M parameter model runs entirely on your CPU. **No data leaves your machine** — not during indexing, not during search. The model weights are downloaded once (~1GB) from HuggingFace on first use, then everything is offline.
+A 494M parameter model runs code-search embeddings entirely on your CPU. The
+model weights are downloaded once (~1GB) from HuggingFace on first use, then
+code-search embedding and query operations are local.
 
-- Matches Voyage's non-contextualized model on all languages tested
+- Historical component measurements below put Jina near or above the older
+  `voyage-code-3` run on the measured subprojects; they do not compare Jina
+  with the current `voyage-4-large` mapping
 - No API key, no internet (after first download), no cost
 - Indexing is CPU-bound (~50 min per 3K chunks without GPU)
 - Query latency ~5s vs ~1s for Voyage
 
-**Use when:** Code cannot leave the machine (security/compliance), you don't want API keys, or you're evaluating the plugin before committing to a paid provider.
+**Use when:** Code cannot leave the machine, you don't want API keys, or you're
+evaluating the plugin before committing to a paid provider. For a fully
+on-device plugin run, remove `VOYAGE_API_KEY` from code-graph's environment;
+setting `CODE_GRAPH_SKIP_EMBEDDINGS=1` additionally prevents node-embedding
+generation if a key is later inherited.
 
 ### Switching Between Providers
 
@@ -124,13 +168,13 @@ The provider is selected at **runtime** via environment variable — not at inst
 # Switch to local
 export EMBEDDING_PROVIDER="jina"
 
-# Switch to cloud
-export EMBEDDING_PROVIDER="voyage-context"
+# Switch code-search to the current cloud default
+export EMBEDDING_PROVIDER="voyage"
 export VOYAGE_API_KEY="pa-..."
 ```
 
-**Important:** On a future readiness-approved BOM, switching providers requires
-re-indexing because each provider produces incompatible vector dimensions.
+**Important:** Switching providers requires re-indexing because indexes are
+provider-specific and are not interchangeable.
 
 ## Prerequisites
 
@@ -197,55 +241,60 @@ and removes it before package builds or MCP processes start.
 
 There is currently no repository secret fallback. If the secret is absent,
 the trusted job intentionally fails; do not skip or weaken this validation.
-If a future BOM is promoted to `status: ready`, the same job invokes the
-readiness smoke generator against the just-installed MCP executables. The
-generated file stays under the isolated runner directory and must pass the
-full version, readiness, identity-shape, generation, and unchanged-checkout
-validator; neither an environment-supplied nor committed evidence fixture is
-accepted as the live CI attestation.
+Because the current BOM is `status: ready`, the same job invokes the readiness
+smoke generator against the just-installed MCP executables on every trusted
+`main` push or manual default-branch run. The fresh `ready-validation` file
+stays under the isolated runner directory and must pass the full version,
+readiness, identity-shape, generation, binding, and unchanged-checkout
+validator. The committed `promotion-candidate` record cannot substitute for
+that run-specific attestation.
 
 ## Environment Variables
 
-These control which embedding model code-search uses. Set them in your shell profile (`.bashrc`, `.zshrc`) or before launching Claude Code. They're read at runtime — you can switch providers without reinstalling.
+These control embedding behavior across the two MCPs. `EMBEDDING_PROVIDER`
+applies only to code-search. Set variables in your shell profile (`.bashrc`,
+`.zshrc`) or before launching Claude Code. They're read at runtime, so you can
+switch providers without reinstalling.
 
 **For Jina (local, free):**
 ```bash
 export EMBEDDING_PROVIDER="jina"
 ```
 
-**For Voyage AI (cloud, best quality):**
+**For Voyage AI (cloud code-search default):**
 ```bash
-export EMBEDDING_PROVIDER="voyage-context"
+export EMBEDDING_PROVIDER="voyage"
 export VOYAGE_API_KEY="pa-..."  # Get a key at https://dash.voyageai.com
 ```
 
-**If neither is set**, code-search auto-selects: `voyage-context` if `VOYAGE_API_KEY` exists, otherwise `local` (basic quality).
+**If neither is set**, code-search auto-selects `voyage` for code when
+`VOYAGE_API_KEY` exists and `local` otherwise. Documentation indexing selects
+`voyage-context` when the Voyage key exists.
 
 **All variables:**
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `EMBEDDING_PROVIDER` | No | Auto-detect | `voyage-context`, `jina`, `local` — see Model Comparison below |
-| `VOYAGE_API_KEY` | Only for Voyage | - | Voyage AI API key |
-| `LOCAL_EMBEDDING_MODEL` | No | `jinaai/jina-code-embeddings-0.5b` | HuggingFace model for `jina` provider |
+| `EMBEDDING_PROVIDER` | No | Auto-detect | code-search provider: `voyage` (Voyage 4 Large), `voyage-context`, `voyage-code-3`, `jina`, or `local` |
+| `VOYAGE_API_KEY` | Only for Voyage | - | Enables Voyage in code-search and optional Voyage embeddings in code-graph |
+| `CODE_GRAPH_SKIP_EMBEDDINGS` | No | Unset | Set to `1` or `true` to prevent code-graph from generating Voyage node embeddings even if the key is present |
+| `LOCAL_EMBEDDING_MODEL` | No | Provider-specific | HuggingFace model for `jina` or `local` provider |
 | `JINA_TRUNCATE_DIM` | No | - | Matryoshka dim truncation (0.5b: 64-896, 1.5b: 128-1536) |
 | `QUANTIZATION` | No | `int8` | FAISS index type: `int8` (4x smaller), `float32`, `binary` (32x smaller) |
 
 ## Usage
 
-### Step 1: Integrated indexing (currently blocked)
+### Step 1: Integrated indexing
 
 ```
 /index-repo /path/to/your/monorepo
 ```
 
-With the current BOM this command must return a blocked/incompatible result
-before either engine starts. It becomes an indexing workflow only after the
-BOM is promoted to `status: ready` with validated capability attestations and
-version-matched readiness evidence.
+The command indexes code-search first, verifies semantic completion, indexes
+code-graph with `skip_report=true`, and then requires both engines to report
+ready with matching complete v1 checkout identities.
 
-**Component timing reference for a future ready BOM** (3,000 chunks, typical
-single crate/package):
+**Component timing reference** (3,000 chunks, typical single crate/package):
 
 | Provider | Time | Notes |
 |----------|------|-------|
@@ -254,12 +303,12 @@ single crate/package):
 | `jina` | ~50 min (CPU) | Local, no API. First run downloads ~1GB model |
 | `local` | ~2-5 min | Local, small model, lower quality |
 
-Structural indexing (code-graph) is always local and completes in ~30-60 seconds regardless of provider.
+Code-graph's AST extraction and SQLite graph construction are local and
+typically complete in ~30-60 seconds. If `VOYAGE_API_KEY` is present and graph
+embeddings are not disabled, code-graph also sends selected node text to
+Voyage; that optional pass adds API-dependent time and cost.
 
-### Step 2: Search (after a future verified dual index)
-
-The routing below describes the intended behavior once integrated readiness is
-unblocked; it is not a claim that the current BOM produced a usable dual index.
+### Step 2: Search (after a verified dual index)
 
 | Question type | Example | What happens |
 |--------------|---------|-------------|
@@ -274,10 +323,9 @@ unblocked; it is not a claim that the current BOM produced a usable dual index.
 | **Compliance** | "What code satisfies STIG control X?" | Graph maps the control ID to code evidence |
 | **Localization** | "Where would I fix \<issue\>?" | Semantic chunk evidence is aggregated into a file-level ranking |
 
-### Step 3: Multi-repo (future ready BOM only)
+### Step 3: Multi-repo
 
-This workflow is unavailable with the current blocked BOM. Once a later BOM
-passes every readiness gate, each verified repo can be activated independently.
+Each verified repo can be activated independently.
 
 ```
 /index-repo /path/to/repo-a
@@ -289,35 +337,52 @@ passes every readiness gate, each verified repo can be activated independently.
 
 The table below predates the provenance-bound routing/evidence harness. It
 compares embedding providers inside code-search on 102 historical queries.
-This is not an integrated E2E comparative grade, does not attest the current
-blocked BOM, and must not be presented as a current live plugin result.
+This is not an integrated E2E comparative grade and must not be presented as a
+current live plugin result.
 
 | Provider | Model | MRR (Nix) | MRR (Rust svc) | MRR (Rust lib) | MRR (TypeScript) | Data leaves machine? | Cost |
 |----------|-------|-----------|----------------|----------------|------------------|---------------------|------|
 | **`voyage-context`** | voyage-context-3 | **0.723** | **0.783** | **0.861** | **0.677** | Yes | ~$0.06/1M tokens |
-| `voyage` | voyage-code-3 | 0.584 | 0.742 | 0.861 | 0.642 | Yes | ~$0.06/1M tokens |
+| historical `voyage` selector | voyage-code-3 | 0.584 | 0.742 | 0.861 | 0.642 | Yes | ~$0.06/1M tokens |
 | **`jina` (enriched)** | jina-code-embeddings-0.5b | **0.638** | 0.742 | ~0.86 | **0.660** | **No** | **Free** |
 | `jina` (baseline) | jina-code-embeddings-0.5b | 0.582 | 0.742 | ~0.86 | 0.660 | No | Free |
 | `local` | all-MiniLM-L6-v2 | ~0.35 | ~0.45 | ~0.50 | ~0.40 | No | Free |
 
 *Jina "enriched" = default mode. Prepends sibling chunk names to each chunk's header, approximating Voyage's contextualized embeddings. Enabled automatically for Jina and local providers.*
 
+At the time of this measurement, the recorded `voyage` selector resolved to
+`voyage-code-3`. That historical label is not the current `voyage` provider:
+at the pinned code-search revision, `voyage` maps to `voyage-4-large`, while
+`voyage-code-3` is a separately selected non-default provider.
+
 ### Key findings
 
-- **`voyage-context-3` is the best model** across all languages tested. Its advantage comes from embedding chunks with awareness of their file context (sibling chunks). The advantage is largest for declarative configuration languages (+24% on Nix) and smallest for self-contained libraries (0% on Rust libs).
+- **In this historical run, `voyage-context-3` led the tested models.** Its
+  advantage came from embedding chunks with awareness of their file context
+  (sibling chunks). The advantage was largest for declarative configuration
+  languages (+24% on Nix) and smallest for self-contained libraries (0% on
+  Rust libs). This result does not compare the current `voyage-4-large`
+  mapping.
 
 - **`jina-code-0.5b` with enriched headers closes 40% of the gap to Voyage** on Nix (0.582 → 0.638, reference 0.723). Enriched context is on by default — no configuration needed. It runs entirely on-device with no API calls.
 
-- **`jina` now beats `voyage-code-3`** on Nix (0.638 vs 0.584, +9.2%) and TypeScript (0.660 vs 0.642, +2.8%), while staying fully local and free.
+- **In this historical run, `jina` beat `voyage-code-3`** on Nix (0.638
+  vs 0.584, +9.2%) and TypeScript (0.660 vs 0.642, +2.8%), while running
+  locally and free of API cost.
 
-- **`voyage-code-3` has no advantage over Jina** and requires an API key + sends code to Voyage. There is no reason to use it.
+- **In this historical run, `voyage-code-3` did not outperform Jina overall**
+  and required sending code to Voyage. It remains a distinct non-default
+  selector; use current component evidence when evaluating it for a specific
+  corpus.
 
 ### Which should I use?
 
 | Situation | Recommended provider |
 |-----------|---------------------|
-| Best quality, code can be sent to Voyage AI | `voyage-context` |
-| Code must stay on-device (security/compliance) | `jina` (enriched headers close 40% of gap) |
+| Current cloud default for code | `voyage` (`voyage-4-large`) |
+| Contextualized documentation indexing | `voyage-context` |
+| Older `voyage-code-3`-specific workflow | `voyage-code-3` (explicitly; not `voyage`) |
+| Code must stay on-device (security/compliance) | `jina`, remove the graph Voyage key, and set `CODE_GRAPH_SKIP_EMBEDDINGS=1` as defense in depth |
 | Quick evaluation, don't want to set up API keys | `jina` |
 | Smallest possible index, lowest resource usage | `local` (lower quality) |
 
@@ -339,15 +404,15 @@ Set via `LOCAL_EMBEDDING_MODEL=jinaai/jina-code-embeddings-1.5b`. Both support M
 ## Lessons Learned: prototype-software-merry
 
 Practical advice from running this plugin on the Corsair monorepo (~4,800 files, 34K chunks, Rust/Nix/TypeScript/Python/HCL).
-These are historical component observations and future-workflow guidance, not
-evidence that the current BOM is integrated-ready.
+These are historical component observations and workflow guidance, not the
+readiness evidence for the current BOM.
 
 ### Index by concern, not the entire repo
 
 Indexing the entire monorepo at once produces 34K chunks. Queries compete against everything — a search for "firewall config" matches Nix modules, Rust network code, TypeScript UI components, and Terraform security groups. The results are diluted.
 
-**Future ready workflow:** Index sub-projects separately based on what you're
-working on only after the BOM block is lifted:
+**Recommended workflow:** Index sub-projects separately based on what you're
+working on:
 
 ```
 /index-repo /path/to/monorepo/nix           # NixOS system config
@@ -372,8 +437,8 @@ Our eval (102 queries, 4 languages) showed that embedding quality depends on the
 
 ### Nix-specific: use full mode for code-graph
 
-On a future ready BOM, the `/index-repo` skill handles this automatically.
-When testing code-graph directly, Nix repos require `mode: "full"`.
+The `/index-repo` skill handles this automatically. When testing code-graph
+directly, Nix repos require `mode: "full"`.
 
 ### First-time indexing is slow with Jina — incremental is fast
 
@@ -382,7 +447,10 @@ The Jina 0.5b model takes ~50 minutes to index 3K chunks on CPU (no GPU). This i
 - **Project switching**: Instant — just loads the existing index from disk.
 - **Query latency**: ~5 seconds per query on CPU.
 
-If the initial indexing time is a blocker, index during lunch or overnight. Or use Voyage for the initial index (`EMBEDDING_PROVIDER=voyage-context`), then switch to Jina for daily use once you're willing to re-index.
+If the initial indexing time is a blocker, index during lunch or overnight.
+Or use the current Voyage code provider for the initial index
+(`EMBEDDING_PROVIDER=voyage`), then switch to Jina for daily use once you're
+willing to re-index.
 
 ### The graph and semantic tools complement each other — don't use just one
 
@@ -398,8 +466,7 @@ Conversely, the graph can't answer "where is the code that handles rate limiting
 
 ### Versioned indexes for docs and release notes
 
-After a future BOM is promoted to ready, version-specific workflows can use
-isolated Git worktrees:
+Version-specific workflows can use isolated Git worktrees:
 
 ```bash
 # Create worktrees for each version you want to index
@@ -428,8 +495,8 @@ Each version gets its own isolated index. Use `switch_project` (or just ask abou
 ## Troubleshooting
 
 **"Search returns irrelevant results from wrong files"**
-- On a readiness-approved BOM, check which verified project is active. With
-  the current BOM, `/index-repo` must remain blocked.
+- Check which verified project is active and rerun `/index-repo` for a stale
+  or unverified checkout.
 
 **"Indexing seems stuck"**
 - Jina CPU indexing is genuinely slow (~1 chunk/second on CPU). Check `~/.claude_code_search/` for growing index files.
@@ -447,7 +514,12 @@ Each version gets its own isolated index. Use `switch_project` (or just ask abou
 
 ## Notes
 
-- **Incremental updates**: This is a future-ready workflow; it is unavailable
-  while the BOM status is blocked.
+- **Incremental updates**: Re-run `/index-repo`; code-search re-embeds changed
+  files and both engines must re-verify the checkout identity.
 - **Index storage**: Indexes are stored in `~/.claude_code_search/` by default. Set `CODE_SEARCH_STORAGE` to change.
-- **code-graph is fully local**: No API calls, no data leaves the machine. Only code-search uses external APIs (when using Voyage providers).
+- **code-graph privacy**: Structural extraction and SQLite storage are local.
+  With `VOYAGE_API_KEY`, code-graph can send selected node and query text to
+  Voyage for embedding-backed features. Remove the key before launching the
+  MCP to prevent all graph Voyage calls. `CODE_GRAPH_SKIP_EMBEDDINGS=1`
+  prevents node-embedding generation but does not by itself prevent query
+  embedding against a pre-existing graph index while the key remains present.

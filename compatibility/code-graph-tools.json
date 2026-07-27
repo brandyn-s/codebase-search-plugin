@@ -15,12 +15,22 @@
       "index_repository.skip_report": true
     },
     "outputs": {
-      "graph_status_ready": false,
+      "graph_status_ready": true,
       "index_identity": {
-        "fields": [],
-        "schema_version": null,
-        "supported": false
+        "fields": [
+          "repository_id",
+          "checkout_id",
+          "source_revision",
+          "dirty_fingerprint",
+          "index_generation",
+          "captured_at"
+        ],
+        "schema_version": 1,
+        "supported": true
       }
+    },
+    "side_effects": {
+      "index_repository.writes_architecture_report": true
     }
   },
   "tools": {

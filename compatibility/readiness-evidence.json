@@ -1,0 +1,44 @@
+{
+  "bom_readiness_status": "blocked",
+  "checkout_unchanged": true,
+  "components": {
+    "code-graph": {
+      "index_identity": {
+        "captured_at": "2026-07-27T03:26:27Z",
+        "checkout_id": "9598bd4dbf0123c467d9f10506e939378febb45843b2c4caeca6f004934ff418",
+        "dirty_fingerprint": "clean",
+        "index_generation": "359397699a700b987328d5cbaf47356f44f65adae7deb7d85244d356e070285d",
+        "repository_id": "9598bd4dbf0123c467d9f10506e939378febb45843b2c4caeca6f004934ff418",
+        "schema_version": 1,
+        "source_revision": "0e93610a9cd036f3614c04e5215f52972a5b82f3"
+      },
+      "status": "ready",
+      "version": "v0.7.0-redacted.2"
+    },
+    "code-search": {
+      "completion": {
+        "chunks_added": 10,
+        "error": null,
+        "files_added": 10,
+        "index_identity_status": "ready",
+        "index_ready": true,
+        "pipeline_version": "2debf8448500543d",
+        "success": true
+      },
+      "index_identity": {
+        "captured_at": "2026-07-27T03:26:26.707448Z",
+        "checkout_id": "9598bd4dbf0123c467d9f10506e939378febb45843b2c4caeca6f004934ff418",
+        "dirty_fingerprint": "clean",
+        "index_generation": "359397699a700b987328d5cbaf47356f44f65adae7deb7d85244d356e070285d",
+        "repository_id": "9598bd4dbf0123c467d9f10506e939378febb45843b2c4caeca6f004934ff418",
+        "schema_version": 1,
+        "source_revision": "0e93610a9cd036f3614c04e5215f52972a5b82f3"
+      },
+      "index_ready": true,
+      "version": "aaff0b25d608d4c4e5735974b1c6526788e579e1"
+    }
+  },
+  "evidence_mode": "promotion-candidate",
+  "producer": "scripts/generate_live_readiness_evidence.py:v2",
+  "schema_version": 1
+}

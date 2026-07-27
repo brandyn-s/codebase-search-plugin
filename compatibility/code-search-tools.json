@@ -8,16 +8,23 @@
   "schema_version": 1,
   "source": {
     "kind": "git",
-    "version": "915a4b6f2a85646bf611682577dd6251d34961c6"
+    "version": "aaff0b25d608d4c4e5735974b1c6526788e579e1"
   },
   "tested_capabilities": {
     "outputs": {
       "index_identity": {
-        "fields": [],
-        "schema_version": null,
-        "supported": false
+        "fields": [
+          "repository_id",
+          "checkout_id",
+          "source_revision",
+          "dirty_fingerprint",
+          "index_generation",
+          "captured_at"
+        ],
+        "schema_version": 1,
+        "supported": true
       },
-      "semantic_index_ready": false
+      "semantic_index_ready": true
     }
   },
   "tools": {

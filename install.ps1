@@ -13,13 +13,6 @@ if (-not (Test-Path $BomPath)) {
     Write-Host "Error: tested component BOM not found: $BomPath" -ForegroundColor Red
     exit 1
 }
-$Bom = Get-Content -Raw -Path $BomPath | ConvertFrom-Json
-$CodeSearchRepository = $Bom.components.'code-search'.install.repository
-$CodeSearchRef = $Bom.components.'code-search'.install.revision
-$GraphRepository = $Bom.components.'code-graph'.install.repository
-$ReleaseTag = $Bom.components.'code-graph'.install.tag
-$ReadinessStatus = $Bom.integrated_readiness.status
-$ReadinessReason = $Bom.integrated_readiness.reason
 
 Write-Host "=== Codebase Search Plugin Installer ===" -ForegroundColor Cyan
 Write-Host ""
@@ -29,25 +22,9 @@ $Arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "386" }
 $Platform = "windows"
 $GraphBinary = "codebase-memory-mcp.exe"
 $AssetKey = "$Platform-$Arch"
-$AssetProperty = $Bom.components.'code-graph'.install.assets.PSObject.Properties[$AssetKey]
-if (-not $AssetProperty) {
-    Write-Host "Error: BOM release asset is missing for $AssetKey." -ForegroundColor Red
-    exit 1
-}
-$AssetName = $AssetProperty.Value.name
-$ExpectedSha256 = $AssetProperty.Value.sha256
-if (-not $AssetName -or $ExpectedSha256 -notmatch '^[0-9a-fA-F]{64}$') {
-    Write-Host "Error: BOM asset name or SHA-256 is missing or invalid for $AssetKey." -ForegroundColor Red
-    exit 1
-}
 
 Write-Host "Platform: $Platform-$Arch"
 Write-Host ""
-
-# ------------------------------------------------------------------
-# 1. Install code-search (Python, pip from GitHub)
-# ------------------------------------------------------------------
-Write-Host "[1/4] Installing code-search (semantic search)..." -ForegroundColor Yellow
 
 # Find Python 3.12+
 $Python = $null
@@ -70,6 +47,52 @@ if (-not $Python) {
     Write-Host "Install Python from https://www.python.org/downloads/"
     exit 1
 }
+
+# ------------------------------------------------------------------
+# 1. Validate the plugin contract and committed readiness evidence
+# ------------------------------------------------------------------
+Write-Host "[1/5] Validating plugin contract and committed readiness evidence..." -ForegroundColor Yellow
+$SavedReadinessEvidenceOverride = $env:CODE_INTEL_READINESS_EVIDENCE_OVERRIDE
+try {
+    Remove-Item Env:CODE_INTEL_READINESS_EVIDENCE_OVERRIDE -ErrorAction SilentlyContinue
+    & $Python (Join-Path $PluginDir "scripts\validate_plugin.py")
+    $PluginValidationExitCode = $LASTEXITCODE
+} finally {
+    if ($null -eq $SavedReadinessEvidenceOverride) {
+        Remove-Item Env:CODE_INTEL_READINESS_EVIDENCE_OVERRIDE -ErrorAction SilentlyContinue
+    } else {
+        $env:CODE_INTEL_READINESS_EVIDENCE_OVERRIDE = $SavedReadinessEvidenceOverride
+    }
+}
+if ($PluginValidationExitCode -ne 0) {
+    Write-Host "Error: plugin contract validation failed." -ForegroundColor Red
+    exit $PluginValidationExitCode
+}
+Write-Host ""
+
+$Bom = Get-Content -Raw -Path $BomPath | ConvertFrom-Json
+$CodeSearchRepository = $Bom.components.'code-search'.install.repository
+$CodeSearchRef = $Bom.components.'code-search'.install.revision
+$GraphRepository = $Bom.components.'code-graph'.install.repository
+$ReleaseTag = $Bom.components.'code-graph'.install.tag
+$ReadinessStatus = $Bom.integrated_readiness.status
+$ReadinessReason = $Bom.integrated_readiness.reason
+$AssetProperty = $Bom.components.'code-graph'.install.assets.PSObject.Properties[$AssetKey]
+if (-not $AssetProperty) {
+    Write-Host "Error: BOM release asset is missing for $AssetKey." -ForegroundColor Red
+    exit 1
+}
+$AssetName = $AssetProperty.Value.name
+$ExpectedSha256 = $AssetProperty.Value.sha256
+if (-not $AssetName -or $ExpectedSha256 -notmatch '^[0-9a-fA-F]{64}$') {
+    Write-Host "Error: BOM asset name or SHA-256 is missing or invalid for $AssetKey." -ForegroundColor Red
+    exit 1
+}
+
+# ------------------------------------------------------------------
+# 2. Install code-search (Python, pip from GitHub)
+# ------------------------------------------------------------------
+Write-Host "[2/5] Installing code-search (semantic search)..." -ForegroundColor Yellow
 
 if (-not (Test-Path $VenvDir)) {
     Write-Host "  Creating virtual environment..."
@@ -104,9 +127,9 @@ Write-Host "  code-search installed."
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 2. Install code-graph (Go binary from GitHub releases)
+# 3. Install code-graph (Go binary from GitHub releases)
 # ------------------------------------------------------------------
-Write-Host "[2/4] Installing code-graph (structural analysis)..." -ForegroundColor Yellow
+Write-Host "[3/5] Installing code-graph (structural analysis)..." -ForegroundColor Yellow
 
 if (-not (Test-Path $BinDir)) {
     New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
@@ -167,9 +190,9 @@ Write-Host "  code-graph installed."
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 3. Create launcher scripts
+# 4. Create launcher scripts
 # ------------------------------------------------------------------
-Write-Host "[3/4] Creating launcher scripts..." -ForegroundColor Yellow
+Write-Host "[4/5] Creating launcher scripts..." -ForegroundColor Yellow
 
 # code-search launcher (.cmd) — .mcp.json references bin/run-code-search;
 # Windows resolves that base name to run-code-search.cmd via PATHEXT.
@@ -220,9 +243,9 @@ Write-Host "  Launchers created."
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 4. Verify the installed MCP contracts
+# 5. Verify the installed MCP contracts
 # ------------------------------------------------------------------
-Write-Host "[4/4] Validating installed MCP tool contracts..." -ForegroundColor Yellow
+Write-Host "[5/5] Validating installed MCP tool contracts..." -ForegroundColor Yellow
 $CodeSearchMcp = Join-Path $VenvDir "Scripts\code-search-mcp.exe"
 $GraphMcp = Join-Path $BinDir $GraphBinary
 & $VenvPython (Join-Path $PluginDir "scripts\validate_installed.py") `
@@ -249,8 +272,11 @@ switch ($ReadinessStatus) {
     }
     "ready" {
         Write-Host "=== INTEGRATED READINESS: READY ===" -ForegroundColor Green
-        Write-Host "Install the plugin in Claude Code and follow the verified README workflow:"
+        Write-Host "1. Install the plugin in Claude Code:"
         Write-Host "  /install-plugin $PluginDir"
+        Write-Host "2. Configure the embedding provider as described in README.md."
+        Write-Host "3. Index a repo:"
+        Write-Host "  /index-repo <repo-path>"
     }
     default {
         Write-Host "Error: unknown integrated readiness status: $ReadinessStatus" -ForegroundColor Red

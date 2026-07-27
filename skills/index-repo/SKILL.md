@@ -47,12 +47,13 @@ If no path is provided, ask the user which repo to index.
      optional string `project_path` property. It must not appear in the
      schema's `required` array. This binds final semantic verification to the
      canonical checkout without changing the active project first.
-   - The current BOM is blocked because both pinned components lack complete
-     attested v1 identity outputs, code-search lacks an attested semantic
-     `index_ready` output, and these two live schema gates are absent.
-   - The pinned current graph release does not write
-     `ARCHITECTURE_REPORT.md`, but it also lacks `skip_report`; a future
-     identity-capable build writes the report unless explicitly suppressed.
+   - The current BOM attests complete v1 identity outputs, semantic
+     `index_ready`, graph `status: ready`, optional search `project_path`, and
+     optional graph `skip_report`. Live schema fingerprint checks remain
+     mandatory because a configured host can still drift from the BOM.
+   - The pinned graph release can write `ARCHITECTURE_REPORT.md` by default.
+     Always pass `skip_report=true`; the v2 readiness gate requires its live
+     integrated run to leave the checkout unchanged.
    - If any gate fails, stop before either index starts. Do not start code-search
      or code-graph. Do not allow a graph build to write
      `ARCHITECTURE_REPORT.md`: that would change the checkout after semantic
@@ -124,13 +125,15 @@ If no path is provided, ask the user which repo to index.
    ```
    For Nix-based repos (presence of `flake.nix`, `Cargo.nix`), use `mode: "full"` — fast mode returns 0 results on Nix repos.
    Require that MCP `isError` is absent or false, the payload
-   error is absent, null, or empty, `status` is not `"degraded"`,
+   error is absent, null, or empty, `status` is absent or exactly `"ready"`
+   (explicit null, `"failed"`, `"degraded"`, or unknown values fail closed),
    `identity_status == "captured"`, and `index_identity` is a complete v1
    identity. Capture the
    non-empty `project` field for the status call; this response contract does
-   not contain a `success` field or `project_name`. A graph error, degraded
-   identity, or missing project is a partial-index failure; report semantic
-   success and graph failure, but do not claim the repository is ready.
+   not contain a `success` field or `project_name`. A graph error, explicit
+   non-ready status, degraded identity, or missing project is a partial-index
+   failure; report semantic success and graph failure, but do not claim the
+   repository is ready.
 
 6. Verify both engines independently after indexing:
    ```
@@ -138,24 +141,27 @@ If no path is provided, ask the user which repo to index.
    mcp__code-graph__index_status(project=<graph-project>)
    ```
    The semantic response must satisfy every exact gate:
-   `index_ready == true`, `index_identity_status == "ready"`, and the
-   semantic error is absent, null, or empty. Missing fields fail closed; do
-   not infer readiness from chunks, files, provider state, or a nonempty
-   identity. The graph response must report `status == "ready"`,
-   `identity_status == "captured"`, and its error must be absent, null, or
-   empty. Both responses must contain an
+   `project_path == <resolved-root>`, `index_ready == true`,
+   `index_identity_status == "ready"`, and the semantic error is absent, null, or empty.
+   The graph response must report
+   `project == <graph-project>`, `root_path == <resolved-root>`,
+   `status == "ready"`, `identity_status == "captured"`, and an error that is
+   absent, null, or empty. Missing or different binding fields fail closed;
+   do not infer readiness from chunks, files, provider state, or a nonempty
+   identity. Both responses must contain an
    `index_identity` object with `schema_version: 1` and these fields:
    `repository_id`, `checkout_id`, `source_revision`, `dirty_fingerprint`,
    `index_generation`, and `captured_at`.
 
-   Compare every identity value exactly:
+   First compare the graph completion identity with the final graph identity.
+   `repository_id`, `checkout_id`, `source_revision`, `dirty_fingerprint`, and `index_generation`
+   must match exactly. Only after that comparison passes, compare the final semantic and graph identities.
+   Require the same five stable fields to match exactly because both engines
+   indexed the same resolved local checkout.
 
-   - `repository_id`, `source_revision`, `dirty_fingerprint`, and
-     `index_generation` must be equal across both engines.
-   - `checkout_id` must also match because both engines indexed the same
-     resolved local checkout.
-   - `captured_at` must be a valid UTC RFC3339 timestamp in each envelope but
-     need not match; the engines capture at different moments.
+   - `captured_at` must be a valid UTC RFC3339 timestamp in every identity
+     envelope but need not match; each engine and response captures at its own
+     moment.
    - Legacy or missing identity fields are incompatible and therefore
      not-ready, never a successful verification.
 
@@ -186,11 +192,18 @@ If no path is provided, ask the user which repo to index.
 ## Notes
 
 - **code-search** embeds code for semantic similarity search. The embedding provider is chosen at runtime via `EMBEDDING_PROVIDER` — no key is required for local use:
-  - `jina` (default for local use) — runs on-device, no API key, no data leaves the machine. The first index of ~3K chunks takes ~50min on CPU; incremental re-indexing is fast.
-  - `voyage-context` — best quality, but sends code to Voyage AI and requires `VOYAGE_API_KEY`. ~5-10min per 3K chunks (API rate-limited).
-  - If neither is set, code-search auto-selects `voyage-context` when `VOYAGE_API_KEY` is present, otherwise a basic local model.
+  - `jina` (recommended high-quality local option) — runs on-device, no API key, no data leaves the machine. The first index of ~3K chunks takes ~50min on CPU; incremental re-indexing is fast.
+  - `voyage` — current default cloud route for code indexing; uses Voyage 4
+    Large, sends code to Voyage AI, and requires `VOYAGE_API_KEY`.
+  - `voyage-context` — contextual cloud route; sends code to Voyage AI and
+    requires `VOYAGE_API_KEY`. `voyage-code-3` is a separate legacy route.
+  - If neither is set, code indexing auto-selects `voyage` when
+    `VOYAGE_API_KEY` is present and `local` otherwise. Documentation indexing
+    selects `voyage-context` when the key is present.
   - See the plugin README for the full provider comparison.
-- **code-graph** uses local tree-sitter AST parsing (~30-60s) and never leaves the machine. When a Voyage key is configured, it also generates embeddings for natural-language search over graph nodes.
+- **code-graph** performs tree-sitter AST extraction locally (~30-60s). When
+  `VOYAGE_API_KEY` is configured, its optional natural-language graph search
+  also sends graph-node text to Voyage for embedding.
 - Both support incremental indexing — re-running only processes changed files.
 - After indexing, use natural language queries. The code-explore skill handles routing.
 

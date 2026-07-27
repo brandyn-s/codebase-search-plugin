@@ -74,6 +74,7 @@ class InstalledContractTests(unittest.TestCase):
         powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
         for installer in (shell, powershell):
             self.assertIn("component-bom.json", installer)
+            self.assertIn("validate_plugin.py", installer)
             self.assertIn("validate_installed.py", installer)
             self.assertIn("verify_code_search_revision.py", installer)
             self.assertNotIn("release list", installer)
@@ -81,6 +82,19 @@ class InstalledContractTests(unittest.TestCase):
             self.assertNotIn("Invoke-RestMethod", installer)
             self.assertNotIn(code_search_revision, installer)
             self.assertNotIn(graph_tag, installer)
+            self.assertLess(
+                installer.index("validate_plugin.py"),
+                installer.index("Installing redacted-code-search"),
+            )
+
+        self.assertIn(
+            "env -u CODE_INTEL_READINESS_EVIDENCE_OVERRIDE",
+            shell,
+        )
+        self.assertIn(
+            "Remove-Item Env:CODE_INTEL_READINESS_EVIDENCE_OVERRIDE",
+            powershell,
+        )
 
         self.assertRegex(
             powershell,
@@ -134,7 +148,10 @@ class InstalledContractTests(unittest.TestCase):
             manual,
         )
 
-    def _run_fake_contract(self, fixture_env: dict[str, str]) -> subprocess.CompletedProcess:
+    def _run_fake_contract(
+        self,
+        fixture_env: dict[str, str],
+    ) -> subprocess.CompletedProcess:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             code_search = self._wrapper(tmp_path, "code-search")

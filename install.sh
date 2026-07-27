@@ -34,11 +34,6 @@ esac
 echo "Platform: $PLATFORM-$ARCH"
 echo ""
 
-# ------------------------------------------------------------------
-# 1. Install code-search (Python, pip from GitHub)
-# ------------------------------------------------------------------
-echo "[1/4] Installing code-search (semantic search)..."
-
 # Find Python 3.12+
 PYTHON=""
 for cmd in python3 python; do
@@ -64,6 +59,14 @@ if [ ! -f "$BOM_FILE" ]; then
     echo "Error: tested component BOM not found: $BOM_FILE" >&2
     exit 1
 fi
+
+# ------------------------------------------------------------------
+# 1. Validate the plugin contract and committed readiness evidence
+# ------------------------------------------------------------------
+echo "[1/5] Validating plugin contract and committed readiness evidence..."
+env -u CODE_INTEL_READINESS_EVIDENCE_OVERRIDE \
+    "$PYTHON" "$PLUGIN_DIR/scripts/validate_plugin.py"
+echo ""
 
 # component-bom.json is the single source of truth for both installers.
 CODE_SEARCH_REPOSITORY=$("$PYTHON" -c \
@@ -97,6 +100,11 @@ if [[ ! "$EXPECTED_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
     exit 1
 fi
 
+# ------------------------------------------------------------------
+# 2. Install code-search (Python, pip from GitHub)
+# ------------------------------------------------------------------
+echo "[2/5] Installing code-search (semantic search)..."
+
 if [ ! -d "$VENV_DIR" ]; then
     echo "  Creating virtual environment..."
     "$PYTHON" -m venv "$VENV_DIR"
@@ -125,9 +133,9 @@ echo "  code-search installed."
 echo ""
 
 # ------------------------------------------------------------------
-# 2. Install code-graph (Go binary from GitHub releases)
+# 3. Install code-graph (Go binary from GitHub releases)
 # ------------------------------------------------------------------
-echo "[2/4] Installing code-graph (structural analysis)..."
+echo "[3/5] Installing code-graph (structural analysis)..."
 mkdir -p "$BIN_DIR"
 
 echo "  Tested release: $RELEASE_TAG"
@@ -193,9 +201,9 @@ echo "  code-graph installed."
 echo ""
 
 # ------------------------------------------------------------------
-# 3. Create launcher script (cross-platform wrapper)
+# 4. Create launcher script (cross-platform wrapper)
 # ------------------------------------------------------------------
-echo "[3/4] Creating launcher scripts..."
+echo "[4/5] Creating launcher scripts..."
 
 # code-search launcher — invokes the venv's Python with the MCP server
 cat > "$BIN_DIR/run-code-search" << LAUNCHER
@@ -216,9 +224,9 @@ echo "  Launchers created."
 echo ""
 
 # ------------------------------------------------------------------
-# 4. Verify the installed MCP contracts
+# 5. Verify the installed MCP contracts
 # ------------------------------------------------------------------
-echo "[4/4] Validating installed MCP tool contracts..."
+echo "[5/5] Validating installed MCP tool contracts..."
 "$VENV_PYTHON" "$PLUGIN_DIR/scripts/validate_installed.py" \
     --server "code-search=$BIN_DIR/run-code-search" \
     --server "code-graph=$BIN_DIR/$GRAPH_BINARY"
@@ -239,8 +247,11 @@ case "$READINESS_STATUS" in
         ;;
     ready)
         echo "=== INTEGRATED READINESS: READY ==="
-        echo "Install the plugin in Claude Code and follow the verified README workflow:"
+        echo "1. Install the plugin in Claude Code:"
         echo "  /install-plugin $PLUGIN_DIR"
+        echo "2. Configure the embedding provider as described in README.md."
+        echo "3. Index a repo:"
+        echo "  /index-repo <repo-path>"
         ;;
     *)
         echo "Error: unknown integrated readiness status: $READINESS_STATUS" >&2
