@@ -37,6 +37,42 @@ class ComparisonDocumentationTests(unittest.TestCase):
         self.assertIn("bench/compare/README.md", root_readme)
         self.assertIn("bench/compare/runs/", ignore)
 
+    def test_runbook_separates_local_calibration_from_future_decision_evidence(self):
+        runbook = (
+            ROOT / "bench" / "compare" / "README.md"
+        ).read_text(encoding="utf-8")
+        normalized_runbook = " ".join(runbook.split())
+
+        for phrase in (
+            "retrospective calibration and regression only",
+            "not final decision evidence",
+            "possible training overlap",
+            "license is unspecified",
+            "does not grant redistribution rights",
+            "parquet, pins, queries, patches, PR-response cache, and repository cache",
+            "remain local and uncommitted",
+            "python3 bench/compare/build_pin.py prepare-june",
+            "--github-pr-cache /absolute/operator-only/github-pr-cache",
+            "--repository-root /absolute/operator-only/repositories",
+            "--output /absolute/operator-only/locbench-june-n200.prepared.json",
+            "--quarantine-report /absolute/operator-only/locbench-june-n200.quarantine.json",
+            "10 Bug, 10 Feature, 10 Performance, and 10 Security",
+            "post-development public merged pull requests",
+            "immutable base, head, and unique merge-base",
+            "two independent reviewers",
+            "oracle remains hidden during retrieval",
+            "managed Claude.ai or keychain OAuth",
+            "does not satisfy `--bare`",
+            "`--max-budget-usd` is defense in depth only",
+            "no production trusted signature verifier",
+            "transactional broker",
+            "provider hard limit",
+            "reviewed real executor",
+            "encrypted response store",
+            "credentials and authority claims are never printed or forwarded",
+        ):
+            self.assertIn(phrase, normalized_runbook)
+
 
 if __name__ == "__main__":
     unittest.main()

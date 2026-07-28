@@ -113,15 +113,80 @@ jobs:
             throw "install.ps1 failed PowerShell AST parsing"
           }
 
+  live-control-plane:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ANTHROPIC_API_KEY: ""
+      ANTHROPIC_AUTH_TOKEN: ""
+      CLAUDE_CODE_USE_BEDROCK: ""
+      CLAUDE_CODE_USE_VERTEX: ""
+      VOYAGE_API_KEY: ""
+      AWS_ACCESS_KEY_ID: ""
+      AWS_SECRET_ACCESS_KEY: ""
+      AWS_SESSION_TOKEN: ""
+      AWS_REGION: ""
+      AWS_DEFAULT_REGION: ""
+      GOOGLE_APPLICATION_CREDENTIALS: ""
+      ANTHROPIC_VERTEX_PROJECT_ID: ""
+      CLOUD_ML_REGION: ""
+      GH_TOKEN: ""
+      GITHUB_TOKEN: ""
+      CODE_INTEL_COMPONENT_TOKEN: ""
+    steps:
+      - name: Block non-GitHub network egress
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+
+      - name: Prove the zero-cost live control plane remains inert
+        run: |
+          python3 -m unittest \
+            tests.test_compare_live_runtime \
+            tests.test_compare_provenance \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_without_authorities_reports_every_zero_cost_blocker \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_self_attested_and_unverified_signed_authorities \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_a_symlink_swapped_between_mkdir_and_open \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_a_path_swap_immediately_after_directory_open \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_a_path_swap_immediately_before_publication \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_never_clobbers_a_diagnostic_won_by_a_racer \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_removes_only_its_diagnostic_when_inventory_races_link \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_unsupported_fd_capabilities_before_writing \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_closes_directory_fd_when_evidence_hashing_fails \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_a_stale_manifest_without_writing \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_a_hardlinked_diagnostic_without_replacing_it \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_every_unexpected_preexisting_entry \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_unsafe_diagnostic_entry_types \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_normalizes_a_non_directory_run_path \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_never_overwrites_a_mismatched_existing_diagnostic \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_normalizes_an_unwritable_diagnostic_path \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_cleans_an_unsafe_new_temporary_diagnostic \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_rejects_inventory_race_during_existing_snapshot \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_reuses_its_only_exact_prior_diagnostic_without_writing \
+            tests.test_compare_run.ComparisonRunTests.test_live_preflight_refuses_a_symlink_artifact_directory \
+            tests.test_compare_documentation
+
   merge-gate:
     name: merge-gate
     if: ${{ always() }}
-    needs: [validate]
+    needs: [validate, live-control-plane]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - name: Require every deterministic validation dependency
         env:
           VALIDATE_RESULT: ${{ needs.validate.result }}
+          LIVE_CONTROL_PLANE_RESULT: ${{ needs.live-control-plane.result }}
         run: |
           test "$VALIDATE_RESULT" = "success"
+          test "$LIVE_CONTROL_PLANE_RESULT" = "success"

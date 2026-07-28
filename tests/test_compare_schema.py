@@ -2,19 +2,69 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-import json
-from pathlib import Path
-import tempfile
 import unittest
+from copy import deepcopy
+from dataclasses import replace
+from decimal import Decimal, localcontext
+from pathlib import Path
 from unittest.mock import ANY
-
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPARE = ROOT / "bench" / "compare"
 
 
 class CompareSchemaTests(unittest.TestCase):
+    def test_microdollar_round_trip_is_exact_at_low_decimal_precision(self):
+        from bench.compare.schema import usd_decimal_from_micros, usd_micros
+
+        value = Decimal("1000000000000.000001")
+        with localcontext() as context:
+            context.prec = 3
+            micros = usd_micros(
+                value,
+                "cost",
+                positive=True,
+            )
+            restored = usd_decimal_from_micros(
+                micros,
+                "cost",
+                positive=True,
+            )
+            canonical_zero = usd_decimal_from_micros(
+                0,
+                "cost",
+                positive=False,
+            )
+
+        self.assertEqual(micros, 1_000_000_000_000_000_001)
+        self.assertEqual(restored, value)
+        self.assertEqual(format(restored, "f"), "1000000000000.000001")
+        self.assertEqual(canonical_zero, Decimal("0.000000"))
+        self.assertFalse(canonical_zero.is_signed())
+
+    def test_live_usd_controls_require_exact_six_place_decimals(self):
+        from bench.compare.schema import ContractError, FrozenControls
+
+        arguments = {
+            "provider": "anthropic",
+            "model_id": "claude-opus-4-1",
+            "cli_version": "2.1.220",
+            "max_total_usd": Decimal("5.000000"),
+            "max_unit_usd": Decimal("0.010000"),
+            "calibration_sha256": "c" * 64,
+        }
+        with self.assertRaisesRegex(ContractError, "six-place"):
+            FrozenControls.live(
+                **{**arguments, "max_total_usd": Decimal("5.0")}
+            )
+
+        controls = FrozenControls.live(**arguments)
+        with self.assertRaisesRegex(ContractError, "six-place"):
+            replace(
+                controls,
+                max_unit_usd=Decimal("0.01"),
+            ).descriptor(ROOT)
+
     def test_five_arms_expose_only_their_pre_registered_read_only_tools(self):
         from bench.compare.schema import ARM_CONTRACTS, FORBIDDEN_TOOLS
 
@@ -247,9 +297,11 @@ class CompareSchemaTests(unittest.TestCase):
         ):
             mutated = deepcopy(record)
             mutated[field] = value
-            with self.subTest(field=field):
-                with self.assertRaisesRegex(ContractError, "binding"):
-                    validate_unit_binding(mutated, **expected)
+            with self.subTest(field=field), self.assertRaisesRegex(
+                ContractError,
+                "binding",
+            ):
+                validate_unit_binding(mutated, **expected)
 
 
 if __name__ == "__main__":

@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from decimal import Decimal, InvalidOperation
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
-from typing import Mapping
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from .token_accounting import tokenizer_descriptor
 
-
 SHA256 = re.compile(r"[0-9a-f]{64}")
 REVISION = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+USD_DECIMAL = re.compile(r"(?:0|[1-9]\d*)\.\d{6}")
 COMPARE_ROOT = Path(__file__).resolve().parent
 
 SEARCH_TOOLS = (
@@ -77,6 +77,11 @@ NONFINALIZABLE_ERROR_CLASSES = frozenset(
         "schema_mismatch",
     }
 )
+LIVE_RETRYABLE_ERROR_CLASSES = (
+    "provider_overloaded",
+    "rate_limited",
+    "transport_interrupted",
+)
 
 
 def scoring_policy_descriptor() -> dict:
@@ -105,6 +110,94 @@ def scoring_policy_descriptor() -> dict:
 
 class ContractError(ValueError):
     """A benchmark control, result, or pinned identity is inconsistent."""
+
+
+def canonical_usd_decimal(
+    value: object,
+    field_name: str,
+    *,
+    positive: bool,
+    serialized: bool = False,
+) -> Decimal:
+    """Validate and normalize one exact six-place USD boundary value."""
+    if serialized:
+        if not isinstance(value, str) or USD_DECIMAL.fullmatch(value) is None:
+            raise ContractError(f"{field_name} is malformed")
+        try:
+            parsed = Decimal(value)
+        except InvalidOperation as exc:
+            raise ContractError(f"{field_name} is malformed") from exc
+    else:
+        parsed = value
+    if (
+        not isinstance(parsed, Decimal)
+        or not parsed.is_finite()
+        or parsed.as_tuple().exponent != -6
+    ):
+        qualifier = "positive" if positive else "non-negative"
+        raise ContractError(
+            f"{field_name} must be an exact six-place {qualifier} decimal"
+        )
+    if parsed <= 0 if positive else parsed < 0:
+        if serialized:
+            raise ContractError(f"{field_name} is outside its bound")
+        qualifier = "positive" if positive else "non-negative"
+        raise ContractError(
+            f"{field_name} must be an exact six-place {qualifier} decimal"
+        )
+    return parsed.copy_abs() if parsed.is_zero() else parsed
+
+
+def usd_micros(
+    value: object,
+    field_name: str,
+    *,
+    positive: bool,
+    serialized: bool = False,
+) -> int:
+    """Convert one canonical six-place USD value to exact integer micros."""
+    parsed = canonical_usd_decimal(
+        value,
+        field_name,
+        positive=positive,
+        serialized=serialized,
+    )
+    digits = 0
+    for digit in parsed.as_tuple().digits:
+        digits = digits * 10 + digit
+    return -digits if parsed.is_signed() and digits else digits
+
+
+def usd_decimal_from_micros(
+    micros: object,
+    field_name: str,
+    *,
+    positive: bool,
+) -> Decimal:
+    """Convert exact integer micros to a canonical six-place USD Decimal."""
+    if isinstance(micros, bool) or not isinstance(micros, int):
+        raise ContractError(f"{field_name} microdollars must be an integer")
+    if micros <= 0 if positive else micros < 0:
+        qualifier = "positive" if positive else "non-negative"
+        raise ContractError(f"{field_name} must be {qualifier}")
+    whole, fractional = divmod(micros, 1_000_000)
+    return Decimal(f"{whole}.{fractional:06d}")
+
+
+def format_usd_decimal(
+    value: Decimal,
+    field_name: str,
+    *,
+    positive: bool,
+) -> str:
+    return format(
+        canonical_usd_decimal(
+            value,
+            field_name,
+            positive=positive,
+        ),
+        "f",
+    )
 
 
 def canonical_json(value: object) -> bytes:
@@ -155,6 +248,7 @@ HARNESS_SOURCE_FILES = (
     "bench/compare/build_fixture.py",
     "bench/compare/build_pin.py",
     "bench/compare/fixture_executor.py",
+    "bench/compare/live_runtime.py",
     "bench/compare/provenance.py",
     "bench/compare/run.py",
     "bench/compare/schema.py",
@@ -333,19 +427,57 @@ class FrozenControls:
     fresh_session: bool = True
     memory: bool = False
     cost_policy: str = "fixture_zero_cost"
-    max_total_usd: Decimal = Decimal("0")
-    max_unit_usd: Decimal = Decimal("0")
+    max_total_usd: Decimal = Decimal(0)
+    max_unit_usd: Decimal = Decimal(0)
     calibration_sha256: str | None = None
+    retry_policy: str = "fixture_no_retry"
+    max_attempts: int = 1
+    retryable_error_classes: tuple[str, ...] = ()
 
     @classmethod
-    def fixture(cls, **changes: object) -> "FrozenControls":
+    def fixture(cls, **changes: object) -> FrozenControls:
         controls = cls(
             provider="fixture",
             model_id="claude-fixture-no-live-call",
             cli_version="fixture-0",
-            temperature=Decimal("0"),
+            temperature=Decimal(0),
         )
         return replace(controls, **changes)
+
+    @classmethod
+    def live(
+        cls,
+        *,
+        provider: str,
+        model_id: str,
+        cli_version: str,
+        max_total_usd: Decimal,
+        max_unit_usd: Decimal,
+        calibration_sha256: str,
+    ) -> FrozenControls:
+        max_total_usd = canonical_usd_decimal(
+            max_total_usd,
+            "max_total_usd",
+            positive=True,
+        )
+        max_unit_usd = canonical_usd_decimal(
+            max_unit_usd,
+            "max_unit_usd",
+            positive=True,
+        )
+        return cls(
+            provider=provider,
+            model_id=model_id,
+            cli_version=cli_version,
+            temperature=Decimal(0),
+            cost_policy="authoritative_operation_bound",
+            max_total_usd=max_total_usd,
+            max_unit_usd=max_unit_usd,
+            calibration_sha256=calibration_sha256,
+            retry_policy="reconcile_before_transient_retry_v1",
+            max_attempts=2,
+            retryable_error_classes=LIVE_RETRYABLE_ERROR_CLASSES,
+        )
 
     def descriptor(self, root: Path) -> dict:
         if not all(
@@ -371,6 +503,43 @@ class FrozenControls:
             or self.memory
         ):
             raise ContractError("benchmark must use plan mode, fresh sessions, no memory")
+        if self.cost_policy == "fixture_zero_cost":
+            valid_cost = (
+                self.max_total_usd == 0
+                and self.max_unit_usd == 0
+                and self.calibration_sha256 is None
+                and self.retry_policy == "fixture_no_retry"
+                and self.max_attempts == 1
+                and self.retryable_error_classes == ()
+            )
+        elif self.cost_policy == "authoritative_operation_bound":
+            max_total_usd = format_usd_decimal(
+                self.max_total_usd,
+                "max_total_usd",
+                positive=True,
+            )
+            max_unit_usd = format_usd_decimal(
+                self.max_unit_usd,
+                "max_unit_usd",
+                positive=True,
+            )
+            valid_cost = (
+                self.max_unit_usd <= self.max_total_usd
+                and isinstance(self.calibration_sha256, str)
+                and SHA256.fullmatch(self.calibration_sha256) is not None
+                and self.retry_policy
+                == "reconcile_before_transient_retry_v1"
+                and self.max_attempts == 2
+                and self.retryable_error_classes
+                == LIVE_RETRYABLE_ERROR_CLASSES
+            )
+        else:
+            valid_cost = False
+        if not valid_cost:
+            raise ContractError("cost and retry controls are not frozen")
+        if self.cost_policy == "fixture_zero_cost":
+            max_total_usd = format(self.max_total_usd, "f")
+            max_unit_usd = format(self.max_unit_usd, "f")
         compare = root / "bench" / "compare"
         hashes = {
             "prompt": sha256_file(compare / "prompt.md"),
@@ -397,9 +566,14 @@ class FrozenControls:
             "network_tool": False,
             "cost": {
                 "policy": self.cost_policy,
-                "max_total_usd": format(self.max_total_usd, "f"),
-                "max_unit_usd": format(self.max_unit_usd, "f"),
+                "max_total_usd": max_total_usd,
+                "max_unit_usd": max_unit_usd,
                 "calibration_sha256": self.calibration_sha256,
+            },
+            "retry": {
+                "policy": self.retry_policy,
+                "max_attempts": self.max_attempts,
+                "retryable_error_classes": list(self.retryable_error_classes),
             },
             "hashes": hashes,
         }

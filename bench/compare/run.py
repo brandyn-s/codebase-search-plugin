@@ -4,14 +4,15 @@
 from __future__ import annotations
 
 import argparse
-from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -38,9 +39,9 @@ from bench.compare.provenance import (  # noqa: E402
     AUTHORITATIVE_CONSUMER,
     ProvenanceError,
     RunBundle,
-    atomic_write_json,
 )
 from bench.compare.build_pin import (  # noqa: E402
+    GitAuditBatch,
     PinError,
     validate_git_label_audit,
 )
@@ -72,6 +73,24 @@ PUBLIC_GITHUB = re.compile(
 )
 REVISION = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 ENVIRONMENT_NAME = re.compile(r"[A-Z][A-Z0-9_]*")
+JUNE_PREPARED_PIN_ID = "locbench-june-n200-prepared-v1"
+JUNE_DATASET_REVISION = "c44cf3b74e07ca642cec841b471a9939907c12a7"
+JUNE_PARQUET_SHA256 = (
+    "8df0833c2c1276c5837aab923d489ab97d7654529abe759d0f59242c4978a662"
+)
+JUNE_PARQUET_SIZE = 3_084_430
+JUNE_EXTERNAL_PIN_SHA256 = (
+    "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453"
+)
+JUNE_RECORDED_ORDER_SHA256 = (
+    "de161cf07a6310209d78e9f2e2f05ca28a21cfcdeef1b871279d39ea24d54577"
+)
+_DIR_FD_CAPABILITY_PROBES = (os.open, os.stat, os.link, os.unlink)
+_NOFOLLOW_CAPABILITY_PROBES = (os.stat, os.link)
+_LISTDIR_FD_CAPABILITY_PROBE = os.listdir
+_SECURE_IO_ERRORS = (OSError, TypeError, NotImplementedError)
+
+
 class RunnerError(ValueError):
     """The invocation, case pin, fixture, or observation is unsafe."""
 
@@ -109,6 +128,58 @@ def _safe_relative_file(value: object, context: str) -> str:
     if candidate.is_absolute() or ".." in candidate.parts or "\\" in value:
         raise RunnerError(f"{context}: unsafe repository-relative file path")
     return candidate.as_posix()
+
+
+def _validate_prepared_june_pin(pin: dict, cases: list[dict]) -> None:
+    if pin.get("pin_id") != JUNE_PREPARED_PIN_ID:
+        return
+    expected_dataset = {
+        "name": "LocBench",
+        "public": True,
+        "repository": "czlll/Loc-Bench_V1",
+        "source_revision": JUNE_DATASET_REVISION,
+        "source_path": "data/test-00000-of-00001.parquet",
+        "source_size": JUNE_PARQUET_SIZE,
+        "source_sha256": JUNE_PARQUET_SHA256,
+        "local_only": True,
+        "redistribution": "operator_local_uncommitted_artifact",
+    }
+    if set(pin) != {
+        "schema_version",
+        "pin_id",
+        "dataset",
+        "generation",
+        "label_audit",
+        "cases",
+    } or pin.get("dataset") != expected_dataset:
+        raise RunnerError("prepared June dataset contract is invalid")
+    case_ids = [
+        case.get("case_id") if isinstance(case, dict) else None
+        for case in cases
+    ]
+    if (
+        len(case_ids) != 200
+        or any(not isinstance(case_id, str) or not case_id for case_id in case_ids)
+        or len(set(case_ids)) != 200
+    ):
+        raise RunnerError("prepared June pin must contain exactly 200 ordered cases")
+    order_sha256 = hashlib.sha256(
+        ("\n".join(case_ids) + "\n").encode("utf-8")
+    ).hexdigest()
+    expected_generation = {
+        "selection": "published_external_order_v1",
+        "expected_count": 200,
+        "selected_instance_ids": case_ids,
+        "external_pin_sha256": JUNE_EXTERNAL_PIN_SHA256,
+        "recorded_order_sha256": JUNE_RECORDED_ORDER_SHA256,
+        "label_source": "locagent_evaluator_edit_functions_v1",
+        "git_provenance": "source_first_pr_comparison_v1",
+    }
+    if (
+        pin.get("generation") != expected_generation
+        or order_sha256 != JUNE_RECORDED_ORDER_SHA256
+    ):
+        raise RunnerError("prepared June generation contract is invalid")
 
 
 def _load_instrument_fixture(
@@ -280,6 +351,7 @@ def load_case_pin(
     cases = pin.get("cases")
     if not isinstance(cases, list) or not cases:
         raise RunnerError("case pin must contain cases")
+    _validate_prepared_june_pin(pin, cases)
     seen: set[str] = set()
     validated: list[dict] = []
     for index, case in enumerate(cases):
@@ -359,11 +431,13 @@ def load_case_pin(
                     f"{case_id}: pinned Git repository root is required "
                     "to verify labels"
                 )
-            try:
-                validate_git_label_audit(case, repository_root)
-            except PinError as exc:
-                raise RunnerError(f"{case_id}: {exc}") from exc
-            assert isinstance(audit, dict)
+            if (
+                not isinstance(audit, dict)
+                or not isinstance(audit.get("changed_files"), list)
+            ):
+                raise RunnerError(
+                    f"{case_id}: Git-object label audit is malformed"
+                )
         changed_files = {
             _safe_relative_file(value, f"{case_id}:changed_files")
             for value in audit["changed_files"]
@@ -378,6 +452,30 @@ def load_case_pin(
             )
         validated.append(case)
     if fixture is None:
+        assert repository_root is not None
+        cases_by_repository: dict[str, list[dict]] = {}
+        for case in validated:
+            repository_url = case["repository"]["url"]
+            repository_slug = repository_url.removeprefix(
+                "https://github.com/"
+            )
+            cases_by_repository.setdefault(repository_slug, []).append(case)
+        for repository_slug in sorted(cases_by_repository):
+            try:
+                with GitAuditBatch(
+                    repository_root,
+                    repository_slug,
+                ) as batch:
+                    for case in cases_by_repository[repository_slug]:
+                        validate_git_label_audit(
+                            case,
+                            repository_root,
+                            batch=batch,
+                        )
+            except PinError as exc:
+                raise RunnerError(
+                    f"{repository_slug}: {exc}"
+                ) from exc
         pin_audit = pin.get("label_audit")
         audit_records = {
             case["case_id"]: case["label_audit"]["audit_record_sha256"]
@@ -394,73 +492,363 @@ def load_case_pin(
     return pin, validated, pin_sha256, encoded_pin
 
 
-def _decimal_argument(value: str | None) -> Decimal | None:
-    if value is None:
-        return None
+def _require_secure_live_diagnostic_capabilities() -> tuple[int, int, int]:
+    flag_names = ("O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC")
+    flags = tuple(getattr(os, name, None) for name in flag_names)
     try:
-        parsed = Decimal(value)
-    except InvalidOperation:
-        return None
-    if not parsed.is_finite() or parsed <= 0:
-        return None
-    return parsed
+        supported = (
+            all(type(value) is int and value != 0 for value in flags)
+            and all(
+                function in os.supports_dir_fd
+                for function in _DIR_FD_CAPABILITY_PROBES
+            )
+            and all(
+                function in os.supports_follow_symlinks
+                for function in _NOFOLLOW_CAPABILITY_PROBES
+            )
+            and _LISTDIR_FD_CAPABILITY_PROBE in os.supports_fd
+        )
+    except (AttributeError, TypeError, NotImplementedError):
+        supported = False
+    if not supported:
+        raise RunnerError(
+            "secure live diagnostic publishing is unsupported on this platform"
+        )
+    return int(flags[0]), int(flags[1]), int(flags[2])
 
 
-def _valid_auth_evidence(path: Path | None, arguments: argparse.Namespace) -> bool:
-    if path is None or not path.is_file():
-        return False
-    try:
-        evidence = load_object(path)
-    except RunnerError:
-        return False
+def _stat_identity(state: os.stat_result) -> tuple[int, int]:
+    return state.st_dev, state.st_ino
+
+
+def _stable_file_state(state: os.stat_result) -> tuple[int, ...]:
     return (
-        evidence.get("schema_version") == 1
-        and evidence.get("authenticated") is True
-        and evidence.get("provider") == arguments.provider
-        and evidence.get("model_id") == arguments.model_id
-        and evidence.get("claude_cli_version") == arguments.claude_cli_version
-        and isinstance(evidence.get("captured_at"), str)
-        and bool(evidence["captured_at"])
+        state.st_dev,
+        state.st_ino,
+        state.st_mode,
+        state.st_nlink,
+        state.st_size,
+        state.st_mtime_ns,
+        state.st_ctime_ns,
     )
 
 
-def _valid_cost_evidence(
-    path: Path | None,
-    *,
-    arguments: argparse.Namespace,
-    max_total: Decimal | None,
-    max_unit: Decimal | None,
-    expected_units: int,
-) -> bool:
+def _verify_live_directory_identity(
+    run_dir: Path,
+    directory_fd: int,
+    expected_identity: tuple[int, int],
+) -> None:
+    try:
+        descriptor_state = os.fstat(directory_fd)
+        path_state = os.stat(run_dir, follow_symlinks=False)
+    except _SECURE_IO_ERRORS as exc:
+        raise RunnerError(
+            f"live artifact directory identity is unsafe or unreadable: {exc}"
+        ) from exc
     if (
-        path is None
-        or not path.is_file()
-        or arguments.calibration is None
-        or not arguments.calibration.is_file()
-        or max_total is None
-        or max_unit is None
+        not stat.S_ISDIR(descriptor_state.st_mode)
+        or not stat.S_ISDIR(path_state.st_mode)
+        or _stat_identity(descriptor_state) != expected_identity
+        or _stat_identity(path_state) != expected_identity
     ):
-        return False
+        raise RunnerError("live artifact directory identity changed unsafely")
+
+
+def _require_live_directory_inventory(
+    directory_fd: int,
+    expected_entries: set[str],
+) -> None:
     try:
-        evidence = load_object(path)
-        evidence_unit_value = evidence.get("max_unit_usd")
-        if not isinstance(evidence_unit_value, str):
-            return False
-        evidence_unit = Decimal(evidence_unit_value)
-    except (RunnerError, InvalidOperation, TypeError):
-        return False
-    return (
-        evidence.get("schema_version") == 1
-        and evidence.get("enforced") is True
-        and evidence.get("provider") == arguments.provider
-        and evidence.get("model_id") == arguments.model_id
-        and evidence.get("mechanism")
-        in {"provider_hard_limit", "transactional_budget_proxy"}
-        and evidence_unit == max_unit
-        and max_unit * expected_units <= max_total
-        and evidence.get("calibration_sha256")
-        == sha256_file(arguments.calibration)
-    )
+        actual_entries = set(os.listdir(directory_fd))
+    except _SECURE_IO_ERRORS as exc:
+        raise RunnerError(
+            f"live artifact directory inventory is unsafe or unreadable: {exc}"
+        ) from exc
+    if actual_entries != expected_entries:
+        raise RunnerError(
+            "live artifact directory contains unexpected entries"
+        )
+
+
+def _open_live_artifact_directory(
+    run_dir: Path,
+    *,
+    directory_flag: int,
+    nofollow_flag: int,
+    cloexec_flag: int,
+) -> tuple[int, tuple[int, int]]:
+    directory_fd: int | None = None
+    try:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        path_state = os.stat(run_dir, follow_symlinks=False)
+        if stat.S_ISLNK(path_state.st_mode):
+            raise RunnerError("refusing unsafe symlink live artifact directory")
+        if not stat.S_ISDIR(path_state.st_mode):
+            raise RunnerError("live artifact directory is unsafe or unreadable")
+        expected_identity = _stat_identity(path_state)
+        directory_fd = os.open(
+            run_dir,
+            os.O_RDONLY | directory_flag | nofollow_flag | cloexec_flag,
+        )
+        _verify_live_directory_identity(
+            run_dir,
+            directory_fd,
+            expected_identity,
+        )
+        return directory_fd, expected_identity
+    except RunnerError:
+        if directory_fd is not None:
+            os.close(directory_fd)
+        raise
+    except _SECURE_IO_ERRORS as exc:
+        if directory_fd is not None:
+            os.close(directory_fd)
+        raise RunnerError(
+            f"live artifact directory is unsafe or unreadable: {exc}"
+        ) from exc
+
+
+def _read_live_diagnostic_snapshot(
+    *,
+    directory_fd: int,
+    nofollow_flag: int,
+    cloexec_flag: int,
+) -> bytes:
+    name = "diagnostic.json"
+    try:
+        path_before = os.stat(
+            name,
+            dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISREG(path_before.st_mode)
+            or path_before.st_nlink != 1
+        ):
+            raise RunnerError(
+                "live artifact diagnostic must be a single-link regular file"
+            )
+        descriptor = os.open(
+            name,
+            os.O_RDONLY | nofollow_flag | cloexec_flag,
+            dir_fd=directory_fd,
+        )
+    except RunnerError:
+        raise
+    except _SECURE_IO_ERRORS as exc:
+        raise RunnerError(
+            f"live artifact diagnostic is unsafe or unreadable: {exc}"
+        ) from exc
+    try:
+        descriptor_before = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        descriptor_after = os.fstat(descriptor)
+    except _SECURE_IO_ERRORS as exc:
+        raise RunnerError(
+            f"live artifact diagnostic is unsafe or unreadable: {exc}"
+        ) from exc
+    finally:
+        os.close(descriptor)
+    try:
+        path_after = os.stat(
+            name,
+            dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+    except _SECURE_IO_ERRORS as exc:
+        raise RunnerError(
+            f"live artifact diagnostic is unsafe or unreadable: {exc}"
+        ) from exc
+    stable_states = {
+        _stable_file_state(path_before),
+        _stable_file_state(descriptor_before),
+        _stable_file_state(descriptor_after),
+        _stable_file_state(path_after),
+    }
+    if (
+        len(stable_states) != 1
+        or not stat.S_ISREG(path_after.st_mode)
+        or path_after.st_nlink != 1
+    ):
+        raise RunnerError("live artifact diagnostic changed during its snapshot")
+    return b"".join(chunks)
+
+
+def _safe_unlink_live_entry(
+    *,
+    directory_fd: int,
+    name: str,
+    expected_identity: tuple[int, int],
+) -> None:
+    try:
+        state = os.stat(
+            name,
+            dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+    except FileNotFoundError:
+        return
+    if _stat_identity(state) != expected_identity:
+        raise RunnerError("live diagnostic cleanup identity changed unsafely")
+    os.unlink(name, dir_fd=directory_fd)
+
+
+def _publish_live_diagnostic(
+    *,
+    run_dir: Path,
+    directory_fd: int,
+    directory_identity: tuple[int, int],
+    encoded: bytes,
+    nofollow_flag: int,
+    cloexec_flag: int,
+) -> None:
+    temporary_name = f".diagnostic.{secrets.token_hex(16)}.tmp"
+    temporary_identity: tuple[int, int] | None = None
+    temporary_present = False
+    published_present = False
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            temporary_name,
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | nofollow_flag
+            | cloexec_flag,
+            0o600,
+            dir_fd=directory_fd,
+        )
+        temporary_present = True
+        temporary_state = os.fstat(descriptor)
+        temporary_identity = _stat_identity(temporary_state)
+        if (
+            not stat.S_ISREG(temporary_state.st_mode)
+            or temporary_state.st_nlink != 1
+        ):
+            raise RunnerError("live diagnostic temporary file is unsafe")
+        offset = 0
+        while offset < len(encoded):
+            written = os.write(descriptor, encoded[offset:])
+            if written <= 0:
+                raise OSError("short write while creating live diagnostic")
+            offset += written
+        os.fsync(descriptor)
+        after_write = os.fstat(descriptor)
+        if (
+            _stat_identity(after_write) != temporary_identity
+            or not stat.S_ISREG(after_write.st_mode)
+            or after_write.st_nlink != 1
+            or after_write.st_size != len(encoded)
+        ):
+            raise RunnerError("live diagnostic temporary file changed unsafely")
+        os.close(descriptor)
+        descriptor = None
+
+        _verify_live_directory_identity(
+            run_dir,
+            directory_fd,
+            directory_identity,
+        )
+        _require_live_directory_inventory(
+            directory_fd,
+            {temporary_name},
+        )
+        os.link(
+            temporary_name,
+            "diagnostic.json",
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+        published_present = True
+        os.unlink(temporary_name, dir_fd=directory_fd)
+        temporary_present = False
+        _require_live_directory_inventory(
+            directory_fd,
+            {"diagnostic.json"},
+        )
+
+        published_state = os.stat(
+            "diagnostic.json",
+            dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+        if (
+            _stat_identity(published_state) != temporary_identity
+            or not stat.S_ISREG(published_state.st_mode)
+            or published_state.st_nlink != 1
+        ):
+            raise RunnerError("published live diagnostic is unsafe")
+        published_snapshot = _read_live_diagnostic_snapshot(
+            directory_fd=directory_fd,
+            nofollow_flag=nofollow_flag,
+            cloexec_flag=cloexec_flag,
+        )
+        if published_snapshot != encoded:
+            raise RunnerError("published live diagnostic content is unsafe")
+        confirmed_state = os.stat(
+            "diagnostic.json",
+            dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+        if (
+            _stat_identity(confirmed_state) != temporary_identity
+            or confirmed_state.st_nlink != 1
+            or not stat.S_ISREG(confirmed_state.st_mode)
+        ):
+            raise RunnerError("published live diagnostic identity is unsafe")
+        _verify_live_directory_identity(
+            run_dir,
+            directory_fd,
+            directory_identity,
+        )
+        os.fsync(directory_fd)
+        _verify_live_directory_identity(
+            run_dir,
+            directory_fd,
+            directory_identity,
+        )
+        _require_live_directory_inventory(
+            directory_fd,
+            {"diagnostic.json"},
+        )
+    except (*_SECURE_IO_ERRORS, RunnerError) as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        cleanup_error: OSError | TypeError | NotImplementedError | RunnerError | None = (
+            None
+        )
+        if temporary_present and temporary_identity is not None:
+            try:
+                _safe_unlink_live_entry(
+                    directory_fd=directory_fd,
+                    name=temporary_name,
+                    expected_identity=temporary_identity,
+                )
+            except (*_SECURE_IO_ERRORS, RunnerError) as cleanup_exc:
+                cleanup_error = cleanup_exc
+        if published_present and temporary_identity is not None:
+            try:
+                _safe_unlink_live_entry(
+                    directory_fd=directory_fd,
+                    name="diagnostic.json",
+                    expected_identity=temporary_identity,
+                )
+                os.fsync(directory_fd)
+            except (*_SECURE_IO_ERRORS, RunnerError) as cleanup_exc:
+                cleanup_error = cleanup_error or cleanup_exc
+        if cleanup_error is not None:
+            raise RunnerError(
+                f"cannot clean failed live diagnostic safely: {cleanup_error}"
+            ) from exc
+        if isinstance(exc, RunnerError):
+            raise
+        raise RunnerError(f"cannot write live diagnostic safely: {exc}") from exc
 
 
 def live_preflight(
@@ -470,54 +858,101 @@ def live_preflight(
     expected_units: int,
     identity_sha256: str,
 ) -> int:
-    max_total = _decimal_argument(arguments.max_total_usd)
-    max_unit = _decimal_argument(arguments.max_unit_usd)
-    reasons: list[str] = []
-    if arguments.model_id == "UNSET":
-        reasons.append("missing_model_identity")
-    if arguments.claude_cli_version == "UNSET":
-        reasons.append("missing_claude_cli_identity")
-    if not _valid_auth_evidence(arguments.auth_evidence, arguments):
-        reasons.append("missing_claude_auth_evidence")
-    if not _valid_cost_evidence(
-        arguments.cost_bound_evidence,
-        arguments=arguments,
-        max_total=max_total,
-        max_unit=max_unit,
-        expected_units=expected_units,
-    ):
-        reasons.append("missing_enforceable_cost_bound")
-    # Step 11 establishes the durable instrument. Enabling paid execution is a
-    # separate Step 13 action after authentication, calibration, and authority.
-    reasons.append("live_executor_not_enabled_in_zero_cost_build")
-    diagnostic = {
-        "schema_version": 1,
-        "status": "not_evaluated",
-        "spent_usd": "0.000000",
-        "reasons": reasons,
-        "cases_sha256": cases_sha256,
-        "component_identity_sha256": identity_sha256,
-        "expected_units": expected_units,
-        "auth_evidence_sha256": (
-            sha256_file(arguments.auth_evidence)
-            if arguments.auth_evidence is not None
-            and arguments.auth_evidence.is_file()
-            else None
-        ),
-        "cost_bound_evidence_sha256": (
-            sha256_file(arguments.cost_bound_evidence)
-            if arguments.cost_bound_evidence is not None
-            and arguments.cost_bound_evidence.is_file()
-            else None
-        ),
-    }
-    if arguments.run_dir.is_symlink():
-        raise RunnerError("refusing symlink live artifact directory")
-    if (arguments.run_dir / ".done").exists():
-        raise RunnerError("live artifact directory is already finalized")
-    arguments.run_dir.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(arguments.run_dir / "diagnostic.json", diagnostic)
-    return 2
+    run_dir = arguments.run_dir
+    directory_flag, nofollow_flag, cloexec_flag = (
+        _require_secure_live_diagnostic_capabilities()
+    )
+    directory_fd, directory_identity = _open_live_artifact_directory(
+        run_dir,
+        directory_flag=directory_flag,
+        nofollow_flag=nofollow_flag,
+        cloexec_flag=cloexec_flag,
+    )
+    try:
+        reasons = [
+            "bare_compatible_authentication_not_verified",
+            "missing_trusted_signature_verifier",
+            "missing_transactional_or_provider_cost_enforcement",
+            "missing_authorized_numeric_cap",
+            "missing_real_executor",
+            "live_executor_not_enabled_in_zero_cost_build",
+        ]
+        diagnostic = {
+            "schema_version": 1,
+            "status": "not_evaluated",
+            "spent_usd": "0.000000",
+            "reasons": reasons,
+            "cases_sha256": cases_sha256,
+            "component_identity_sha256": identity_sha256,
+            "expected_units": expected_units,
+            "auth_evidence_sha256": (
+                sha256_file(arguments.auth_evidence)
+                if arguments.auth_evidence is not None
+                and arguments.auth_evidence.is_file()
+                else None
+            ),
+            "cost_bound_evidence_sha256": (
+                sha256_file(arguments.cost_bound_evidence)
+                if arguments.cost_bound_evidence is not None
+                and arguments.cost_bound_evidence.is_file()
+                else None
+            ),
+        }
+        _verify_live_directory_identity(
+            run_dir,
+            directory_fd,
+            directory_identity,
+        )
+        try:
+            entries = tuple(os.listdir(directory_fd))
+        except _SECURE_IO_ERRORS as exc:
+            raise RunnerError(
+                f"live artifact directory is unsafe or unreadable: {exc}"
+            ) from exc
+        unexpected = sorted(
+            entry for entry in entries if entry != "diagnostic.json"
+        )
+        if unexpected:
+            raise RunnerError(
+                "live artifact directory contains unexpected pre-existing entries"
+            )
+        expected_bytes = canonical_json(diagnostic) + b"\n"
+        if entries:
+            snapshot = _read_live_diagnostic_snapshot(
+                directory_fd=directory_fd,
+                nofollow_flag=nofollow_flag,
+                cloexec_flag=cloexec_flag,
+            )
+            _verify_live_directory_identity(
+                run_dir,
+                directory_fd,
+                directory_identity,
+            )
+            if snapshot != expected_bytes:
+                raise RunnerError(
+                    "existing live diagnostic differs; refusing to overwrite it"
+                )
+            _verify_live_directory_identity(
+                run_dir,
+                directory_fd,
+                directory_identity,
+            )
+            _require_live_directory_inventory(
+                directory_fd,
+                {"diagnostic.json"},
+            )
+            return 2
+        _publish_live_diagnostic(
+            run_dir=run_dir,
+            directory_fd=directory_fd,
+            directory_identity=directory_identity,
+            encoded=expected_bytes,
+            nofollow_flag=nofollow_flag,
+            cloexec_flag=cloexec_flag,
+        )
+        return 2
+    finally:
+        os.close(directory_fd)
 
 
 def _fixture_results(

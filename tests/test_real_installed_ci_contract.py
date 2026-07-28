@@ -57,7 +57,10 @@ class RealInstalledCIContractTests(unittest.TestCase):
             workflow.split("validate-installed-components:", 1)[1],
         )
         self.assertNotIn("validate-installed-components:", pull_request_workflow)
-        self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", pull_request_workflow)
+        self.assertNotIn(
+            "secrets.CODE_INTEL_COMPONENT_TOKEN",
+            pull_request_workflow,
+        )
         self.assertNotIn("pull_request:", workflow)
 
         self.assertTrue(HELPER.is_file(), HELPER)
@@ -292,13 +295,172 @@ class RealInstalledCIContractTests(unittest.TestCase):
         merge_gate = workflow.split("merge-gate:", 1)[1]
         self.assertIn("name: merge-gate", merge_gate)
         self.assertIn("if: ${{ always() }}", merge_gate)
-        self.assertIn("needs: [validate]", merge_gate)
+        self.assertIn(
+            "needs: [validate, live-control-plane]",
+            merge_gate,
+        )
         self.assertIn(
             "VALIDATE_RESULT: ${{ needs.validate.result }}",
             merge_gate,
         )
+        self.assertIn(
+            "LIVE_CONTROL_PLANE_RESULT: ${{ needs.live-control-plane.result }}",
+            merge_gate,
+        )
         self.assertIn('test "$VALIDATE_RESULT" = "success"', merge_gate)
-        self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", workflow)
+        self.assertIn(
+            'test "$LIVE_CONTROL_PLANE_RESULT" = "success"',
+            merge_gate,
+        )
+        self.assertNotIn("secrets.CODE_INTEL_COMPONENT_TOKEN", workflow)
+
+    def test_zero_cost_live_control_plane_job_is_secret_free_and_offline(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("  live-control-plane:", workflow)
+        live_job = workflow.split("  live-control-plane:", 1)[1].split(
+            "  merge-gate:",
+            1,
+        )[0]
+
+        self.assertIn("persist-credentials: false", live_job)
+        self.assertIn("egress-policy: block", live_job)
+        allowed_endpoints = live_job.split(
+            "allowed-endpoints: >",
+            1,
+        )[1].split("\n\n", 1)[0]
+        endpoint_hosts = {
+            line.strip().rsplit(":", 1)[0]
+            for line in allowed_endpoints.splitlines()
+            if line.strip()
+        }
+        self.assertEqual(
+            endpoint_hosts,
+            {
+                "github.com",
+                "api.github.com",
+                "objects.githubusercontent.com",
+            },
+        )
+        self.assertTrue(
+            all(
+                host == "github.com"
+                or host.endswith(".github.com")
+                or host.endswith(".githubusercontent.com")
+                for host in endpoint_hosts
+            )
+        )
+        for name in (
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "VOYAGE_API_KEY",
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_SESSION_TOKEN",
+            "GOOGLE_APPLICATION_CREDENTIALS",
+            "ANTHROPIC_VERTEX_PROJECT_ID",
+            "GH_TOKEN",
+            "GITHUB_TOKEN",
+            "CODE_INTEL_COMPONENT_TOKEN",
+        ):
+            self.assertIn(f'{name}: ""', live_job)
+        for test_target in (
+            "tests.test_compare_live_runtime",
+            "tests.test_compare_provenance",
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_without_authorities_reports_every_zero_cost_blocker"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_self_attested_and_unverified_signed_authorities"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_a_symlink_swapped_between_mkdir_and_open"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_a_path_swap_immediately_after_directory_open"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_a_path_swap_immediately_before_publication"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_never_clobbers_a_diagnostic_won_by_a_racer"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_removes_only_its_diagnostic_when_inventory_races_link"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_unsupported_fd_capabilities_before_writing"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_closes_directory_fd_when_evidence_hashing_fails"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_a_stale_manifest_without_writing"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_a_hardlinked_diagnostic_without_replacing_it"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_every_unexpected_preexisting_entry"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_unsafe_diagnostic_entry_types"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_normalizes_a_non_directory_run_path"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_never_overwrites_a_mismatched_existing_diagnostic"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_normalizes_an_unwritable_diagnostic_path"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_cleans_an_unsafe_new_temporary_diagnostic"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_rejects_inventory_race_during_existing_snapshot"
+            ),
+            (
+                "tests.test_compare_run.ComparisonRunTests."
+                "test_live_preflight_reuses_its_only_exact_prior_diagnostic_without_writing"
+            ),
+            "tests.test_compare_documentation",
+        ):
+            self.assertIn(test_target, live_job)
+        for forbidden in (
+            "anthropic.com",
+            "voyageai.com",
+            "amazonaws.com",
+            "googleapis.com",
+            "/opt/anthropic/bin/claude",
+            "claude -p",
+            "python3 bench/compare/run.py",
+            "pip install",
+            "pyarrow",
+            "curl ",
+            "wget ",
+        ):
+            self.assertNotIn(forbidden, live_job)
+        self.assertNotIn("secrets.", live_job)
+        self.assertNotIn("continue-on-error", live_job)
 
     def test_load_bom_uses_the_exact_requested_candidate_path(self):
         helper = load_helper()

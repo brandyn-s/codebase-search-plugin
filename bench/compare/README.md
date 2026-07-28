@@ -143,6 +143,13 @@ exercise resume, add `--fixture-stop-after 1`, observe exit three and no
 
 ## Calibration and June references
 
+LocBench is retrospective calibration and regression only, not final decision
+evidence. Because it is a published benchmark, possible training overlap must
+be assumed for any model that may have seen its cases or derivatives. Its
+license is unspecified; public download access does not grant redistribution
+rights. The source parquet, pins, queries, patches, PR-response cache, and
+repository cache therefore remain local and uncommitted.
+
 `build_pin.py build-n40` accepts separate content-addressed public label and
 audit-evidence sources plus a local cache of the pinned public Git
 repositories. It requires the base and head commits to exist, derives the
@@ -173,26 +180,69 @@ python3 bench/compare/build_pin.py verify-june \
   --external-pin /path/to/locbench-n200-pin.json
 ```
 
-No live calibration or decision run is valid until the audited `n=40` pin and
-the published external `n=200` address both verify.
+To prepare the external June cases, keep every mutable input, cache, and output
+outside this plugin checkout. `--output` is the complete pin only when all 200
+cases verify; `--quarantine-report` is the content-free failure artifact:
+
+```bash
+python3 bench/compare/build_pin.py prepare-june \
+  --reference bench/compare/pins/locbench-june-n200.external.json \
+  --external-pin /absolute/operator-only/locbench-n200-pin.json \
+  --parquet /absolute/operator-only/test-00000-of-00001.parquet \
+  --github-pr-cache /absolute/operator-only/github-pr-cache \
+  --repository-root /absolute/operator-only/repositories \
+  --output /absolute/operator-only/locbench-june-n200.prepared.json \
+  --quarantine-report /absolute/operator-only/locbench-june-n200.quarantine.json
+```
+
+The future confirmatory decision set is a separate 40-case sample: 10 Bug, 10
+Feature, 10 Performance, and 10 Security cases drawn only from post-development
+public merged pull requests. Each case binds an immutable base, head, and unique
+merge-base, requires two independent reviewers, and the oracle remains hidden
+during retrieval. No live decision run is valid until that confirmatory pin and
+the published external `n=200` calibration address both verify.
 
 ## Live preflight and current blocker
 
-Live mode is intentionally fail-closed in this zero-cost build. It requires
-fingerprinted Claude authentication evidence, a calibration artifact, an
-explicit positive `--max-total-usd`, an exact per-unit bound, and evidence that
-the provider or a transactional proxy can enforce that bound. Merely having a
-secret does not authorize spend.
+Live mode is intentionally fail-closed in this zero-cost build. A managed
+Claude.ai or keychain OAuth session does not satisfy `--bare`; compatible
+headless authentication must be proven by a signed, operation-bound authority
+and a configured trusted verifier. The default CLI has no such verifier and
+does not interpret supplied authority claims. Consequently
+`bare_incompatible_authentication` can be reported only by a future boundary
+where a genuinely trusted verifier has accepted the signature and rejected the
+credential mode.
 
-Today the diagnostic includes
-`live_executor_not_enabled_in_zero_cost_build`, exits nonzero, records
-`status: not_evaluated` and `spent_usd: 0.000000`, and writes no `.done`.
-Enabling model calls belongs to the separately authorized calibration phase,
-after numeric spend authority and enforceable bounds exist.
+The diagnostic always reports these unresolved requirements:
+
+- `bare_compatible_authentication_not_verified`
+- `missing_trusted_signature_verifier`
+- `missing_transactional_or_provider_cost_enforcement`
+- `missing_authorized_numeric_cap`
+- `missing_real_executor`
+- `live_executor_not_enabled_in_zero_cost_build`
+
+`--max-budget-usd` is defense in depth only; it is a Claude CLI stop and not
+transactional or provider enforcement. Likewise, caller-supplied
+`--max-total-usd` and `--max-unit-usd` strings cannot create signed numeric
+authority. There is no production trusted signature verifier, transactional
+broker, provider hard limit, reviewed real executor, or encrypted response
+store in this zero-cost build.
+
+The command exits two, records `status: not_evaluated` and
+`spent_usd: 0.000000`, and writes only `diagnostic.json`: no `.done`, manifest,
+observation, error, attempt journal, or model response artifact. Enabling model
+calls belongs to a separately authorized phase after every blocker is removed
+by reviewed production dependencies.
 
 `CODE_INTEL_COMPONENT_TOKEN` is only a fetch credential for installing exact
 private release artifacts. It must never enter a child MCP or model process.
 Model and embedding credentials likewise stay outside MCP child environments,
-public logs, and public artifacts.
+public logs, and public artifacts. The diagnostic records content hashes only;
+credentials and authority claims are never printed or forwarded.
+
+The checked-in `merge-gate` depends on both deterministic workflow jobs.
+Repository branch protection is an external GitHub setting and must require
+the stable `merge-gate` check.
 
 This harness changes no production routing, indexes, or doctor behavior.
