@@ -97,7 +97,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         )
         upload_action = (
             "actions/upload-artifact@"
-            "ea165f8d65b6e75b540449e92b4886f43607fa02"
+            "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
         )
 
         self.assertIn(
@@ -108,7 +108,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
             f'--readiness-evidence-output "{output}"',
             normalized_job,
         )
-        self.assertIn(f"uses: {upload_action} # v4.6.2", real_job)
+        self.assertIn(f"uses: {upload_action} # v7.0.1", real_job)
         self.assertIn(
             "name: Validate exact installed components and live readiness",
             workflow,
