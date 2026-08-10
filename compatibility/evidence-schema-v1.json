@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://redacted.com/code-intel/evidence-schema-v1.json",
+  "title": "Code Intelligence Evidence Reference",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "repository_id",
+    "source_revision",
+    "index_generation",
+    "relative_path",
+    "start_line",
+    "end_line",
+    "evidence_type"
+  ],
+  "properties": {
+    "id": {"type": "string", "pattern": "^ev:v1:[0-9a-f]{64}$"},
+    "schema_version": {"const": 1},
+    "repository_id": {"type": "string"},
+    "source_revision": {"type": "string"},
+    "index_generation": {"type": "string"},
+    "relative_path": {"type": "string", "minLength": 1},
+    "start_line": {"type": "integer", "minimum": 0},
+    "end_line": {"type": "integer", "minimum": 0},
+    "evidence_type": {"type": "string", "minLength": 1},
+    "symbol_ref": {
+      "type": "object",
+      "required": [
+        "id",
+        "schema_version",
+        "repository_id",
+        "source_revision",
+        "relative_path",
+        "symbol_kind",
+        "qualified_name",
+        "start_line",
+        "end_line"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^sym:v1:[0-9a-f]{64}$"},
+        "schema_version": {"const": 1},
+        "repository_id": {"type": "string"},
+        "source_revision": {"type": "string"},
+        "relative_path": {"type": "string", "minLength": 1},
+        "symbol_kind": {"type": "string", "minLength": 1},
+        "qualified_name": {"type": "string", "minLength": 1},
+        "start_line": {"type": "integer", "minimum": 0},
+        "end_line": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
