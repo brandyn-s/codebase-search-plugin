@@ -35,6 +35,7 @@ Example:
 python3 bench/e2e/pilot/run.py \
   --arms native,code-search,code-graph,composed \
   --repetitions 2 \
+  --max-budget-usd 1.0 \
   --output-dir /isolated/pilot-run \
   --code-search /verified/bin/code-search-mcp \
   --code-graph /verified/bin/codebase-memory-mcp \
@@ -42,9 +43,12 @@ python3 bench/e2e/pilot/run.py \
   --local-model /verified/local-model
 ```
 
-Two repetitions over this small fixture improve stability evidence and expose
-route variance. They are still not enough for statistical rankings or a
-comparative accuracy grade.
+The preregistration records a $1.00 per-case hard ceiling. It was amended after
+the first operator attempt produced structured output but exhausted the prior
+$0.50 ceiling before the terminal result; cases, hypotheses, thresholds, and
+scoring did not change. Two repetitions over this small fixture improve
+stability evidence and expose route variance. They are still not enough for
+statistical rankings or a comparative accuracy grade.
 
 ## Run it
 

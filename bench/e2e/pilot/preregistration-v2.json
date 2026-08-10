@@ -4,6 +4,23 @@
   "decision": "wave4_1_verification_lift",
   "positioning": "verifiable_code_intelligence",
   "run_type": "bounded_operator_authorized_repeated_directional_pilot",
+  "amendments": [
+    {
+      "amended_at": "2026-08-10T19:19:23Z",
+      "scope": "operational_budget_only",
+      "trigger": "The first operator attempt produced the requested structured answer but the CLI terminated at 0.622778 USD under a 0.50 USD ceiling.",
+      "change": "Raise the per-case hard ceiling to 1.00 USD so completed structured output can reach the terminal result.",
+      "unchanged": [
+        "cases",
+        "hypotheses",
+        "activation bar",
+        "model",
+        "arms",
+        "repetitions",
+        "scoring"
+      ]
+    }
+  ],
   "scope": {
     "included": [
       "same-model comparative analysis",
@@ -31,7 +48,7 @@
       "source_revision": "9cfa8d322bc14d1a1cfab37fb4c1145653b3c601"
     },
     "plugin": {
-      "version": "0.4.3",
+      "version": "0.4.4",
       "registration_base_revision": "825b85c47279d43591095dab5e5deb0ebe02b2ba",
       "runtime_revision_binding": "copied component-bom.json plus run manifest"
     }
@@ -40,6 +57,7 @@
     "model": "sonnet",
     "fallback_model": null,
     "repetitions": 2,
+    "max_budget_usd_per_case": 1.0,
     "fresh_session_per_case": true,
     "repository_is_untrusted_evidence": true,
     "writes_and_network_tools_denied": true,

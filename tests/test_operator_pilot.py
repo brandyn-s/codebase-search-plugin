@@ -14,6 +14,7 @@ from bench.e2e.pilot.run import (
     _prompt,
     _route_satisfies,
     _routing_contract_satisfies,
+    build_parser,
     project_transcript,
 )
 
@@ -36,6 +37,20 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         ]
 
         self.assertEqual(preregistration["controls"]["repetitions"], 2)
+        self.assertEqual(
+            preregistration["controls"]["max_budget_usd_per_case"], 1.0
+        )
+        arguments = build_parser().parse_args(
+            [
+                "--output-dir",
+                "/tmp/pilot",
+                "--code-search-storage",
+                "/tmp/storage",
+                "--local-model",
+                "/tmp/model",
+            ]
+        )
+        self.assertEqual(arguments.max_budget_usd, 1.0)
         self.assertEqual(len(cases), 8)
         self.assertEqual(
             preregistration["controls"]["case_ids"],

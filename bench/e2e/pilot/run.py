@@ -769,7 +769,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--model", default="sonnet")
     parser.add_argument("--max-turns", type=int, default=8)
-    parser.add_argument("--max-budget-usd", type=float, default=0.5)
+    parser.add_argument("--max-budget-usd", type=float, default=1.0)
     parser.add_argument("--timeout-seconds", type=float, default=180.0)
     return parser
 
