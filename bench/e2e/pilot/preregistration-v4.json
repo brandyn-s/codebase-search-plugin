@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "registered_at": "2026-08-10T21:42:49Z",
+  "decision": "wave4_3_outcome_gate_confirmation",
+  "positioning": "verifiable_code_intelligence",
+  "run_type": "bounded_operator_authorized_outcome_gate_confirmation",
+  "run_id_prefix": "wave43",
+  "source_evidence": {
+    "wave4_1_run_id": "wave41-20260810T193035Z",
+    "wave4_1_manifest_sha256": "246a0301507ef62849bc8f43738a089f04f2056d95219be8a9ef3cb15c7d72f8",
+    "wave4_2_run_id": "wave42-20260810T203717Z",
+    "wave4_2_manifest_sha256": "206a8c57f08e5d882ae08c1de2faf34b898235cc70eb085a2a5c87c746d0dab6",
+    "wave4_2_summary_sha256": "520912254adbde047fd89905cd5cf32b1c36350db49ebf940de2b955bc18658a",
+    "wave4_2_recorded_result": {
+      "composed_evidence_precision": 1.0,
+      "composed_evidence_recall": 1.0,
+      "composed_routing_accuracy": 0.75,
+      "composed_routing_contract_accuracy": 1.0,
+      "composed_unsupported_claim_rate": 0.125,
+      "composed_errors": 0,
+      "composed_canary_violations": 0
+    },
+    "known_measurement_defect": "The v1 response contract overloaded claim_text as both candidate identity and asserted support, so two exact negative-candidate echoes were misclassified as unsupported claims. Wave 4.2 remains recorded as failed under its preregistered gate."
+  },
+  "scope": {
+    "included": [
+      "same eight adjudicated source-grounded cases",
+      "two fresh-session composed-arm repetitions",
+      "separate exact candidate_assertion and conditional asserted_claim fields",
+      "deterministic disposition and cross-field adjudication",
+      "outcome-first activation gates",
+      "exact directed-trace contracts where relationship semantics matter"
+    ],
+    "excluded": [
+      "rewriting or replacing the Wave 4.1 or Wave 4.2 historical result",
+      "generic route-label accuracy as an activation gate",
+      "new cases or changed ground truth",
+      "new graph or search binaries",
+      "developer platform expansion",
+      "broad most-accurate-engine or statistical superiority claims"
+    ]
+  },
+  "components": {
+    "code-search": {
+      "version": "v0.3.0",
+      "source_revision": "525368e4e0e531d677de69498be8d458ac5c48ba"
+    },
+    "code-graph": {
+      "version": "v0.8.0-redacted.2",
+      "source_revision": "9cfa8d322bc14d1a1cfab37fb4c1145653b3c601"
+    },
+    "plugin": {
+      "version": "0.4.6",
+      "registration_base_revision": "01ced90d527d03665c1b6b36524d5a1038da78b8",
+      "runtime_revision_binding": "copied component-bom.json, preregistration, raw traces, projections, summary, outcome-gate report, and run manifest"
+    }
+  },
+  "controls": {
+    "model": "sonnet",
+    "fallback_model": null,
+    "repetitions": 2,
+    "max_budget_usd_per_case": 1.0,
+    "fresh_session_per_case": true,
+    "repository_is_untrusted_evidence": true,
+    "writes_and_network_tools_denied": true,
+    "same_checkout_for_all_cases": true,
+    "objective_ground_truth": "bench/e2e/pilot/cases-v2.jsonl",
+    "case_ids": [
+      "semantic-auth",
+      "graph-callers",
+      "lexical-config",
+      "mixed-auth-flow",
+      "security-input-sink",
+      "graph-login-callers",
+      "graph-token-callees",
+      "negative-auth-bypass"
+    ],
+    "arms": [
+      "composed"
+    ]
+  },
+  "response_contract": {
+    "candidate_assertion": "always the byte-exact candidate under evaluation",
+    "disposition": "supported, not_supported, or unresolved",
+    "asserted_claim": "the byte-exact candidate only when supported; otherwise null",
+    "validation": "deterministic candidate identity, disposition, asserted-claim, and required-evidence checks"
+  },
+  "required_preconditions": {
+    "fresh_dual_index_readiness": {
+      "required": "pass",
+      "evidence": "fresh evidence showing both component indexes ready with equal repository, checkout, source, dirty-state, and generation identities"
+    },
+    "portable_proof_export_smoke": {
+      "required": "pass",
+      "evidence": "a newly exported proof packet that passes deterministic verification"
+    }
+  },
+  "outcome_gates": {
+    "arm": "composed",
+    "min_evidence_precision": 0.9,
+    "min_evidence_recall": 0.9,
+    "min_adjudication_accuracy": 1.0,
+    "max_unsupported_asserted_claim_rate": 0.0,
+    "min_routing_contract_accuracy": 1.0,
+    "max_errors": 0,
+    "max_canary_violations": 0
+  },
+  "operational_observations": [
+    "generic routing accuracy",
+    "tool calls",
+    "latency",
+    "cost"
+  ],
+  "falsifier": "Do not activate Wave 4.3 if either required precondition or any outcome gate fails. Preserve prior failed runs and stop after this one bounded confirmation rather than tuning against the fixed fixture.",
+  "interpretation_limit": "This prospective confirmation can support bounded activation of verifiable code intelligence. It cannot rewrite Wave 4.1 or Wave 4.2, establish statistical superiority, or support a broad most-accurate graph or search claim."
+}

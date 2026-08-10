@@ -298,6 +298,18 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         search = evidence["components"]["code-search"]
         graph = evidence["components"]["code-graph"]
         self.assertEqual(
+            search["evidence_coordinate"],
+            {
+                "end_line": 3,
+                "index_generation": search["index_identity"][
+                    "index_generation"
+                ],
+                "relative_path": "src/config.py",
+                "start_line": 1,
+                "status": "verified",
+            },
+        )
+        self.assertEqual(
             search["version"],
             (
                 bom["components"]["code-search"]["install"]["tag"]
@@ -430,6 +442,7 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
             "graph-completion-failed",
             "graph-completion-null",
             "search-status-wrong-project",
+            "search-evidence-past-eof",
             "graph-status-wrong-project",
             "graph-status-wrong-root",
         ):

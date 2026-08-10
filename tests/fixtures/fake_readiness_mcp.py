@@ -37,6 +37,18 @@ SEARCH_SCHEMAS = {
             }
         },
     },
+    "search_code_evidence": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "k": {"type": "integer"},
+            "search_mode": {"type": "string"},
+            "file_pattern": {"type": "string"},
+            "include_context": {"type": "boolean"},
+            "auto_reindex": {"type": "boolean"},
+        },
+        "required": ["query"],
+    },
 }
 GRAPH_SCHEMAS = {
     "index_repository": INDEX_REPOSITORY_SCHEMA,
@@ -218,6 +230,48 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
                 "index_identity_status": "ready",
                 "error": None,
                 "index_identity": identity(),
+            },
+        )
+    elif COMPONENT == "code-search" and name == "search_code_evidence":
+        assert repository is not None
+        if arguments != {
+            "query": "CODE_SEARCH_STORAGE",
+            "k": 5,
+            "search_mode": "keyword",
+            "file_pattern": "src/config.py",
+            "include_context": False,
+            "auto_reindex": False,
+        }:
+            raise RuntimeError("unexpected evidence-coordinate query")
+        search_identity = identity()
+        end_line = 4 if BEHAVIOR == "search-evidence-past-eof" else 3
+        tool_result(
+            request_id,
+            {
+                "query": "CODE_SEARCH_STORAGE",
+                "results": [
+                    {
+                        "file": "src/config.py",
+                        "lines": f"1-{end_line}",
+                        "evidence_ref": {
+                            "relative_path": "src/config.py",
+                            "start_line": 1,
+                            "end_line": end_line,
+                            "index_generation": search_identity[
+                                "index_generation"
+                            ],
+                        },
+                    }
+                ],
+                "_metadata": {
+                    "evidence_refs": {
+                        "emitted": True,
+                        "count": 1,
+                        "index_generation": search_identity[
+                            "index_generation"
+                        ],
+                    }
+                },
             },
         )
     elif COMPONENT == "code-graph" and name == "index_repository":

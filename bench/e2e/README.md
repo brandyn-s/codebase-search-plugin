@@ -69,6 +69,14 @@ The v3 file binds the primary run and its failure mass. Its composed-only result
 is a post-primary remediation confirmation, not a replacement primary run or a
 superiority claim.
 
+Wave 4.2 remains failed under that registered bar. For the prospective Wave 4.3
+decision, first verify fresh coherent dual indexes and export/verify a new
+portable proof packet, then run exactly one confirmation with
+`pilot/preregistration-v4.json`. The v4 runner writes `outcome-gates.json` and
+binds it in the manifest. It gates on evidence, adjudication, unsupported
+assertions, exact directed-trace contracts, errors, and canaries; generic route
+labels and efficiency remain nonblocking observations.
+
 ## Run it
 
 ```bash

@@ -4,13 +4,13 @@
   "components": {
     "code-graph": {
       "index_identity": {
-        "captured_at": "2026-08-10T18:49:49Z",
-        "checkout_id": "a8f6b6619c9a9c7acb1959893eb1da2a4d6858b11263bef83b76fef7b329c7ea",
+        "captured_at": "2026-08-10T22:50:57Z",
+        "checkout_id": "192e70b42700c6c72b159028043d05824f4927be531e0daa85171fea15e0163b",
         "dirty_fingerprint": "clean",
-        "index_generation": "a34f116e9e941fcccd5509395641a44373fa77aca5a878d3f4a316dac9aefbff",
-        "repository_id": "a8f6b6619c9a9c7acb1959893eb1da2a4d6858b11263bef83b76fef7b329c7ea",
+        "index_generation": "fe72792a26da774c5cd9e7f65d1a3deb712151a308029a66b2a67e7f7cd804e2",
+        "repository_id": "192e70b42700c6c72b159028043d05824f4927be531e0daa85171fea15e0163b",
         "schema_version": 1,
-        "source_revision": "e72bb5a51d6353f3d7872f24cdb5fcb6a7b94df1"
+        "source_revision": "10146ad70e34e482f2ef536192fb4b48769d1b2b"
       },
       "install_descriptor_sha256": "6dcc9483f35523e31281578a953ecbc36c8542f00f4caa913fdcf160fa0f5cf4",
       "status": "ready",
@@ -23,21 +23,28 @@
         "files_added": 11,
         "index_identity_status": "ready",
         "index_ready": true,
-        "pipeline_version": "b276d374aadeb4ff",
+        "pipeline_version": "416d1031791551d4",
         "success": true
       },
+      "evidence_coordinate": {
+        "end_line": 3,
+        "index_generation": "fe72792a26da774c5cd9e7f65d1a3deb712151a308029a66b2a67e7f7cd804e2",
+        "relative_path": "src/config.py",
+        "start_line": 1,
+        "status": "verified"
+      },
       "index_identity": {
-        "captured_at": "2026-08-10T18:49:49.165852Z",
-        "checkout_id": "a8f6b6619c9a9c7acb1959893eb1da2a4d6858b11263bef83b76fef7b329c7ea",
+        "captured_at": "2026-08-10T22:50:57.418720Z",
+        "checkout_id": "192e70b42700c6c72b159028043d05824f4927be531e0daa85171fea15e0163b",
         "dirty_fingerprint": "clean",
-        "index_generation": "a34f116e9e941fcccd5509395641a44373fa77aca5a878d3f4a316dac9aefbff",
-        "repository_id": "a8f6b6619c9a9c7acb1959893eb1da2a4d6858b11263bef83b76fef7b329c7ea",
+        "index_generation": "fe72792a26da774c5cd9e7f65d1a3deb712151a308029a66b2a67e7f7cd804e2",
+        "repository_id": "192e70b42700c6c72b159028043d05824f4927be531e0daa85171fea15e0163b",
         "schema_version": 1,
-        "source_revision": "e72bb5a51d6353f3d7872f24cdb5fcb6a7b94df1"
+        "source_revision": "10146ad70e34e482f2ef536192fb4b48769d1b2b"
       },
       "index_ready": true,
-      "install_descriptor_sha256": "d167877d4038e2deed93f0cb5a39292b1bf2d89c66924a3f72716012454e8d62",
-      "version": "v0.3.0"
+      "install_descriptor_sha256": "cc991de9f920a8e20d6c7279db8f91e8bdafd7de0d691205d7ed0b8e10cd176a",
+      "version": "v0.3.1"
     }
   },
   "evidence_mode": "promotion-candidate",

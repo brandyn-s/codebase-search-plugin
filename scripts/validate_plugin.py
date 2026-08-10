@@ -83,6 +83,7 @@ READINESS_REQUIREMENTS = {
     "code-search": {
         "completion.success": True,
         "completion.error": "empty",
+        "evidence_coordinate": "src/config.py:1-3",
         "index_ready": True,
     },
     "code-graph": {
@@ -724,7 +725,7 @@ if snapshots:
     if readiness.get("requires") != READINESS_REQUIREMENTS:
         errors.append(
             "component-bom.json: integrated_readiness.requires must preserve "
-            "every identity, status, skip_report, and evidence gate"
+            "every identity, status, skip_report, coordinate, and evidence gate"
         )
     required_identity_version = (
         readiness.get("requires", {})
@@ -967,6 +968,38 @@ if snapshots:
                 if search_evidence.get("index_ready") is not True:
                     errors.append(
                         f"{evidence_label}: code-search index_ready must be true"
+                    )
+                coordinate = search_evidence.get("evidence_coordinate")
+                search_identity_for_coordinate = search_evidence.get(
+                    "index_identity"
+                )
+                expected_generation = (
+                    search_identity_for_coordinate.get("index_generation")
+                    if isinstance(search_identity_for_coordinate, dict)
+                    else None
+                )
+                if (
+                    not isinstance(coordinate, dict)
+                    or set(coordinate)
+                    != {
+                        "status",
+                        "relative_path",
+                        "start_line",
+                        "end_line",
+                        "index_generation",
+                    }
+                    or coordinate.get("status") != "verified"
+                    or coordinate.get("relative_path") != "src/config.py"
+                    or coordinate.get("start_line") != 1
+                    or coordinate.get("end_line") != 3
+                    or not isinstance(expected_generation, str)
+                    or coordinate.get("index_generation")
+                    != expected_generation
+                ):
+                    errors.append(
+                        f"{evidence_label}: code-search evidence coordinate "
+                        "must verify src/config.py:1-3 against the indexed "
+                        "generation"
                     )
 
             graph_evidence = evidence_components.get("code-graph", {})

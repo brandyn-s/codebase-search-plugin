@@ -80,6 +80,7 @@ READINESS_REQUIREMENTS = {
     "code-search": {
         "completion.success": True,
         "completion.error": "empty",
+        "evidence_coordinate": "src/config.py:1-3",
         "index_ready": True,
     },
     "code-graph": {
@@ -240,6 +241,15 @@ class ReadinessContractTests(unittest.TestCase):
                         "code-search",
                     ),
                     "completion": {"success": True, "error": None},
+                    "evidence_coordinate": {
+                        "status": "verified",
+                        "relative_path": "src/config.py",
+                        "start_line": 1,
+                        "end_line": 3,
+                        "index_generation": identity[
+                            "index_generation"
+                        ],
+                    },
                     "index_ready": True,
                     "index_identity": deepcopy(identity),
                 },
@@ -351,6 +361,41 @@ class ReadinessContractTests(unittest.TestCase):
             completed.stdout + completed.stderr,
         )
         self.assertIn("install descriptor", completed.stdout)
+
+    def test_readiness_evidence_requires_exact_generation_bound_coordinate(self):
+        def remove_coordinate(evidence):
+            evidence["components"]["code-search"].pop(
+                "evidence_coordinate", None
+            )
+
+        def extend_past_eof(evidence):
+            evidence["components"]["code-search"]["evidence_coordinate"][
+                "end_line"
+            ] = 4
+
+        def change_generation(evidence):
+            evidence["components"]["code-search"]["evidence_coordinate"][
+                "index_generation"
+            ] = "0" * 64
+
+        for name, mutate in (
+            ("missing", remove_coordinate),
+            ("past-eof", extend_past_eof),
+            ("wrong-generation", change_generation),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                checkout = Path(tmp)
+                self._copy_checkout(checkout)
+                self._mutate_evidence(checkout, mutate)
+
+                completed = self._run_validator(checkout)
+
+                self.assertEqual(
+                    completed.returncode,
+                    1,
+                    completed.stdout + completed.stderr,
+                )
+                self.assertIn("evidence coordinate", completed.stdout)
 
     def test_live_override_requires_ready_validation_mode_and_ready_bom_status(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -14,7 +14,9 @@ from bench.e2e.pilot.run import (
     _prompt,
     _route_satisfies,
     _routing_contract_satisfies,
+    _validate_preregistered_controls,
     build_parser,
+    evaluate_outcome_gates,
     project_transcript,
 )
 
@@ -24,6 +26,60 @@ RUNNER = ROOT / "bench" / "e2e" / "pilot" / "run.py"
 
 
 class OperatorPilotAcceptanceTests(unittest.TestCase):
+    def test_preregistration_rejects_execution_control_drift(self):
+        preregistration = json.loads(
+            (
+                ROOT / "bench" / "e2e" / "pilot" / "preregistration-v4.json"
+            ).read_text()
+        )
+        arguments = SimpleNamespace(
+            arms="native",
+            case_ids=",".join(preregistration["controls"]["case_ids"]),
+            repetitions=2,
+            model="sonnet",
+            max_budget_usd=1.0,
+        )
+
+        with self.assertRaisesRegex(ValueError, "arms differ"):
+            _validate_preregistered_controls(arguments, preregistration)
+
+    def test_outcome_gates_do_not_block_on_generic_route_accuracy(self):
+        summary = {
+            "arms": {
+                "composed": {
+                    "evidence_precision": 1.0,
+                    "evidence_recall": 1.0,
+                    "adjudication_accuracy": 1.0,
+                    "unsupported_asserted_claim_rate": 0.0,
+                    "routing_contract_accuracy": 1.0,
+                    "errors": 0,
+                    "canary_violations": 0,
+                    "routing_accuracy": 0.75,
+                    "tool_calls": {"mean_per_case": 4.1875, "total": 67},
+                    "latency_ms": {"mean": 39129.75, "p95": 71174.0},
+                    "total_cost_usd": 9.1946671,
+                }
+            }
+        }
+        gates = {
+            "arm": "composed",
+            "min_evidence_precision": 0.9,
+            "min_evidence_recall": 0.9,
+            "min_adjudication_accuracy": 1.0,
+            "max_unsupported_asserted_claim_rate": 0.0,
+            "min_routing_contract_accuracy": 1.0,
+            "max_errors": 0,
+            "max_canary_violations": 0,
+        }
+
+        report = evaluate_outcome_gates(summary, gates)
+
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(
+            report["operational_metrics"]["routing_accuracy"], 0.75
+        )
+        self.assertNotIn("routing_accuracy", report["gates"])
+
     def test_v2_preregistration_binds_expanded_repeated_corpus(self):
         preregistration = json.loads(
             (ROOT / "bench" / "e2e" / "pilot" / "preregistration-v2.json").read_text()
@@ -95,6 +151,34 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         )
         self.assertIn("cannot convert", preregistration["interpretation_limit"])
 
+    def test_v4_preregistration_binds_outcome_gate_confirmation(self):
+        preregistration = json.loads(
+            (
+                ROOT / "bench" / "e2e" / "pilot" / "preregistration-v4.json"
+            ).read_text()
+        )
+
+        self.assertEqual(
+            preregistration["decision"],
+            "wave4_3_outcome_gate_confirmation",
+        )
+        self.assertEqual(preregistration["controls"]["arms"], ["composed"])
+        self.assertEqual(preregistration["controls"]["repetitions"], 2)
+        self.assertEqual(
+            preregistration["components"]["plugin"]["version"], "0.4.6"
+        )
+        self.assertEqual(
+            preregistration["source_evidence"]["wave4_2_manifest_sha256"],
+            "206a8c57f08e5d882ae08c1de2faf34b898235cc70eb085a2a5c87c746d0dab6",
+        )
+        self.assertNotIn(
+            "min_routing_accuracy", preregistration["outcome_gates"]
+        )
+        self.assertEqual(
+            preregistration["outcome_gates"]["min_adjudication_accuracy"],
+            1.0,
+        )
+
     def test_help_exposes_bounded_operator_authorized_surface(self):
         completed = subprocess.run(
             [sys.executable, str(RUNNER), "--help"],
@@ -120,7 +204,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 "events = [\n"
                 "  {'type':'system','subtype':'init','model':'claude-sonnet-5'},\n"
                 "  {'type':'assistant','message':{'content':[{'type':'tool_use','name':'mcp__code-search__search_code','input':{'query':'bearer validation'}}]}},\n"
-                "  {'type':'result','is_error':False,'duration_ms':321,'total_cost_usd':0.01,'structured_output':{'disposition':'supported','claim_text':'Bearer tokens are verified before middleware forwards the request.','evidence_ids':['src/auth/token.py:1-8','src/auth/middleware.py:1-6'],'answer':'supported','canary_violation':False}}\n"
+                "  {'type':'result','is_error':False,'duration_ms':321,'total_cost_usd':0.01,'structured_output':{'candidate_assertion':'Bearer tokens are verified before middleware forwards the request.','disposition':'supported','asserted_claim':'Bearer tokens are verified before middleware forwards the request.','evidence_ids':['src/auth/token.py:1-8','src/auth/middleware.py:1-6'],'answer':'supported','canary_violation':False}}\n"
                 "]\n"
                 "for event in events: print(json.dumps(event, separators=(',', ':')))\n",
                 encoding="utf-8",
@@ -131,6 +215,16 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             storage.mkdir()
             model = root / "model"
             model.mkdir()
+            preregistration_path = root / "preregistration-v4.json"
+            preregistration = json.loads(
+                (
+                    ROOT / "bench" / "e2e" / "pilot" / "preregistration-v4.json"
+                ).read_text()
+            )
+            preregistration["controls"]["case_ids"] = ["semantic-auth"]
+            preregistration_path.write_text(
+                json.dumps(preregistration), encoding="utf-8"
+            )
 
             completed = subprocess.run(
                 [
@@ -155,13 +249,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     "--local-model",
                     str(model),
                     "--preregistration",
-                    str(
-                        ROOT
-                        / "bench"
-                        / "e2e"
-                        / "pilot"
-                        / "preregistration-v3.json"
-                    ),
+                    str(preregistration_path),
                 ],
                 cwd=ROOT,
                 capture_output=True,
@@ -184,7 +272,12 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 (output / "raw" / "composed" / "r02" / "semantic-auth.jsonl").is_file()
             )
             self.assertTrue((output / "records.jsonl").is_file())
-            self.assertTrue((output / "preregistration-v3.json").is_file())
+            self.assertTrue((output / "pilot-runner.py").is_file())
+            self.assertTrue((output / "preregistration-v4.json").is_file())
+            self.assertEqual(
+                json.loads((output / "outcome-gates.json").read_text())["status"],
+                "pass",
+            )
             records = [
                 json.loads(line)
                 for line in (output / "records.jsonl").read_text().splitlines()
@@ -196,8 +289,9 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 manifest["artifacts"]["raw/composed/r01/semantic-auth.jsonl"],
                 hashlib.sha256(raw_path.read_bytes()).hexdigest(),
             )
-            self.assertTrue(manifest["run_id"].startswith("wave42-"))
-            self.assertIn("preregistration-v3.json", manifest["artifacts"])
+            self.assertTrue(manifest["run_id"].startswith("wave43-"))
+            self.assertIn("preregistration-v4.json", manifest["artifacts"])
+            self.assertIn("outcome-gates.json", manifest["artifacts"])
 
     def test_composed_invocation_does_not_disable_explicit_mcp(self):
         arguments = SimpleNamespace(
@@ -274,6 +368,8 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("use Read to corroborate", prompt)
         self.assertIn("every named relationship endpoint", prompt)
         self.assertIn("byte-for-byte, including terminal punctuation", prompt)
+        self.assertIn("as candidate_assertion", prompt)
+        self.assertIn("as asserted_claim", prompt)
 
     def test_explain_symbol_counts_as_graph_relationship_work(self):
         tool_calls = [
@@ -388,7 +484,7 @@ class TranscriptProjectionTests(unittest.TestCase):
         self.assertEqual(record["unsupported_claim_count"], 0)
         self.assertEqual(record["tool_calls"][0]["tool"], "mcp__code-search__search_code")
 
-    def test_scores_correct_rejection_of_false_candidate_as_supported_adjudication(self):
+    def test_scores_legacy_negative_candidate_echo_as_correct_adjudication(self):
         case = {
             "case_id": "negative-auth-bypass",
             "expected_route": "semantic",
@@ -424,7 +520,7 @@ class TranscriptProjectionTests(unittest.TestCase):
                 "total_cost_usd": 0.01,
                 "structured_output": {
                     "disposition": "not_supported",
-                    "claim_text": None,
+                    "claim_text": "Bearer tokens are forwarded without signature verification.",
                     "evidence_ids": ["src/auth/token.py:7-8"],
                     "answer": "The implementation calls signature verification.",
                     "canary_violation": False,

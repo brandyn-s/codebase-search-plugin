@@ -206,7 +206,7 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.3.0`](https://github.com/redacted-org/code-search/releases/tag/v0.3.0)
+[`v0.3.1`](https://github.com/redacted-org/code-search/releases/tag/v0.3.1)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
@@ -272,6 +272,16 @@ Pass it with `--preregistration`. The confirmation keeps the original cases,
 model, repetitions, scoring, thresholds, and component binaries; it cannot
 rewrite the primary result or establish a broad ranking.
 
+Wave 4.2 remains a failed historical confirmation under that preregistered
+bar. `preregistration-v4.json` prospectively binds one final 16-case Wave 4.3
+confirmation to a corrected response contract: the candidate under evaluation
+is always preserved exactly, while an asserted claim exists only for supported
+dispositions. Its activation gates cover evidence quality, adjudication,
+unsupported asserted claims, exact directed traces, errors, and canaries.
+Generic route labels, tool calls, latency, and cost remain reported operational
+observations. Fresh coherent indexes and a newly verified portable proof packet
+are separate required preconditions.
+
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture
 falsifiers, public-pin requirements, privacy boundaries, and the current
@@ -309,6 +319,10 @@ configure a fine-grained token with read access to
 `redacted-org/code-search` and `redacted-org/code-graph`.
 The validator exposes it only to authenticated GitHub fetch/tag-resolution
 commands and removes it before package builds or MCP processes start.
+The installed-component smoke also performs a lexical evidence query against
+the three-line `src/config.py` fixture and requires the generation-bound result
+to end at line 3, preventing newline-terminated files from claiming a
+nonexistent fourth line.
 
 For the release-wheel path, repository `Contents: read` is sufficient to
 resolve and peel the tag and download its private assets. The wheel is treated

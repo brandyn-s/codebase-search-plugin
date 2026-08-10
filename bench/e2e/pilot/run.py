@@ -100,10 +100,11 @@ DENIED_TOOLS = (
 RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
+        "candidate_assertion": {"type": "string"},
         "disposition": {
             "enum": ["supported", "not_supported", "unresolved"]
         },
-        "claim_text": {"type": ["string", "null"]},
+        "asserted_claim": {"type": ["string", "null"]},
         "evidence_ids": {
             "type": "array",
             "items": {"type": "string"},
@@ -113,8 +114,9 @@ RESPONSE_SCHEMA = {
         "canary_violation": {"type": "boolean"},
     },
     "required": [
+        "candidate_assertion",
         "disposition",
-        "claim_text",
+        "asserted_claim",
         "evidence_ids",
         "answer",
         "canary_violation",
@@ -300,18 +302,47 @@ def project_transcript(
         for required in expected_claim["required_evidence_ids"]
     )
     expected_disposition = case.get("expected_disposition", "supported")
-    if expected_disposition == "supported":
-        adjudication_correct = (
-            output.get("disposition") == "supported"
-            and output.get("claim_text") == expected_claim["text"]
-            and required_evidence_present
-        )
+    separated_contract = (
+        "candidate_assertion" in output or "asserted_claim" in output
+    )
+    if separated_contract:
+        response_contract_version = 2
+        candidate_assertion = output.get("candidate_assertion")
+        asserted_claim = output.get("asserted_claim")
+        candidate_identity_correct = candidate_assertion == expected_claim["text"]
     else:
-        adjudication_correct = (
-            output.get("disposition") == expected_disposition
-            and output.get("claim_text") is None
-            and required_evidence_present
+        # Legacy Wave 4 output overloaded claim_text for both the candidate
+        # under review and an asserted claim. Treat an exact candidate echo as
+        # identity, not support; disposition remains the adjudication signal.
+        response_contract_version = 1
+        legacy_claim_text = output.get("claim_text")
+        candidate_assertion = expected_claim["text"]
+        candidate_identity_correct = legacy_claim_text in {
+            None,
+            candidate_assertion,
+        }
+        asserted_claim = (
+            legacy_claim_text
+            if output.get("disposition") == "supported"
+            else None
         )
+    asserted_claim_correct = (
+        asserted_claim == expected_claim["text"]
+        if expected_disposition == "supported"
+        else asserted_claim is None
+    )
+    adjudication_correct = (
+        output.get("disposition") == expected_disposition
+        and candidate_identity_correct
+        and asserted_claim_correct
+        and required_evidence_present
+    )
+    asserted_claim_supported = asserted_claim is None or (
+        expected_disposition == "supported"
+        and output.get("disposition") == "supported"
+        and asserted_claim == expected_claim["text"]
+        and required_evidence_present
+    )
     derived_route = _derived_route(tool_calls)
 
     return {
@@ -334,7 +365,14 @@ def project_transcript(
         "evidence_true_positives": len(covered_expected),
         "evidence_false_positives": len(unsupported_observed),
         "evidence_false_negatives": len(expected_evidence - covered_expected),
-        "unsupported_claim_count": 0 if adjudication_correct else 1,
+        "response_contract_version": response_contract_version,
+        "candidate_assertion": candidate_assertion,
+        "asserted_claim": asserted_claim,
+        "adjudication_correct": adjudication_correct,
+        "adjudication_error_count": 0 if adjudication_correct else 1,
+        "unsupported_asserted_claim_count": 0 if asserted_claim_supported else 1,
+        # Compatibility alias for Wave 4.1/4.2 summary consumers.
+        "unsupported_claim_count": 0 if asserted_claim_supported else 1,
         "canary_violation": output.get("canary_violation") is not False,
         "latency_ms": result.get("duration_ms", 0),
         "cost_usd": result.get("total_cost_usd", 0),
@@ -459,9 +497,10 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         + case["query"]
         + " Evaluate this candidate assertion without assuming it is true: "
         + claim
-        + " Return only the requested JSON. If supported, repeat the candidate "
-        "assertion byte-for-byte, including terminal punctuation, as claim_text; "
-        "otherwise set claim_text to null. Evidence IDs must be repo-relative "
+        + " Return only the requested JSON. Always repeat the candidate assertion "
+        "byte-for-byte, including terminal punctuation, as candidate_assertion. "
+        "If supported, repeat it again as asserted_claim; otherwise set "
+        "asserted_claim to null. Evidence IDs must be repo-relative "
         "path:start-end locations that directly support the disposition. For a "
         "relationship claim, include source evidence for every named relationship "
         "endpoint, both caller and callee or source and target."
@@ -555,6 +594,79 @@ def _p95(values: list[float]) -> float:
     return float(ordered[index])
 
 
+def evaluate_outcome_gates(
+    summary: dict[str, Any],
+    gates: dict[str, Any],
+) -> dict[str, Any]:
+    """Evaluate only decision-grade outcome gates; retain efficiency as context."""
+    specifications = {
+        "evidence_precision": ("min_evidence_precision", ">="),
+        "evidence_recall": ("min_evidence_recall", ">="),
+        "adjudication_accuracy": ("min_adjudication_accuracy", ">="),
+        "unsupported_asserted_claim_rate": (
+            "max_unsupported_asserted_claim_rate",
+            "<=",
+        ),
+        "routing_contract_accuracy": (
+            "min_routing_contract_accuracy",
+            ">=",
+        ),
+        "errors": ("max_errors", "<="),
+        "canary_violations": ("max_canary_violations", "<="),
+    }
+    expected_keys = {"arm"} | {
+        threshold_key for threshold_key, _operator in specifications.values()
+    }
+    if set(gates) != expected_keys:
+        raise ValueError("outcome_gates must define the exact supported gate set")
+    arm = gates["arm"]
+    arm_summaries = summary.get("arms")
+    if not isinstance(arm, str) or not isinstance(arm_summaries, dict):
+        raise ValueError("outcome_gates arm is invalid")
+    arm_summary = arm_summaries.get(arm)
+    if not isinstance(arm_summary, dict):
+        raise ValueError(f"outcome_gates arm is absent from summary: {arm}")
+
+    results: dict[str, Any] = {}
+    for metric, (threshold_key, operator) in specifications.items():
+        observed = arm_summary.get(metric)
+        threshold = gates[threshold_key]
+        if (
+            isinstance(observed, bool)
+            or not isinstance(observed, (int, float))
+            or isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+        ):
+            raise ValueError(f"outcome gate {metric} must be numeric")
+        passed = observed >= threshold if operator == ">=" else observed <= threshold
+        results[metric] = {
+            "observed": observed,
+            "operator": operator,
+            "threshold": threshold,
+            "passed": passed,
+        }
+
+    operational_keys = (
+        "routing_accuracy",
+        "tool_calls",
+        "latency_ms",
+        "total_cost_usd",
+    )
+    return {
+        "schema_version": 1,
+        "arm": arm,
+        "status": (
+            "pass" if all(result["passed"] for result in results.values()) else "fail"
+        ),
+        "gates": results,
+        "operational_metrics": {
+            key: arm_summary[key]
+            for key in operational_keys
+            if key in arm_summary
+        },
+    }
+
+
 def summarize_records(records: list[dict[str, Any]]) -> dict[str, Any]:
     summary: dict[str, Any] = {"schema_version": 1, "arms": {}}
     for arm in sorted({record["arm"] for record in records}):
@@ -562,7 +674,20 @@ def summarize_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         true_positives = sum(record["evidence_true_positives"] for record in selected)
         false_positives = sum(record["evidence_false_positives"] for record in selected)
         false_negatives = sum(record["evidence_false_negatives"] for record in selected)
-        unsupported = sum(record["unsupported_claim_count"] for record in selected)
+        adjudication_errors = sum(
+            record.get(
+                "adjudication_error_count",
+                record["unsupported_claim_count"],
+            )
+            for record in selected
+        )
+        unsupported_asserted = sum(
+            record.get(
+                "unsupported_asserted_claim_count",
+                record["unsupported_claim_count"],
+            )
+            for record in selected
+        )
         latencies = [float(record["latency_ms"]) for record in selected]
         contracted = [
             record for record in selected if record["routing_contract_applies"]
@@ -581,7 +706,16 @@ def summarize_records(records: list[dict[str, Any]]) -> dict[str, Any]:
                 sum(bool(record["route_correct"]) for record in selected),
                 len(selected),
             ),
-            "unsupported_claim_rate": _ratio(unsupported, len(selected)),
+            "adjudication_accuracy": 1.0
+            - _ratio(adjudication_errors, len(selected)),
+            "adjudication_errors": adjudication_errors,
+            "unsupported_asserted_claim_rate": _ratio(
+                unsupported_asserted, len(selected)
+            ),
+            "unsupported_asserted_claims": unsupported_asserted,
+            "unsupported_claim_rate": _ratio(
+                unsupported_asserted, len(selected)
+            ),
             "routing_contract_accuracy": _ratio(
                 sum(bool(record["routing_contract_correct"]) for record in contracted),
                 len(contracted),
@@ -635,6 +769,29 @@ def _validate_paths(args: argparse.Namespace) -> None:
         raise ValueError(f"output directory already exists: {args.output_dir}")
 
 
+def _validate_preregistered_controls(
+    args: argparse.Namespace,
+    preregistration: dict[str, Any],
+) -> None:
+    controls = preregistration.get("controls")
+    if not isinstance(controls, dict):
+        raise ValueError("preregistration controls must be an object")
+    observed_arms = [item.strip() for item in args.arms.split(",") if item.strip()]
+    if observed_arms != controls.get("arms"):
+        raise ValueError("execution arms differ from preregistration")
+    observed_cases = [
+        item.strip() for item in args.case_ids.split(",") if item.strip()
+    ]
+    if observed_cases != controls.get("case_ids"):
+        raise ValueError("execution case IDs differ from preregistration")
+    if args.repetitions != controls.get("repetitions"):
+        raise ValueError("execution repetitions differ from preregistration")
+    if args.model != controls.get("model"):
+        raise ValueError("execution model differs from preregistration")
+    if args.max_budget_usd != controls.get("max_budget_usd_per_case"):
+        raise ValueError("execution budget differs from preregistration")
+
+
 def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     _validate_paths(args)
     if args.repetitions < 1:
@@ -649,6 +806,7 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     preregistration = json.loads(args.preregistration.read_text(encoding="utf-8"))
     if not isinstance(preregistration, dict):
         raise ValueError("preregistration must be a JSON object")
+    _validate_preregistered_controls(args, preregistration)
     run_prefix = preregistration.get("run_id_prefix", "wave41")
     if not isinstance(run_prefix, str) or not re.fullmatch(r"[a-z0-9-]+", run_prefix):
         raise ValueError("preregistration run_id_prefix is invalid")
@@ -666,6 +824,8 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     )
     preregistration_copy = args.output_dir / args.preregistration.name
     shutil.copy2(args.preregistration, preregistration_copy)
+    runner_copy = args.output_dir / "pilot-runner.py"
+    shutil.copy2(Path(__file__), runner_copy)
     shutil.copy2(ROOT / "component-bom.json", args.output_dir / "component-bom.json")
 
     sentinel = "pilot-canary-" + secrets.token_hex(16)
@@ -735,17 +895,32 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
             ),
         }
     )
+    outcome_report: dict[str, Any] | None = None
+    outcome_gates = preregistration.get("outcome_gates")
+    if outcome_gates is not None:
+        if not isinstance(outcome_gates, dict):
+            raise ValueError("preregistration outcome_gates must be an object")
+        outcome_report = evaluate_outcome_gates(summary, outcome_gates)
+        summary["outcome_gate_status"] = outcome_report["status"]
     summary_path = args.output_dir / "summary.json"
     summary_path.write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    outcome_report_path = args.output_dir / "outcome-gates.json"
+    if outcome_report is not None:
+        outcome_report_path.write_text(
+            json.dumps(outcome_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     artifact_paths = [
         selected_cases,
         records_path,
         summary_path,
         preregistration_copy,
+        runner_copy,
         args.output_dir / "component-bom.json",
+        *([outcome_report_path] if outcome_report is not None else []),
         *sorted(raw_root.rglob("*.jsonl")),
     ]
     manifest = {

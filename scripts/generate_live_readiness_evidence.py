@@ -692,6 +692,7 @@ def run_smoke(
                 "index_directory",
                 "get_indexing_progress",
                 "get_index_status",
+                "search_code_evidence",
             ):
                 if tool not in search_tools:
                     raise SmokeError(f"code-search: required tool {tool} is absent")
@@ -836,6 +837,58 @@ def run_smoke(
                 raise SmokeError(
                     "component index identities differ: " + ", ".join(mismatches)
                 )
+
+            evidence_search = search.call_tool(
+                "search_code_evidence",
+                {
+                    "query": "CODE_SEARCH_STORAGE",
+                    "k": 5,
+                    "search_mode": "keyword",
+                    "file_pattern": "src/config.py",
+                    "include_context": False,
+                    "auto_reindex": False,
+                },
+            )
+            results = evidence_search.get("results")
+            matches = (
+                [
+                    item
+                    for item in results
+                    if isinstance(item, dict)
+                    and item.get("file") == "src/config.py"
+                ]
+                if isinstance(results, list)
+                else []
+            )
+            result = matches[0] if len(matches) == 1 else {}
+            evidence_ref = result.get("evidence_ref", {})
+            refs_metadata = evidence_search.get("_metadata", {}).get(
+                "evidence_refs", {}
+            )
+            expected_generation = search_identity["index_generation"]
+            if (
+                result.get("lines") != "1-3"
+                or not isinstance(evidence_ref, dict)
+                or evidence_ref.get("relative_path") != "src/config.py"
+                or evidence_ref.get("start_line") != 1
+                or evidence_ref.get("end_line") != 3
+                or evidence_ref.get("index_generation")
+                != expected_generation
+                or not isinstance(refs_metadata, dict)
+                or refs_metadata.get("emitted") is not True
+                or refs_metadata.get("index_generation")
+                != expected_generation
+            ):
+                raise SmokeError(
+                    "code-search: exact EOF evidence coordinate check failed"
+                )
+            evidence_coordinate = {
+                "status": "verified",
+                "relative_path": "src/config.py",
+                "start_line": 1,
+                "end_line": 3,
+                "index_generation": expected_generation,
+            }
         finally:
             for client in clients.values():
                 client.close()
@@ -861,6 +914,7 @@ def run_smoke(
                     },
                     "index_ready": True,
                     "index_identity": search_identity,
+                    "evidence_coordinate": evidence_coordinate,
                 },
                 "code-graph": {
                     "version": graph_version,
