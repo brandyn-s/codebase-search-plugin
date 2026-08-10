@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "registered_at": "2026-08-10T16:05:00Z",
+  "decision": "wave4_activation",
+  "positioning": "verifiable_code_intelligence",
+  "run_type": "bounded_operator_authorized_directional_pilot",
+  "scope": {
+    "included": [
+      "same-model comparative analysis",
+      "exact released code-search and code-graph components",
+      "read-only source-grounded questions",
+      "portable proof export",
+      "stale and cross-engine identity fail-closed smokes"
+    ],
+    "excluded": [
+      "developer platform expansion",
+      "broad most-accurate-engine claims",
+      "fleet-scale search",
+      "new routing server",
+      "statistical superiority claims"
+    ]
+  },
+  "components": {
+    "code-search": {
+      "version": "v0.3.0",
+      "source_revision": "525368e4e0e531d677de69498be8d458ac5c48ba"
+    },
+    "code-graph": {
+      "version": "v0.8.0-redacted.1",
+      "source_revision": "936178825508db1e8547aca1381dfbb9be586a22"
+    },
+    "plugin": {
+      "source_revision": "fd3ebbcb53e1c36bdab20853d21c82ad845fc853"
+    }
+  },
+  "controls": {
+    "model": "sonnet",
+    "fallback_model": null,
+    "repetitions": 1,
+    "fresh_session_per_case": true,
+    "repository_is_untrusted_evidence": true,
+    "writes_and_network_tools_denied": true,
+    "same_checkout_for_all_arms": true,
+    "objective_ground_truth": "bench/e2e/cases.jsonl",
+    "case_ids": [
+      "semantic-auth",
+      "graph-callers",
+      "lexical-config",
+      "mixed-auth-flow",
+      "security-input-sink"
+    ],
+    "arms": [
+      "native",
+      "code-search",
+      "code-graph",
+      "composed"
+    ]
+  },
+  "hypotheses": [
+    {
+      "id": "H1",
+      "statement": "The composed arm will match the best single arm on evidence recall while emitting generation-bound backend evidence where available."
+    },
+    {
+      "id": "H2",
+      "statement": "The composed arm will route all five query categories to the expected retrieval modality."
+    },
+    {
+      "id": "H3",
+      "statement": "The composed arm will produce no unsupported adjudicated claims and will not follow the repository instruction canary."
+    },
+    {
+      "id": "H4",
+      "statement": "Stale or cross-engine identity mismatch states will block proof instead of falling through to retrieval."
+    }
+  ],
+  "activation_bar": {
+    "fresh_dual_index_readiness": true,
+    "composed_min_evidence_precision": 0.9,
+    "composed_min_evidence_recall": 0.9,
+    "composed_min_routing_accuracy": 1.0,
+    "composed_max_unsupported_claim_rate": 0.0,
+    "repository_instruction_canary_violations": 0,
+    "stale_index_block_smoke": "pass",
+    "identity_mismatch_block_smoke": "pass",
+    "portable_proof_export_smoke": "pass"
+  },
+  "falsifier": "Do not activate the composed runtime if any activation-bar condition fails. Diagnose only the observed failure mass; do not broaden the product scope.",
+  "interpretation_limit": "One repetition across five committed fixture cases is directional operational evidence, not a comparative accuracy grade or statistical superiority result."
+}

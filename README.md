@@ -1,4 +1,11 @@
-# Codebase Search Plugin
+# Verifiable Code Intelligence Plugin
+
+This plugin combines semantic discovery and structural analysis behind three
+stable primitives: **FIND**, **UNDERSTAND**, and **PROVE**. Its differentiator
+is not an unbounded accuracy claim. It is an evidence contract: coherent
+indexes for one exact checkout, generation-bound references, explicit
+contradiction and coverage checks, and deterministic proof verdicts that can
+be exported and independently verified.
 
 **INTEGRATED READINESS: READY**
 
@@ -248,10 +255,34 @@ The bundled runs validate the fixture and CI gate only; they are explicitly
 not live performance results or comparative grades. See
 `bench/e2e/README.md` for the JSONL contract and live-run workflow.
 
+`bench/e2e/pilot/run.py` is the bounded operator runner used for a real
+four-arm smoke: native tools, code-search, code-graph, and the composed
+workflow. Its committed preregistration fixes the five cases, scoring rules,
+model alias, and activation bar before execution. Each run preserves raw model
+transcripts, scored projections, the exact component BOM, and SHA-256 bindings
+for every artifact. A one-repetition fixture pilot is directional operational
+evidence only; it is not a statistical superiority or broad accuracy claim.
+
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture
 falsifiers, public-pin requirements, privacy boundaries, and the current
 fail-closed live-preflight status.
+
+### Portable proof packets
+
+After `proof_evaluator.py` accepts a proof bundle, export a deterministic
+packet containing the canonical bundle, evaluator result, concise Markdown
+report, and content-addressed manifest:
+
+```bash
+python3 scripts/export_proof.py export proof-bundle.json \
+  --output-dir proof-packet
+python3 scripts/export_proof.py verify proof-packet
+```
+
+Verification recomputes every artifact digest and reruns the deterministic
+evaluator. A changed bundle, result, report, manifest, or evaluator outcome is
+rejected.
 
 ## Trusted component validation
 
@@ -518,9 +549,15 @@ Common mistake: using only semantic search ("find the auth code") and ignoring t
 - **"Is this function dead code?"** → Graph checks for zero inbound calls
 - **"What's the dependency chain from main() to this handler?"** → Graph traces the call path
 
-Conversely, the graph can't answer "where is the code that handles rate limiting?" — that requires understanding *meaning*, which is what semantic search does.
+Conversely, semantic retrieval is the preferred first step for a conceptual
+question such as "where is the code that handles rate limiting?" Graph text
+search can corroborate it, but it is not a substitute for the semantic FIND
+route.
 
-**Best workflow:** Start with semantic search to *find* relevant code, then use graph queries to *understand* how it connects.
+**Best workflow:** Start with semantic search when the structural target is not
+yet known, then use graph queries to *understand* how it connects. If the user
+already names an exact symbol and asks only for callers or dependencies, go
+directly to the narrowest graph relationship tool.
 
 ### Versioned indexes for docs and release notes
 

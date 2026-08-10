@@ -10,6 +10,38 @@ pipeline. They are synthetic fixtures, **not live benchmark results** and not
 evidence that this plugin outperforms another tool. Merely changing
 `"run_mode"` to `"live"` is rejected.
 
+## Bounded operator pilot
+
+`pilot/run.py` executes five committed content cases across native,
+code-search, code-graph, and composed arms. Read
+`pilot/preregistration-v1.json` before running it: the cases, route contract,
+scoring rules, model alias, and activation bar are fixed there. The runner
+requires exact local component executables, an existing code-search storage
+directory, and an existing local embedding model. It denies mutation and
+network tools inside the evaluated sessions.
+
+Every run writes raw JSONL transcripts, objective case records, a summary, the
+selected cases, the preregistration, and the component BOM. `manifest.json`
+binds all of them—including every raw transcript—with SHA-256. Operator runs
+are intentionally not bundled in this repository because they contain
+host-specific paths and full model/tool traces. Preserve the complete output
+directory when citing a result.
+
+Example:
+
+```bash
+python3 bench/e2e/pilot/run.py \
+  --arms native,code-search,code-graph,composed \
+  --output-dir /isolated/pilot-run \
+  --code-search /verified/bin/code-search-mcp \
+  --code-graph /verified/bin/codebase-memory-mcp \
+  --code-search-storage /isolated/search-storage \
+  --local-model /verified/local-model
+```
+
+One repetition over this small fixture is useful for smoke and falsification,
+not for statistical rankings or a comparative accuracy grade.
+
 ## Run it
 
 ```bash

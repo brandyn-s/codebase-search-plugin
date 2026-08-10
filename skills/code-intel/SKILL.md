@@ -14,6 +14,26 @@ Use three public primitives. Do not expose backend selection as a user concern.
 Preserve the existing cross-engine index-identity checks before combining
 results from code-search and code-graph.
 
+## Route selection
+
+Classify the question before calling tools. Use the first matching route:
+
+1. An explicit source-to-sink, trust-boundary, or security-path question uses
+   graph security/relationship tools.
+2. An exact identifier, config key, or literal-location question uses
+   `mcp__code-search__search_code` with `search_mode="keyword"`.
+3. A question combining conceptual explanation with callers or relationships
+   uses code-search semantic/default retrieval first, then the narrowest graph
+   relationship tool. An explicit symbol does not waive this mixed route when
+   explanation and relationship are both requested.
+4. A callers-only or relationship-only question with an explicit symbol uses
+   the narrowest graph tool directly.
+5. Other conceptual behavior questions use code-search semantic/default
+   retrieval.
+
+Do not substitute graph text search for a required code-search semantic or
+keyword FIND step. Additional tools may corroborate the required route.
+
 ## FIND
 
 Use for localization and discovery: where code lives, exact identifiers,
@@ -93,6 +113,18 @@ A PROVE answer is a deterministic proof workflow, not ordinary retrieval:
 8. Use the word **verified** only when the evaluator returns
    `verdict="verified"`. Preserve the exact evaluator verdict otherwise:
    `contradicted`, `unresolved`, or `blocked`.
+9. When the proof must leave the session, export and verify a portable packet:
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/export_proof.py" export \
+     <proof-bundle.json> --output-dir <proof-packet-directory>
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/export_proof.py" verify \
+     <proof-packet-directory>
+   ```
+
+   The packet binds the canonical bundle, deterministic evaluator result, and
+   concise Markdown report with SHA-256. Verification rejects tampering and
+   evaluator-result drift.
 
 ### Contradiction rules
 

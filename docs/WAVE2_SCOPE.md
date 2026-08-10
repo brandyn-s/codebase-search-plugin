@@ -7,4 +7,7 @@ This stacked change set builds one complete `PROVE` vertical slice on top of Wav
 3. a contradiction pass is mandatory before a security or exhaustive claim can be marked verified;
 4. executable invariant specs and fixture tests pin pass, fail, unresolved, and incoherent-index behavior.
 
-Runtime-trace fusion and compiler/LSP enrichment remain subsequent Wave 2 tranches. They are intentionally not mixed into this slice so the evidence contract can stabilize first.
+This was the original Wave 2 slice boundary. Wave 3 subsequently added
+generation-bound relationship evidence with resolver provenance and optional
+runtime corroboration. Those signals strengthen a static relationship; they
+do not waive coherence, coverage, contradiction, or unresolved-subject rules.
