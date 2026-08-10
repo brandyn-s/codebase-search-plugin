@@ -228,7 +228,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.1`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.1).
+[`v0.8.0-redacted.2`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.2).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -258,11 +258,13 @@ not live performance results or comparative grades. See
 
 `bench/e2e/pilot/run.py` is the bounded operator runner used for a real
 four-arm smoke: native tools, code-search, code-graph, and the composed
-workflow. Its committed preregistration fixes the five cases, scoring rules,
-model alias, and activation bar before execution. Each run preserves raw model
-transcripts, scored projections, the exact component BOM, and SHA-256 bindings
-for every artifact. A one-repetition fixture pilot is directional operational
-evidence only; it is not a statistical superiority or broad accuracy claim.
+workflow. Its v2 preregistration fixes eight cases, two fresh-session
+repetitions, scoring rules, a directed-trace efficiency contract, one false
+candidate assertion, the model alias, and the activation bar before execution.
+Each run preserves raw model transcripts by repetition, scored projections, the
+exact component BOM, and SHA-256 bindings for every artifact. This small fixed
+fixture improves stability and falsification evidence; it is not a statistical
+superiority or broad accuracy claim.
 
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture
@@ -283,7 +285,8 @@ python3 scripts/export_proof.py verify proof-packet
 
 Verification recomputes every artifact digest and reruns the deterministic
 evaluator. A changed bundle, result, report, manifest, or evaluator outcome is
-rejected.
+rejected. The validation workflow exports and verifies the committed proof
+fixture before publishing the packet as a retained CI artifact.
 
 ## Trusted component validation
 

@@ -88,7 +88,7 @@ from the other engine, and do not auto-chain into it.
 | "How does X work?" | Conceptual | code-search |
 | "Show me X patterns" | Conceptual | code-search |
 | "What calls X?" | Structural | graph: trace_call_path inbound |
-| "Who uses X?" | Structural | graph: search_graph + trace |
+| "Who uses X?" | Structural | graph: trace_call_path inbound when X is exact |
 | "Blast radius of changing X" | Structural | graph: detect_changes |
 | "Find dead code" | Structural | graph: search_graph max_degree=0 |
 | "Show all routes/endpoints" | Structural | graph: get_architecture routes |
@@ -104,6 +104,12 @@ from the other engine, and do not auto-chain into it.
 ### Step 2: Execute primary tool
 
 Run the tool identified in Step 1.
+
+For an exact function relationship, make one `trace_call_path` call with
+`direction="inbound"` for callers or `direction="outbound"` for callees.
+Do not add `search_graph` before or after a trace that resolves the exact
+symbol; use it only when the symbol is unresolved. Use `Read` to corroborate returned
+relationships and pin source lines without repeating graph discovery.
 
 ### Step 3: Auto-chain if the answer needs the other tool
 

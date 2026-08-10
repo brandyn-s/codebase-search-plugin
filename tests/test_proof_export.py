@@ -11,6 +11,7 @@ from tests.test_proof_evaluator import _bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "export_proof.py"
+CI_FIXTURE = ROOT / "bench" / "e2e" / "proof-fixture-v1.json"
 
 
 class ProofExportTests(unittest.TestCase):
@@ -107,6 +108,33 @@ class ProofExportTests(unittest.TestCase):
 
             self.assertEqual(verified.returncode, 2)
             self.assertIn("sha256 mismatch", verified.stderr)
+
+    def test_checked_in_ci_fixture_exports_and_verifies(self):
+        self.assertTrue(CI_FIXTURE.is_file(), CI_FIXTURE)
+        with tempfile.TemporaryDirectory() as temporary:
+            packet = Path(temporary) / "packet"
+            exported = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "export",
+                    str(CI_FIXTURE),
+                    "--output-dir",
+                    str(packet),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(exported.returncode, 0, exported.stderr)
+            verified = subprocess.run(
+                [sys.executable, str(SCRIPT), "verify", str(packet)],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(verified.returncode, 0, verified.stderr)
+            self.assertEqual(json.loads(verified.stdout)["status"], "verified")
 
 
 if __name__ == "__main__":

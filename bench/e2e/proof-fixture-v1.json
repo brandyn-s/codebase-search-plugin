@@ -1,0 +1,95 @@
+{
+  "claim": {
+    "claim_kind": "security_invariant",
+    "claim_text": "All administrative routes pass through authorization.",
+    "id": "claim:v1:f56873de0ddf016d3f937cc7e7f05e64c1514243b66cedfa6f260ecd3f5b9c2a",
+    "repository_id": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+    "schema_version": 1
+  },
+  "contradiction_search": {
+    "candidate_count": 13,
+    "performed": true,
+    "strategy": "enumerate_routes_and_search_bypasses"
+  },
+  "coverage": {
+    "examined": 13,
+    "expected": 13,
+    "state": "complete",
+    "unresolved": 0
+  },
+  "index_state": {
+    "coherent": true,
+    "freshness": "current",
+    "index_generation": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+  },
+  "invariant": {
+    "checked": 13,
+    "id": "SEC-AUTH-001",
+    "status": "pass",
+    "unresolved": 0,
+    "violations": 0
+  },
+  "observations": [
+    {
+      "confidence_band": "high",
+      "derivation": "resolved_call_path",
+      "evidence_ref": {
+        "end_line": 10,
+        "evidence_type": "resolved_call_path",
+        "id": "ev:v1:80514a6646549b199cac811289bacb3537e21fab716ed3729747fe99ec6010c4",
+        "index_generation": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+        "relative_path": "src/api/admin.py",
+        "repository_id": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+        "schema_version": 1,
+        "source_revision": "ssssssssssssssssssssssssssssssssssssssss",
+        "start_line": 1,
+        "symbol_ref": {
+          "end_line": 10,
+          "id": "sym:v1:0206ed7fda599b9100a3e137d66f6aca6be83c643ed6409213a85caba38c73e8",
+          "qualified_name": "admin_handler",
+          "relative_path": "src/api/admin.py",
+          "repository_id": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+          "schema_version": 1,
+          "source_revision": "ssssssssssssssssssssssssssssssssssssssss",
+          "start_line": 1,
+          "symbol_kind": "function"
+        }
+      },
+      "id": "obs:v1:c12340b6a50e9bda2efed25709641acb9a52278e0e21f23acb309132d3870d1f",
+      "schema_version": 1,
+      "source_engine": "code-graph",
+      "stance": "support"
+    },
+    {
+      "confidence_band": "high",
+      "derivation": "hybrid_match",
+      "evidence_ref": {
+        "end_line": 10,
+        "evidence_type": "hybrid_match",
+        "id": "ev:v1:0180ef8dd3279a3f2ae38f8520b2db49815ad3670290d573e3144cd759e54e68",
+        "index_generation": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+        "relative_path": "src/auth/middleware.py",
+        "repository_id": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+        "schema_version": 1,
+        "source_revision": "ssssssssssssssssssssssssssssssssssssssss",
+        "start_line": 1,
+        "symbol_ref": {
+          "end_line": 10,
+          "id": "sym:v1:60b212bb4ad34c5867cd636ddbad710d9ec52a5dc08fe85f7be269800032d760",
+          "qualified_name": "AuthMiddleware.verify",
+          "relative_path": "src/auth/middleware.py",
+          "repository_id": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+          "schema_version": 1,
+          "source_revision": "ssssssssssssssssssssssssssssssssssssssss",
+          "start_line": 1,
+          "symbol_kind": "function"
+        }
+      },
+      "id": "obs:v1:d5e1049c8fe237940ef549451d788a07e5c346e3bf5cca43411191ab523c6d24",
+      "schema_version": 1,
+      "source_engine": "code-search",
+      "stance": "support"
+    }
+  ],
+  "schema_version": 1
+}

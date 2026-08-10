@@ -70,10 +70,12 @@ fast metadata-only path.
 
 Callers of an exact function use `mcp__code-graph__trace_call_path` with
 `direction="inbound"`; callees use the same tool with `direction="outbound"`.
-Use `search_graph` first only when the exact function name is unresolved. Do
-not replace those narrow operations with ad hoc `query_graph` queries. The
-installed query evaluator accepts the documented Cypher subset and does not
-support the full Cypher function surface (for example, `type(r)`).
+Call the directed trace once. Do not add `search_graph` before or after it when
+the exact symbol resolves; use `search_graph` only when the exact function name
+is unresolved. Use `Read` only to corroborate the returned relationship and pin
+source lines. Do not replace those narrow operations with ad hoc `query_graph`
+queries. The installed query evaluator accepts the documented Cypher subset and
+does not support the full Cypher function surface (for example, `type(r)`).
 
 When the installed code-graph component exposes `get_relationship_evidence`,
 use it after resolving an exact qualified symbol whenever the answer depends on

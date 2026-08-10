@@ -41,6 +41,34 @@ def load_helper():
 
 
 class RealInstalledCIContractTests(unittest.TestCase):
+    def test_validation_publishes_an_independently_verified_proof_packet(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        validate_job = workflow.split("  live-control-plane:", 1)[0]
+        upload_action = (
+            "actions/upload-artifact@"
+            "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+        )
+
+        self.assertIn("name: Export and verify portable proof packet", validate_job)
+        self.assertIn(
+            "python3 scripts/export_proof.py export "
+            "bench/e2e/proof-fixture-v1.json",
+            validate_job,
+        )
+        self.assertIn(
+            'python3 scripts/export_proof.py verify "$RUNNER_TEMP/proof-packet"',
+            validate_job,
+        )
+        self.assertIn(f"uses: {upload_action} # v7.0.1", validate_job)
+        self.assertIn("name: code-intelligence-proof-packet", validate_job)
+        self.assertIn("path: ${{ runner.temp }}/proof-packet", validate_job)
+        self.assertIn("if-no-files-found: error", validate_job)
+        self.assertIn("retention-days: 30", validate_job)
+        self.assertLess(
+            validate_job.index("scripts/export_proof.py verify"),
+            validate_job.index(upload_action),
+        )
+
     def test_distinct_ci_job_installs_and_validates_real_private_components(self):
         workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
         pull_request_workflow = WORKFLOW.read_text(encoding="utf-8")

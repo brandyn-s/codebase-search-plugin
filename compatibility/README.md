@@ -10,7 +10,7 @@ published component and has been captured from `tools/list`.
 The current BOM's integrated readiness status is `ready`. Its
 `tested_capabilities` section declares complete version-1 `index_identity`
 outputs, semantic `index_ready`, graph `status: ready`, and the optional
-boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.1`. The
+boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.2`. The
 committed schema snapshots cover MCP input surfaces; they do not by themselves
 prove output behavior. `/index-repo` revalidates every live input-schema
 fingerprint before either index starts.

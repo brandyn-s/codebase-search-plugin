@@ -9,6 +9,15 @@ SKILL = ROOT / "skills" / "code-explore" / "SKILL.md"
 
 
 class CodeExploreSkillContractTests(unittest.TestCase):
+    def test_exact_relationships_use_one_directed_trace_then_source_read(self):
+        text = SKILL.read_text(encoding="utf-8")
+
+        self.assertIn("one `trace_call_path` call", text)
+        self.assertIn('`direction="inbound"` for callers', text)
+        self.assertIn('`direction="outbound"` for callees', text)
+        self.assertIn("Do not add `search_graph`", text)
+        self.assertIn("Use `Read` to corroborate", text)
+
     def test_identity_mismatch_blocks_cross_engine_routing_and_chaining(self):
         text = SKILL.read_text(encoding="utf-8")
         preflight = text.split("## Pre-flight Check", 1)[1].split(

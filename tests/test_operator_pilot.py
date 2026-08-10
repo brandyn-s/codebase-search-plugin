@@ -13,6 +13,7 @@ from bench.e2e.pilot.run import (
     _claude_environment,
     _prompt,
     _route_satisfies,
+    _routing_contract_satisfies,
     project_transcript,
 )
 
@@ -22,6 +23,36 @@ RUNNER = ROOT / "bench" / "e2e" / "pilot" / "run.py"
 
 
 class OperatorPilotAcceptanceTests(unittest.TestCase):
+    def test_v2_preregistration_binds_expanded_repeated_corpus(self):
+        preregistration = json.loads(
+            (ROOT / "bench" / "e2e" / "pilot" / "preregistration-v2.json").read_text()
+        )
+        cases = [
+            json.loads(line)
+            for line in (
+                ROOT / "bench" / "e2e" / "pilot" / "cases-v2.jsonl"
+            ).read_text().splitlines()
+            if line.strip()
+        ]
+
+        self.assertEqual(preregistration["controls"]["repetitions"], 2)
+        self.assertEqual(len(cases), 8)
+        self.assertEqual(
+            preregistration["controls"]["case_ids"],
+            [case["case_id"] for case in cases],
+        )
+        self.assertEqual(
+            preregistration["components"]["code-graph"]["version"],
+            "v0.8.0-redacted.2",
+        )
+        self.assertTrue(
+            any(case.get("expected_disposition") == "not_supported" for case in cases)
+        )
+        self.assertEqual(
+            sum(isinstance(case.get("routing_contract"), dict) for case in cases),
+            4,
+        )
+
     def test_help_exposes_bounded_operator_authorized_surface(self):
         completed = subprocess.run(
             [sys.executable, str(RUNNER), "--help"],
@@ -34,6 +65,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("bounded operator-authorized", completed.stdout)
         self.assertIn("--arms", completed.stdout)
         self.assertIn("--output-dir", completed.stdout)
+        self.assertIn("--repetitions", completed.stdout)
 
     def test_literal_command_records_and_scores_one_fake_case(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -65,6 +97,8 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     "composed",
                     "--case-ids",
                     "semantic-auth",
+                    "--repetitions",
+                    "2",
                     "--output-dir",
                     str(output),
                     "--claude",
@@ -85,19 +119,33 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
             summary = json.loads((output / "summary.json").read_text())
-            self.assertEqual(summary["arms"]["composed"]["case_count"], 1)
+            self.assertEqual(summary["arms"]["composed"]["case_count"], 2)
+            self.assertEqual(summary["arms"]["composed"]["unique_case_count"], 1)
+            self.assertEqual(summary["arms"]["composed"]["repetitions"], 2)
             self.assertEqual(summary["arms"]["composed"]["evidence_precision"], 1.0)
             self.assertEqual(summary["arms"]["composed"]["evidence_recall"], 1.0)
             self.assertEqual(summary["arms"]["composed"]["routing_accuracy"], 1.0)
             self.assertEqual(summary["arms"]["composed"]["unsupported_claim_rate"], 0.0)
-            self.assertTrue((output / "raw" / "composed" / "semantic-auth.jsonl").is_file())
+            self.assertTrue(
+                (output / "raw" / "composed" / "r01" / "semantic-auth.jsonl").is_file()
+            )
+            self.assertTrue(
+                (output / "raw" / "composed" / "r02" / "semantic-auth.jsonl").is_file()
+            )
             self.assertTrue((output / "records.jsonl").is_file())
+            self.assertTrue((output / "preregistration-v2.json").is_file())
+            records = [
+                json.loads(line)
+                for line in (output / "records.jsonl").read_text().splitlines()
+            ]
+            self.assertEqual([record["repetition"] for record in records], [1, 2])
             manifest = json.loads((output / "manifest.json").read_text())
-            raw_path = output / "raw" / "composed" / "semantic-auth.jsonl"
+            raw_path = output / "raw" / "composed" / "r01" / "semantic-auth.jsonl"
             self.assertEqual(
-                manifest["artifacts"]["raw/composed/semantic-auth.jsonl"],
+                manifest["artifacts"]["raw/composed/r01/semantic-auth.jsonl"],
                 hashlib.sha256(raw_path.read_bytes()).hexdigest(),
             )
+            self.assertIn("preregistration-v2.json", manifest["artifacts"])
 
     def test_composed_invocation_does_not_disable_explicit_mcp(self):
         arguments = SimpleNamespace(
@@ -151,6 +199,8 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("semantic search first, then a graph relationship tool", prompt)
         self.assertIn("An explicit symbol does not waive this mixed route", prompt)
         self.assertIn("Do not substitute graph text search", prompt)
+        self.assertIn('trace_call_path once with direction="inbound"', prompt)
+        self.assertIn("use Read to corroborate", prompt)
 
     def test_explain_symbol_counts_as_graph_relationship_work(self):
         tool_calls = [
@@ -165,6 +215,31 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         ]
 
         self.assertTrue(_route_satisfies("mixed", tool_calls))
+
+    def test_exact_callers_contract_allows_one_inbound_trace_and_read(self):
+        case = {
+            "routing_contract": {
+                "trace_call_path": {"count": 1, "direction": "inbound"},
+                "forbidden_tools": ["mcp__code-graph__search_graph"],
+            }
+        }
+        efficient = [
+            {
+                "tool": "mcp__code-graph__trace_call_path",
+                "arguments": {"function_name": "login", "direction": "inbound"},
+            },
+            {"tool": "Read", "arguments": {"file_path": "src/api/session.py"}},
+        ]
+        redundant = [
+            {
+                "tool": "mcp__code-graph__trace_call_path",
+                "arguments": {"function_name": "login", "direction": "both"},
+            },
+            {"tool": "mcp__code-graph__search_graph", "arguments": {"name": "login"}},
+        ]
+
+        self.assertTrue(_routing_contract_satisfies(case, efficient))
+        self.assertFalse(_routing_contract_satisfies(case, redundant))
 
 
 class TranscriptProjectionTests(unittest.TestCase):
@@ -239,6 +314,62 @@ class TranscriptProjectionTests(unittest.TestCase):
         self.assertEqual(record["evidence_false_negatives"], 0)
         self.assertEqual(record["unsupported_claim_count"], 0)
         self.assertEqual(record["tool_calls"][0]["tool"], "mcp__code-search__search_code")
+
+    def test_scores_correct_rejection_of_false_candidate_as_supported_adjudication(self):
+        case = {
+            "case_id": "negative-auth-bypass",
+            "expected_route": "semantic",
+            "expected_disposition": "not_supported",
+            "expected_evidence": ["src/auth/token.py:7-8"],
+            "expected_claims": [
+                {
+                    "claim_id": "negative-auth-bypass:signature-skip",
+                    "text": "Bearer tokens are forwarded without signature verification.",
+                    "required_evidence_ids": ["src/auth/token.py:7-8"],
+                }
+            ],
+            "expected_index_error": "none",
+        }
+        transcript = [
+            {"type": "system", "subtype": "init", "model": "claude-sonnet-5"},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "mcp__code-search__search_code",
+                            "input": {"query": "bearer signature verification"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "result",
+                "is_error": False,
+                "duration_ms": 100,
+                "total_cost_usd": 0.01,
+                "structured_output": {
+                    "disposition": "not_supported",
+                    "claim_text": None,
+                    "evidence_ids": ["src/auth/token.py:7-8"],
+                    "answer": "The implementation calls signature verification.",
+                    "canary_violation": False,
+                },
+            },
+        ]
+
+        record = project_transcript(
+            transcript,
+            case=case,
+            arm="composed",
+            run_id="pilot-negative",
+            repetition=2,
+        )
+
+        self.assertEqual(record["repetition"], 2)
+        self.assertEqual(record["unsupported_claim_count"], 0)
+        self.assertEqual(record["evidence_true_positives"], 1)
 
     def test_accepts_narrower_evidence_and_expected_route_with_corroboration(self):
         case = {

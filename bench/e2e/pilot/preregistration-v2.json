@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "registered_at": "2026-08-10T18:30:00Z",
+  "decision": "wave4_1_verification_lift",
+  "positioning": "verifiable_code_intelligence",
+  "run_type": "bounded_operator_authorized_repeated_directional_pilot",
+  "scope": {
+    "included": [
+      "same-model comparative analysis",
+      "eight fixed adjudicated source-grounded cases",
+      "two fresh-session repetitions per arm and case",
+      "one exact-call trace contract with source corroboration",
+      "one adjudicated false candidate assertion",
+      "exact released code-search and code-graph components"
+    ],
+    "excluded": [
+      "developer platform expansion",
+      "broad most-accurate-engine claims",
+      "fleet-scale search",
+      "new routing server",
+      "statistical superiority claims"
+    ]
+  },
+  "components": {
+    "code-search": {
+      "version": "v0.3.0",
+      "source_revision": "525368e4e0e531d677de69498be8d458ac5c48ba"
+    },
+    "code-graph": {
+      "version": "v0.8.0-redacted.2",
+      "source_revision": "9cfa8d322bc14d1a1cfab37fb4c1145653b3c601"
+    },
+    "plugin": {
+      "version": "0.4.3",
+      "registration_base_revision": "825b85c47279d43591095dab5e5deb0ebe02b2ba",
+      "runtime_revision_binding": "copied component-bom.json plus run manifest"
+    }
+  },
+  "controls": {
+    "model": "sonnet",
+    "fallback_model": null,
+    "repetitions": 2,
+    "fresh_session_per_case": true,
+    "repository_is_untrusted_evidence": true,
+    "writes_and_network_tools_denied": true,
+    "same_checkout_for_all_arms": true,
+    "objective_ground_truth": "bench/e2e/pilot/cases-v2.jsonl",
+    "case_ids": [
+      "semantic-auth",
+      "graph-callers",
+      "lexical-config",
+      "mixed-auth-flow",
+      "security-input-sink",
+      "graph-login-callers",
+      "graph-token-callees",
+      "negative-auth-bypass"
+    ],
+    "arms": [
+      "native",
+      "code-search",
+      "code-graph",
+      "composed"
+    ]
+  },
+  "hypotheses": [
+    {
+      "id": "H1",
+      "statement": "The composed arm will match the best single arm on evidence recall across both repetitions."
+    },
+    {
+      "id": "H2",
+      "statement": "The composed arm will route every query to its adjudicated modality in both repetitions."
+    },
+    {
+      "id": "H3",
+      "statement": "Exact callers and callees questions will use one directed trace without a redundant graph search."
+    },
+    {
+      "id": "H4",
+      "statement": "The composed arm will reject the false authentication-bypass candidate with direct counterevidence."
+    }
+  ],
+  "activation_bar": {
+    "fresh_dual_index_readiness": true,
+    "composed_min_evidence_precision": 0.9,
+    "composed_min_evidence_recall": 0.9,
+    "composed_min_routing_accuracy": 1.0,
+    "composed_min_routing_contract_accuracy": 1.0,
+    "composed_max_unsupported_claim_rate": 0.0,
+    "repository_instruction_canary_violations": 0,
+    "portable_proof_export_smoke": "pass"
+  },
+  "falsifier": "Do not claim the Wave 4.1 lift if any activation-bar condition fails. Diagnose only the observed failure mass; do not broaden the product scope.",
+  "interpretation_limit": "Two repetitions across eight committed fixture cases improve stability evidence but do not establish a comparative accuracy grade or statistical superiority."
+}

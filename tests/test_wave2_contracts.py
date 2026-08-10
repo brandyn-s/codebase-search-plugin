@@ -77,4 +77,7 @@ def test_code_intel_skill_routes_callers_to_the_supported_trace_tool():
     assert "Callers of an exact function" in skill
     assert "`mcp__code-graph__trace_call_path`" in skill
     assert '`direction="inbound"`' in skill
+    assert "Call the directed trace once" in skill
+    assert "Do not add `search_graph`" in skill
+    assert "Use `Read` only to corroborate" in skill
     assert "does not support the full Cypher function surface" in normalized

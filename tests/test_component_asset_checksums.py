@@ -17,23 +17,23 @@ HELPER = ROOT / "scripts" / "validate_real_installed.py"
 EXPECTED_ASSETS = {
     "darwin-amd64": {
         "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-        "sha256": "2498cff6c384182a590502a3ca185b067ae46e275f508aa1f19cdae4a758ae2a",
+        "sha256": "63b84e285a2807dd6b0ac4470e415e716fa24f1f3b7c122ee068c73a54c0451f",
     },
     "darwin-arm64": {
         "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-        "sha256": "1e98d3c406fc93e09325f66bbf1f93e12fb830d608f96a153ace37da6c8ee214",
+        "sha256": "7958e586b86f7c82f7612a7963173e62ce7d598485f900409d5cad2a4ac65fe2",
     },
     "linux-amd64": {
         "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-        "sha256": "084187fab4949d012f14448bf8fd9ca2a02a96b449d3bcdf9f60d52742b8e332",
+        "sha256": "10782d064464d0ed00c2058695e5e8a90c214f0139ce3914e458f5e7e99bb348",
     },
     "linux-arm64": {
         "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-        "sha256": "20e38d48f5a42eb40087deae476861867f103e3ff3e35fa2065ffc5b07d06b7c",
+        "sha256": "73c5f7affa223769507d5de0f6c2e52a7d814f6be74f502aff27c503181538ad",
     },
     "windows-amd64": {
         "name": "codebase-memory-mcp-windows-amd64.zip",
-        "sha256": "bd64e35a1ac748948d41f42f4a9213313fdb2c58c61c0021fd7deb44b82192a4",
+        "sha256": "fa0149c605dc55c657de578e30ff617ec45b97cfbb361146258350099ec15c94",
     },
 }
 
@@ -43,10 +43,10 @@ EXPECTED_GRAPH_INSTALL = {
         "bundle": {
             "path": (
                 "compatibility/attestations/"
-                "code-graph-v0.8.0-redacted.1-provenance.jsonl"
+                "code-graph-v0.8.0-redacted.2-provenance.jsonl"
             ),
             "sha256": (
-                "1ad1906f7d31596ab8a6343ea538037afd7f595e2348744d4f1c876ebd7f9efa"
+                "31974430639a508002c1e39df439682836b87fb3e999b6fd3ee360fac5f6a482"
             ),
         },
         "deny_self_hosted_runners": True,
@@ -58,13 +58,13 @@ EXPECTED_GRAPH_INSTALL = {
     "checksums": {
         "name": "checksums.txt",
         "sha256": (
-            "020b93facb324ac99c812a2ad64e8100f44cda038ada6b34aa6c2003db80a253"
+            "edd0ec029e7cf61994827af768a3aab31fedd94b96bd1ae5efd2b208e6e8ab5b"
         ),
     },
     "kind": "github-release",
     "repository": "redacted-org/code-graph",
-    "source_revision": "936178825508db1e8547aca1381dfbb9be586a22",
-    "tag": "v0.8.0-redacted.1",
+    "source_revision": "9cfa8d322bc14d1a1cfab37fb4c1145653b3c601",
+    "tag": "v0.8.0-redacted.2",
 }
 
 EXPECTED_SEARCH_INSTALL = {
