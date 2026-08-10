@@ -209,6 +209,7 @@ run_with_allowed_environment() {
     local name
 
     allowed_environment=("PATH=$PATH")
+    allowed_environment+=("HOME=$INSTALL_RUNTIME_HOME")
     for name in \
         LANG LC_ALL LC_CTYPE TZ \
         SSL_CERT_FILE SSL_CERT_DIR REQUESTS_CA_BUNDLE; do
@@ -312,6 +313,8 @@ rollback_install() {
 }
 
 INSTALL_STAGE=$(mktemp -d "$PLUGIN_DIR/.install-staging.XXXXXX")
+INSTALL_RUNTIME_HOME="$INSTALL_STAGE/runtime-home"
+mkdir -p "$INSTALL_RUNTIME_HOME"
 BIN_DIR="$INSTALL_STAGE/bin"
 VENV_DIR="$TARGET_VENV_DIR"
 trap rollback_install EXIT
@@ -587,6 +590,7 @@ run_with_allowed_environment \
         --server "code-graph=$BIN_DIR/$GRAPH_BINARY"
 echo ""
 
+rm -rf "$INSTALL_RUNTIME_HOME"
 echo "Promoting validated installation..."
 if [ -e "$TARGET_BIN_DIR" ]; then
     mv "$TARGET_BIN_DIR" "$ROLLBACK_BIN_DIR"

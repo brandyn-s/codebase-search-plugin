@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -516,6 +517,11 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             ),
         )
         shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+        shell_function_match = re.search(
+            r"(?ms)^run_with_allowed_environment\(\) \{.*?^\}",
+            shell,
+        )
+        self.assertIsNotNone(shell_function_match)
         final_validation = shell.split(
             "[5/5] Validating installed MCP tool contracts...",
             1,
@@ -540,6 +546,14 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             ),
         )
         self.assertIn("env -i", shell)
+        self.assertIn(
+            'allowed_environment+=("HOME=$INSTALL_RUNTIME_HOME")',
+            shell_function_match.group(),
+        )
+        self.assertIn(
+            '$env:USERPROFILE = $script:InstallRuntimeHome',
+            function_match.group(),
+        )
         for secret_name in (
             "GH_TOKEN",
             "GITHUB_TOKEN",
@@ -552,6 +566,38 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             self.assertNotIn(secret_name, function_match.group())
         self.assertIn('"PATH"', function_match.group())
 
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_home = Path(tmp) / "isolated-home"
+            runtime_home.mkdir()
+            probe = (
+                shell_function_match.group()
+                + "\n"
+                + r'''
+INSTALL_RUNTIME_HOME="$1"
+run_with_allowed_environment sh -c '
+    test "$HOME" = "$1"
+    test -d "$HOME"
+    test -z "${GH_TOKEN+x}"
+' sh "$INSTALL_RUNTIME_HOME"
+'''
+            )
+            environment = dict(os.environ)
+            environment["HOME"] = "/ambient-home-must-not-leak"
+            environment["GH_TOKEN"] = "ambient-token-must-not-leak"
+            completed = subprocess.run(
+                ["bash", "-c", probe, "probe", str(runtime_home)],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=environment,
+            )
+
+        self.assertEqual(
+            completed.returncode,
+            0,
+            completed.stdout + completed.stderr,
+        )
+
         pwsh = shutil.which("pwsh")
         if pwsh is None:
             self.skipTest("pwsh is unavailable")
@@ -559,6 +605,13 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             function_match.group()
             + "\n"
             + r"""
+$script:InstallRuntimeHome = Join-Path $PSScriptRoot "isolated-home"
+New-Item -ItemType Directory -Path $script:InstallRuntimeHome | Out-Null
+[Environment]::SetEnvironmentVariable(
+    "USERPROFILE",
+    "ambient-home-must-not-leak",
+    "Process"
+)
 $Names = @(
     "GH_TOKEN",
     "GITHUB_TOKEN",
@@ -572,6 +625,9 @@ foreach ($Name in $Names) {
     [Environment]::SetEnvironmentVariable($Name, "sentinel-$Name", "Process")
 }
 Invoke-WithAllowedEnvironment {
+    if ($env:USERPROFILE -ne $script:InstallRuntimeHome) {
+        throw "isolated runtime home was not applied"
+    }
     foreach ($Name in $Names) {
         if ($null -ne [Environment]::GetEnvironmentVariable($Name, "Process")) {
             throw "$Name leaked into secret-free operation"
@@ -587,6 +643,9 @@ foreach ($Name in $Names) {
 }
 try {
     Invoke-WithAllowedEnvironment {
+        if ($env:USERPROFILE -ne $script:InstallRuntimeHome) {
+            throw "isolated runtime home was not applied"
+        }
         foreach ($Name in $Names) {
             if ($null -ne [Environment]::GetEnvironmentVariable($Name, "Process")) {
                 throw "$Name leaked into failing secret-free operation"
@@ -605,6 +664,9 @@ foreach ($Name in $Names) {
     if ($Actual -ne $Expected) {
         throw "$Name was not restored after failure"
     }
+}
+if ($env:USERPROFILE -ne "ambient-home-must-not-leak") {
+    throw "ambient home was not restored"
 }
 Write-Output "token-isolation-ok"
 """

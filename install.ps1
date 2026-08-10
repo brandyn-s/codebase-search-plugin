@@ -214,6 +214,8 @@ function Invoke-WithAllowedEnvironment {
                 -ErrorAction SilentlyContinue
         }
     }
+    $env:HOME = $script:InstallRuntimeHome
+    $env:USERPROFILE = $script:InstallRuntimeHome
     try {
         & $Operation
     } finally {
@@ -331,6 +333,8 @@ function Restore-PreviousInstallation {
 }
 
 New-Item -ItemType Directory -Path $InstallStage | Out-Null
+$InstallRuntimeHome = Join-Path $InstallStage "runtime-home"
+New-Item -ItemType Directory -Path $InstallRuntimeHome | Out-Null
 $BinDir = Join-Path $InstallStage "bin"
 $VenvDir = $TargetVenvDir
 
