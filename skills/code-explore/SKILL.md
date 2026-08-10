@@ -81,6 +81,19 @@ from the other engine, and do not auto-chain into it.
 
 ### Step 1: Classify the query
 
+Apply this precedence before the examples in the table. An explicit
+source-to-sink, trust-boundary, or security-path request is structural security
+work. Security vocabulary alone does not make a question a security-path
+question. A request combining conceptual explanation with callers or other
+relationships uses code-search semantic/default retrieval first, followed by
+exactly one directed graph relationship query. Conceptual how, why, or whether
+behavior remains semantic/default retrieval even when it names an exact symbol
+or discusses security. Do not call graph security tools for conceptual behavior
+unless the question explicitly requests a path, sink reachability, trust
+boundary, or security-surface enumeration. Use keyword retrieval only for pure
+literal or location lookup, and graph-only routing only for an explicit
+relationship without a conceptual explanation.
+
 | Query pattern | Type | Primary tool |
 |--------------|------|-------------|
 | "Where is the X code?" | Conceptual | code-search |
@@ -109,7 +122,9 @@ For an exact function relationship, make one `trace_call_path` call with
 `direction="inbound"` for callers or `direction="outbound"` for callees.
 Do not add `search_graph` before or after a trace that resolves the exact
 symbol; use it only when the symbol is unresolved. Use `Read` to corroborate returned
-relationships and pin source lines without repeating graph discovery.
+relationships and pin source lines without repeating graph discovery. Cite
+every named relationship endpoint, both caller and callee or source and target,
+even when the trace already shows one endpoint.
 
 ### Step 3: Auto-chain if the answer needs the other tool
 

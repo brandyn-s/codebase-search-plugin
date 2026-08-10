@@ -19,18 +19,22 @@ results from code-search and code-graph.
 Classify the question before calling tools. Use the first matching route:
 
 1. An explicit source-to-sink, trust-boundary, or security-path question uses
-   graph security/relationship tools.
-2. An exact identifier, config key, or literal-location question uses
-   `mcp__code-search__search_code` with `search_mode="keyword"`.
-3. A question combining conceptual explanation with callers or relationships
-   uses code-search semantic/default retrieval first, then the narrowest graph
-   relationship tool. An explicit symbol does not waive this mixed route when
-   explanation and relationship are both requested.
-4. A callers-only or relationship-only question with an explicit symbol uses
+   graph security/relationship tools. Security vocabulary alone does not make
+   a question a security-path question.
+2. A question combining conceptual explanation with callers or relationships
+   uses code-search semantic/default retrieval first, then exactly one directed
+   graph relationship query. An explicit symbol does not waive this mixed route
+   when explanation and relationship are both requested.
+3. A callers-only or relationship-only question with an explicit symbol uses
    the narrowest graph tool directly.
-5. Other conceptual behavior questions use code-search semantic/default
-   retrieval.
+4. Pure literal or location lookup for an exact identifier or config key uses
+   `mcp__code-search__search_code` with `search_mode="keyword"`.
+5. Conceptual how, why, or whether behavior uses code-search semantic/default
+   retrieval, even when it names an exact symbol or discusses security.
 
+Do not call graph security tools for conceptual behavior unless the question
+explicitly requests a path, sink reachability, trust boundary, or
+security-surface enumeration.
 Do not substitute graph text search for a required code-search semantic or
 keyword FIND step. Additional tools may corroborate the required route.
 
@@ -73,9 +77,11 @@ Callers of an exact function use `mcp__code-graph__trace_call_path` with
 Call the directed trace once. Do not add `search_graph` before or after it when
 the exact symbol resolves; use `search_graph` only when the exact function name
 is unresolved. Use `Read` only to corroborate the returned relationship and pin
-source lines. Do not replace those narrow operations with ad hoc `query_graph`
-queries. The installed query evaluator accepts the documented Cypher subset and
-does not support the full Cypher function surface (for example, `type(r)`).
+source lines. For a relationship claim, cite every named relationship endpoint,
+both caller and callee or source and target, even when the trace already shows
+one endpoint. Do not replace those narrow operations with ad hoc `query_graph`
+queries. The installed query evaluator accepts the documented Cypher subset
+and does not support the full Cypher function surface (for example, `type(r)`).
 
 When the installed code-graph component exposes `get_relationship_evidence`,
 use it after resolving an exact qualified symbol whenever the answer depends on
@@ -179,6 +185,9 @@ generation.
 ## Output
 
 Give the verdict or direct answer first, then the minimum supporting evidence.
+When evaluating a supplied candidate assertion, reproduce it byte-for-byte,
+including terminal punctuation, or mark it unsupported; do not silently rewrite
+the claim identity.
 For PROVE, include:
 
 - proof ID and verdict;

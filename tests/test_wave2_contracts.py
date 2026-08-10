@@ -81,3 +81,28 @@ def test_code_intel_skill_routes_callers_to_the_supported_trace_tool():
     assert "Do not add `search_graph`" in skill
     assert "Use `Read` only to corroborate" in skill
     assert "does not support the full Cypher function surface" in normalized
+
+
+def test_code_intel_skill_disambiguates_semantic_security_and_mixed_routes():
+    skill = (ROOT / "skills" / "code-intel" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    normalized = " ".join(skill.split())
+
+    assert "Security vocabulary alone does not make" in normalized
+    assert "Conceptual how, why, or whether behavior" in normalized
+    assert "even when it names an exact symbol" in normalized
+    assert "Do not call graph security tools for conceptual behavior" in normalized
+    assert "semantic/default retrieval first" in normalized
+    assert "exactly one directed graph relationship query" in normalized
+
+
+def test_code_intel_skill_binds_relationship_evidence_and_claim_identity():
+    skill = (ROOT / "skills" / "code-intel" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    normalized = " ".join(skill.split())
+
+    assert "every named relationship endpoint" in normalized
+    assert "both caller and callee" in normalized
+    assert "byte-for-byte, including terminal punctuation" in normalized

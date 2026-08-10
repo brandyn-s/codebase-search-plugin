@@ -266,6 +266,12 @@ exact component BOM, and SHA-256 bindings for every artifact. This small fixed
 fixture improves stability and falsification evidence; it is not a statistical
 superiority or broad accuracy claim.
 
+`preregistration-v3.json` separately binds one composed-only confirmation after
+the primary run exposed routing, endpoint-evidence, and exact-claim failures.
+Pass it with `--preregistration`. The confirmation keeps the original cases,
+model, repetitions, scoring, thresholds, and component binaries; it cannot
+rewrite the primary result or establish a broad ranking.
+
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture
 falsifiers, public-pin requirements, privacy boundaries, and the current

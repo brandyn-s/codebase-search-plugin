@@ -51,6 +51,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             ]
         )
         self.assertEqual(arguments.max_budget_usd, 1.0)
+        self.assertEqual(arguments.preregistration.name, "preregistration-v2.json")
         self.assertEqual(len(cases), 8)
         self.assertEqual(
             preregistration["controls"]["case_ids"],
@@ -68,6 +69,32 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             4,
         )
 
+    def test_v3_preregistration_binds_targeted_composed_confirmation(self):
+        preregistration = json.loads(
+            (
+                ROOT / "bench" / "e2e" / "pilot" / "preregistration-v3.json"
+            ).read_text()
+        )
+
+        self.assertEqual(
+            preregistration["decision"],
+            "wave4_2_targeted_remediation_confirmation",
+        )
+        self.assertEqual(preregistration["controls"]["arms"], ["composed"])
+        self.assertEqual(preregistration["controls"]["repetitions"], 2)
+        self.assertEqual(
+            preregistration["components"]["plugin"]["version"], "0.4.5"
+        )
+        self.assertEqual(
+            preregistration["source_evidence"]["primary_run_id"],
+            "wave41-20260810T193035Z",
+        )
+        self.assertEqual(
+            preregistration["source_evidence"]["primary_manifest_sha256"],
+            "246a0301507ef62849bc8f43738a089f04f2056d95219be8a9ef3cb15c7d72f8",
+        )
+        self.assertIn("cannot convert", preregistration["interpretation_limit"])
+
     def test_help_exposes_bounded_operator_authorized_surface(self):
         completed = subprocess.run(
             [sys.executable, str(RUNNER), "--help"],
@@ -81,6 +108,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("--arms", completed.stdout)
         self.assertIn("--output-dir", completed.stdout)
         self.assertIn("--repetitions", completed.stdout)
+        self.assertIn("--preregistration", completed.stdout)
 
     def test_literal_command_records_and_scores_one_fake_case(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -126,6 +154,14 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     str(storage),
                     "--local-model",
                     str(model),
+                    "--preregistration",
+                    str(
+                        ROOT
+                        / "bench"
+                        / "e2e"
+                        / "pilot"
+                        / "preregistration-v3.json"
+                    ),
                 ],
                 cwd=ROOT,
                 capture_output=True,
@@ -148,7 +184,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 (output / "raw" / "composed" / "r02" / "semantic-auth.jsonl").is_file()
             )
             self.assertTrue((output / "records.jsonl").is_file())
-            self.assertTrue((output / "preregistration-v2.json").is_file())
+            self.assertTrue((output / "preregistration-v3.json").is_file())
             records = [
                 json.loads(line)
                 for line in (output / "records.jsonl").read_text().splitlines()
@@ -160,7 +196,8 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 manifest["artifacts"]["raw/composed/r01/semantic-auth.jsonl"],
                 hashlib.sha256(raw_path.read_bytes()).hexdigest(),
             )
-            self.assertIn("preregistration-v2.json", manifest["artifacts"])
+            self.assertTrue(manifest["run_id"].startswith("wave42-"))
+            self.assertIn("preregistration-v3.json", manifest["artifacts"])
 
     def test_composed_invocation_does_not_disable_explicit_mcp(self):
         arguments = SimpleNamespace(
@@ -205,17 +242,38 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         case = {
             "query": "Explain login and its callers",
             "expected_claims": [{"text": "Session creation calls login."}],
+            "routing_contract": {
+                "trace_call_path": {"count": 1, "direction": "inbound"},
+                "forbidden_tools": ["mcp__code-graph__search_graph"],
+            },
         }
 
         prompt = _prompt(case, "composed")
 
         self.assertIn("explicit source-to-sink", prompt)
         self.assertIn('search_mode="keyword"', prompt)
-        self.assertIn("semantic search first, then a graph relationship tool", prompt)
+        self.assertIn("Security vocabulary alone does not make", prompt)
+        self.assertIn("Conceptual how, why, or whether behavior", prompt)
+        self.assertIn("even when it names an exact symbol", prompt)
+        self.assertIn(
+            "Do not call graph security tools for conceptual behavior",
+            prompt,
+        )
+        self.assertIn("Pure literal or location lookup", prompt)
+        self.assertIn(
+            "semantic search first, then exactly one graph relationship tool",
+            prompt,
+        )
         self.assertIn("An explicit symbol does not waive this mixed route", prompt)
         self.assertIn("Do not substitute graph text search", prompt)
-        self.assertIn('trace_call_path once with direction="inbound"', prompt)
+        self.assertIn(
+            'For this case, call trace_call_path exactly once with direction="inbound"',
+            prompt,
+        )
+        self.assertIn("Do not call trace_call_path in any other direction", prompt)
         self.assertIn("use Read to corroborate", prompt)
+        self.assertIn("every named relationship endpoint", prompt)
+        self.assertIn("byte-for-byte, including terminal punctuation", prompt)
 
     def test_explain_symbol_counts_as_graph_relationship_work(self):
         tool_calls = [

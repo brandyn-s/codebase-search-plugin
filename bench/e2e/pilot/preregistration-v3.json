@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "registered_at": "2026-08-10T20:03:25Z",
+  "decision": "wave4_2_targeted_remediation_confirmation",
+  "positioning": "verifiable_code_intelligence",
+  "run_type": "bounded_operator_authorized_targeted_composed_confirmation",
+  "run_id_prefix": "wave42",
+  "source_evidence": {
+    "primary_run_id": "wave41-20260810T193035Z",
+    "primary_manifest_sha256": "246a0301507ef62849bc8f43738a089f04f2056d95219be8a9ef3cb15c7d72f8",
+    "primary_summary_sha256": "763ab3a05de8c5f1310443d5a7d872f0329514e7941231fb375ea31e3f43a3e2",
+    "observed_failure_mass": {
+      "composed_evidence_recall": 0.9,
+      "composed_routing_accuracy": 0.6875,
+      "composed_routing_contract_accuracy": 0.875,
+      "composed_unsupported_claim_rate": 0.3125,
+      "composed_mean_tool_calls": 3.75
+    }
+  },
+  "scope": {
+    "included": [
+      "same eight adjudicated source-grounded cases",
+      "two fresh-session composed-arm repetitions",
+      "conceptual security versus explicit security-path route precedence",
+      "semantic-first mixed routing with one directed relationship trace",
+      "relationship endpoint evidence completeness",
+      "byte-exact candidate claim identity"
+    ],
+    "excluded": [
+      "new cases or changed ground truth",
+      "changed scoring or activation thresholds",
+      "new graph or search binaries",
+      "developer platform expansion",
+      "broad most-accurate-engine claims",
+      "statistical superiority claims"
+    ]
+  },
+  "components": {
+    "code-search": {
+      "version": "v0.3.0",
+      "source_revision": "525368e4e0e531d677de69498be8d458ac5c48ba"
+    },
+    "code-graph": {
+      "version": "v0.8.0-redacted.2",
+      "source_revision": "9cfa8d322bc14d1a1cfab37fb4c1145653b3c601"
+    },
+    "plugin": {
+      "version": "0.4.5",
+      "registration_base_revision": "d330bd6111fb98df00b2fa94e11f0f7295925e9f",
+      "runtime_revision_binding": "copied component-bom.json plus run manifest"
+    }
+  },
+  "controls": {
+    "model": "sonnet",
+    "fallback_model": null,
+    "repetitions": 2,
+    "max_budget_usd_per_case": 1.0,
+    "fresh_session_per_case": true,
+    "repository_is_untrusted_evidence": true,
+    "writes_and_network_tools_denied": true,
+    "same_checkout_for_all_cases": true,
+    "objective_ground_truth": "bench/e2e/pilot/cases-v2.jsonl",
+    "case_ids": [
+      "semantic-auth",
+      "graph-callers",
+      "lexical-config",
+      "mixed-auth-flow",
+      "security-input-sink",
+      "graph-login-callers",
+      "graph-token-callees",
+      "negative-auth-bypass"
+    ],
+    "arms": [
+      "composed"
+    ]
+  },
+  "hypotheses": [
+    {
+      "id": "R1",
+      "statement": "Conceptual how or whether questions will use semantic retrieval in both repetitions even when they mention security or an exact symbol."
+    },
+    {
+      "id": "R2",
+      "statement": "The mixed explanation-and-callers case will use semantic retrieval first and exactly one inbound trace in both repetitions."
+    },
+    {
+      "id": "R3",
+      "statement": "Supported relationship claims will cite every required endpoint in both repetitions."
+    },
+    {
+      "id": "R4",
+      "statement": "Supported candidate assertions will preserve byte-exact claim text including punctuation."
+    }
+  ],
+  "activation_bar": {
+    "fresh_dual_index_readiness": true,
+    "composed_min_evidence_precision": 0.9,
+    "composed_min_evidence_recall": 0.9,
+    "composed_min_routing_accuracy": 1.0,
+    "composed_min_routing_contract_accuracy": 1.0,
+    "composed_max_unsupported_claim_rate": 0.0,
+    "repository_instruction_canary_violations": 0,
+    "portable_proof_export_smoke": "pass"
+  },
+  "falsifier": "Do not claim the targeted remediation is confirmed if any activation-bar condition fails. Stop after this bounded confirmation rather than repeatedly tuning the fixed fixture.",
+  "interpretation_limit": "This post-primary targeted confirmation can confirm the bounded remediation but cannot convert the failed primary run into a superiority or broad accuracy claim."
+}

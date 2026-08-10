@@ -50,6 +50,25 @@ scoring did not change. Two repetitions over this small fixture improve
 stability evidence and expose route variance. They are still not enough for
 statistical rankings or a comparative accuracy grade.
 
+After a completed primary run identifies a bounded failure cell, use the
+separate targeted registration without changing the adjudicated cases:
+
+```bash
+python3 bench/e2e/pilot/run.py \
+  --arms composed \
+  --repetitions 2 \
+  --preregistration bench/e2e/pilot/preregistration-v3.json \
+  --output-dir /isolated/targeted-confirmation \
+  --code-search /verified/bin/code-search-mcp \
+  --code-graph /verified/bin/codebase-memory-mcp \
+  --code-search-storage /isolated/search-storage \
+  --local-model /verified/local-model
+```
+
+The v3 file binds the primary run and its failure mass. Its composed-only result
+is a post-primary remediation confirmation, not a replacement primary run or a
+superiority claim.
+
 ## Run it
 
 ```bash
