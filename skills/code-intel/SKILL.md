@@ -68,6 +68,13 @@ to fuzzy short-name matching. For `search_graph`, set `include_source=true`
 when generation-bound graph evidence is required; ordinary searches retain the
 fast metadata-only path.
 
+Callers of an exact function use `mcp__code-graph__trace_call_path` with
+`direction="inbound"`; callees use the same tool with `direction="outbound"`.
+Use `search_graph` first only when the exact function name is unresolved. Do
+not replace those narrow operations with ad hoc `query_graph` queries. The
+installed query evaluator accepts the documented Cypher subset and does not
+support the full Cypher function surface (for example, `type(r)`).
+
 When the installed code-graph component exposes `get_relationship_evidence`,
 use it after resolving an exact qualified symbol whenever the answer depends on
 an edge rather than only a source location. Preserve its `relationship_ref`,

@@ -66,3 +66,15 @@ def test_code_intel_skill_requires_deterministic_proof_gate():
     assert "scripts/proof_evaluator.py" in skill
     assert "contradiction pass is mandatory" in skill
     assert 'verdict="verified"' in skill
+
+
+def test_code_intel_skill_routes_callers_to_the_supported_trace_tool():
+    skill = (ROOT / "skills" / "code-intel" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    normalized = " ".join(skill.split())
+
+    assert "Callers of an exact function" in skill
+    assert "`mcp__code-graph__trace_call_path`" in skill
+    assert '`direction="inbound"`' in skill
+    assert "does not support the full Cypher function surface" in normalized
