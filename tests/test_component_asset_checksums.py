@@ -16,23 +16,23 @@ HELPER = ROOT / "scripts" / "validate_real_installed.py"
 EXPECTED_ASSETS = {
     "darwin-amd64": {
         "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-        "sha256": "c2f522c905b696b804b99cd8bf72604d73a1a3afe5308fe35cd1825282e3f5a9",
+        "sha256": "2498cff6c384182a590502a3ca185b067ae46e275f508aa1f19cdae4a758ae2a",
     },
     "darwin-arm64": {
         "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-        "sha256": "cfc867909d5164e0ca96d8c34432c708c86b07740841ac1a5fabb9ef5cc9f36a",
+        "sha256": "1e98d3c406fc93e09325f66bbf1f93e12fb830d608f96a153ace37da6c8ee214",
     },
     "linux-amd64": {
         "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-        "sha256": "8d198e7d0e8b40fa7ce904152751804f8543a2c0cbfdaa6295f0a3997fd023b8",
+        "sha256": "084187fab4949d012f14448bf8fd9ca2a02a96b449d3bcdf9f60d52742b8e332",
     },
     "linux-arm64": {
         "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-        "sha256": "97a634fe4fef1601df0cd49df65416aeccf95f4da6f258d06f96d0b749eb0ba2",
+        "sha256": "20e38d48f5a42eb40087deae476861867f103e3ff3e35fa2065ffc5b07d06b7c",
     },
     "windows-amd64": {
         "name": "codebase-memory-mcp-windows-amd64.zip",
-        "sha256": "be4f406e8aac40e3dd52550e2a4f31f90033678469e05fedb347431e1f9dac48",
+        "sha256": "bd64e35a1ac748948d41f42f4a9213313fdb2c58c61c0021fd7deb44b82192a4",
     },
 }
 
@@ -42,10 +42,10 @@ EXPECTED_GRAPH_INSTALL = {
         "bundle": {
             "path": (
                 "compatibility/attestations/"
-                "code-graph-v0.7.0-redacted.3-provenance.jsonl"
+                "code-graph-v0.8.0-redacted.1-provenance.jsonl"
             ),
             "sha256": (
-                "c5a7dbd0fc0c36702fe6e5e820439566380b6cfaadf35e758888625c12d88945"
+                "1ad1906f7d31596ab8a6343ea538037afd7f595e2348744d4f1c876ebd7f9efa"
             ),
         },
         "deny_self_hosted_runners": True,
@@ -57,27 +57,27 @@ EXPECTED_GRAPH_INSTALL = {
     "checksums": {
         "name": "checksums.txt",
         "sha256": (
-            "4712e6c113a79559929a40e596c10415caa8fd2be3307c1f70de04bc9d8db0fc"
+            "020b93facb324ac99c812a2ad64e8100f44cda038ada6b34aa6c2003db80a253"
         ),
     },
     "kind": "github-release",
     "repository": "redacted-org/code-graph",
-    "source_revision": "5145b02f7238f41dae2892a4fafcb545f78064d8",
-    "tag": "v0.7.0-redacted.3",
+    "source_revision": "936178825508db1e8547aca1381dfbb9be586a22",
+    "tag": "v0.8.0-redacted.1",
 }
 
 EXPECTED_SEARCH_INSTALL = {
     "asset": {
-        "name": "redacted_code_search-0.2.1-py3-none-any.whl",
+        "name": "redacted_code_search-0.3.0-py3-none-any.whl",
         "sha256": (
-            "567d4caabdd3b5446bcaa789afc7104fb8cce142ff69d7fc8f1294398532e7e9"
+            "d33bdb596cb224492c88aa564596d797a1b19f7fdbcdc49fd5d247853ccc8fbe"
         ),
     },
     "attestation": {
         "bundle": {
-            "name": "redacted_code_search-0.2.1-provenance.jsonl",
+            "name": "redacted_code_search-0.3.0-provenance.jsonl",
             "sha256": (
-                "b30e5c121d11e7dda02e4d31d7b3e1d0db12b8d6b0de6b4f596f0b6a98228330"
+                "7375904c206e3b21afc42b4eaff1fee5de29730a8aec35d3e883f3b9743dc5c0"
             ),
         },
         "deny_self_hosted_runners": True,
@@ -89,13 +89,13 @@ EXPECTED_SEARCH_INSTALL = {
     "checksums": {
         "name": "SHA256SUMS",
         "sha256": (
-            "127a9ebb80cd14e0820c6244fdaec06a07f7408d03859333cfc2302ad987624a"
+            "0538b02a669a1800cbdacf9b62bb57d44e4a254fc990c45803c2fa3e5ccce8f9"
         ),
     },
     "kind": "github-release",
     "repository": "redacted-org/code-search",
-    "source_revision": "b7d6f84d139899955027ed428ad1a86f9d28a127",
-    "tag": "v0.2.1",
+    "source_revision": "525368e4e0e531d677de69498be8d458ac5c48ba",
+    "tag": "v0.3.0",
 }
 
 
@@ -451,7 +451,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         self.assertIn("vendored", combined)
         self.assertIn("production BOM pins code-search release", readme)
         self.assertIn(
-            "code-search/releases/tag/v0.2.1",
+            "code-search/releases/tag/v0.3.0",
             readme,
         )
         self.assertIn("`install.kind: github-release`", readme)

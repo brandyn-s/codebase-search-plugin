@@ -7,9 +7,9 @@
   },
   "schema_version": 1,
   "source": {
-    "install_descriptor_sha256": "0409f351bc6bdb0ffff2ac8cb5c5081eb1e8cb3a8f2c16a1f41813f031584d42",
+    "install_descriptor_sha256": "2da053a9df8a59f44a11c327de29abf1165773e037eaf3f961cdbbc12f419ec2",
     "kind": "github-release",
-    "version": "v0.7.0-redacted.3"
+    "version": "v0.8.0-redacted.1"
   },
   "tested_capabilities": {
     "inputs": {
@@ -29,9 +29,6 @@
         "schema_version": 1,
         "supported": true
       }
-    },
-    "side_effects": {
-      "index_repository.writes_architecture_report": true
     }
   },
   "tools": {
@@ -495,6 +492,53 @@
         "type": "object"
       },
       "input_schema_sha256": "d431a229440c84f2d8e88d158d1ee12d1d00b7eda071def1a850c2915f276d46"
+    },
+    "get_relationship_evidence": {
+      "input_schema": {
+        "properties": {
+          "direction": {
+            "default": "both",
+            "description": "Which adjacent graph edges to return.",
+            "enum": [
+              "outbound",
+              "inbound",
+              "both"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project name. Defaults to the session project.",
+            "type": "string"
+          },
+          "qualified_name": {
+            "description": "Exact canonical qualified name of the focal symbol.",
+            "type": "string"
+          },
+          "related_qualified_name": {
+            "description": "Optional exact qualified-name filter for the symbol on the other end of the relationship.",
+            "type": "string"
+          },
+          "relationship_types": {
+            "description": "Optional edge-type allowlist, for example CALLS, HTTP_CALLS, ASYNC_CALLS, TESTS, POLICY_GATES.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "qualified_name"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "5df58116ea784d14fa0ecbb0aacb7876fc85ac835b246e4b300aed98c296d069"
     },
     "get_relevant_context": {
       "input_schema": {

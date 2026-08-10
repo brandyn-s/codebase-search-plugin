@@ -33,6 +33,9 @@ export CODE_GRAPH_SKIP_EMBEDDINGS=1         # disable graph cloud embeddings
 
 # 5. Build and verify both indexes
 /index-repo /path/to/your/repo
+
+# 6. Ask through the stable FIND / UNDERSTAND / PROVE facade
+/code-intel Find the request authentication entry points
 ```
 
 This runs both semantic and structural indexing, suppresses graph report
@@ -92,21 +95,26 @@ blast radius.
 
 ### How They Work Together
 
-`/code-explore` automatically routes your question to the right tool:
+`/code-intel` presents three stable public primitives while preserving the
+same automatic backend routing and cross-engine coherence checks:
 
-| Question type | Tool used | Example |
-|--------------|-----------|---------|
-| Conceptual | code-search | "How does authentication work?" |
-| Structural | code-graph | "What calls processOrder?" |
-| Mixed | Both (chained) | "Understand the auth system" → finds auth code, then traces its callers |
+| Public primitive | Routed capability | Example |
+|------------------|-------------------|---------|
+| FIND | Semantic or lexical code-search | "Find the authentication middleware" |
+| UNDERSTAND | Structural code-graph, optionally chained from FIND | "What calls processOrder?" |
+| PROVE | Coherent evidence from both engines plus deterministic contradiction and coverage evaluation | "Prove every request path passes through authorization" |
 
-You don't need to know which tool to use — the plugin decides based on your question.
+You do not need to select a backend. `/code-explore` remains available as the
+compact natural-language discovery and relationship workflow; it uses the
+same engines and preserves canonical evidence when the installed components
+expose it.
 
 ### Skills
 
 | Skill | Purpose |
 |-------|---------|
 | **`/index-repo`** | Index both engines and verify their readiness and checkout identities |
+| **`/code-intel`** | Stable FIND / UNDERSTAND / PROVE facade with coherence, contradiction, and coverage rules |
 | **`/code-explore`** | Ask natural language questions — auto-routes to the right search tool |
 
 ## Offline vs Online Embedding Models
@@ -190,7 +198,7 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.2.1`](https://github.com/redacted-org/code-search/releases/tag/v0.2.1)
+[`v0.3.0`](https://github.com/redacted-org/code-search/releases/tag/v0.3.0)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
@@ -212,7 +220,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.7.0-redacted.3`](https://github.com/redacted-org/code-graph/releases/tag/v0.7.0-redacted.3).
+[`v0.8.0-redacted.1`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.1).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at

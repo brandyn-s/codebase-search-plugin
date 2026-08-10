@@ -49,7 +49,6 @@ CURRENT_GRAPH_CAPABILITIES = {
         },
         "graph_status_ready": True,
     },
-    "side_effects": {"index_repository.writes_architecture_report": True},
 }
 READY_SEARCH_CAPABILITIES = {
     "outputs": {
@@ -71,7 +70,6 @@ READY_GRAPH_CAPABILITIES = {
         },
         "graph_status_ready": True,
     },
-    "side_effects": {"index_repository.writes_architecture_report": True},
 }
 READINESS_REQUIREMENTS = {
     "index_identity": {

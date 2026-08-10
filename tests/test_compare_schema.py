@@ -172,8 +172,8 @@ class CompareSchemaTests(unittest.TestCase):
         )
 
         identity = component_identity(ROOT)
-        self.assertEqual(identity["code-search"]["version"], "v0.2.1")
-        self.assertEqual(identity["code-graph"]["version"], "v0.7.0-redacted.3")
+        self.assertEqual(identity["code-search"]["version"], "v0.3.0")
+        self.assertEqual(identity["code-graph"]["version"], "v0.8.0-redacted.1")
         self.assertEqual(len(identity["bom_sha256"]), 64)
         self.assertEqual(len(identity["routing_policy_sha256"]), 64)
         self.assertEqual(len(identity["code-search"]["tool_snapshot_sha256"]), 64)

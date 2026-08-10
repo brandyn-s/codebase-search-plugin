@@ -3,41 +3,41 @@
   "checkout_unchanged": true,
   "components": {
     "code-graph": {
-      "install_descriptor_sha256": "0409f351bc6bdb0ffff2ac8cb5c5081eb1e8cb3a8f2c16a1f41813f031584d42",
       "index_identity": {
-        "captured_at": "2026-07-27T05:33:37Z",
-        "checkout_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
+        "captured_at": "2026-08-10T10:00:25Z",
+        "checkout_id": "d5ceb403c6d41fb71e2502af53956caffcdd260ea0155ea2b4617d7bcd35042f",
         "dirty_fingerprint": "clean",
-        "index_generation": "c31fe48ce786cbe5d0787097e94369728b9705eae0dc44fe8bba60d86277cb98",
-        "repository_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
+        "index_generation": "be24aa1fef4c21094b61c0593a3260ae517557253e4b1624b9c89372e8dfd9b2",
+        "repository_id": "d5ceb403c6d41fb71e2502af53956caffcdd260ea0155ea2b4617d7bcd35042f",
         "schema_version": 1,
-        "source_revision": "65ed864fc73456428583b9bd7dcf3271095b0f21"
+        "source_revision": "4f385001dfc624938487520d363282aafdacd5d6"
       },
+      "install_descriptor_sha256": "2da053a9df8a59f44a11c327de29abf1165773e037eaf3f961cdbbc12f419ec2",
       "status": "ready",
-      "version": "v0.7.0-redacted.3"
+      "version": "v0.8.0-redacted.1"
     },
     "code-search": {
-      "install_descriptor_sha256": "bc12fa687965a7aebeb19e1435df08bda12f08a72643fc606b81a33338983e79",
       "completion": {
-        "chunks_added": 10,
+        "chunks_added": 11,
         "error": null,
-        "files_added": 10,
+        "files_added": 11,
         "index_identity_status": "ready",
         "index_ready": true,
-        "pipeline_version": "2debf8448500543d",
+        "pipeline_version": "abe8cca1c0784980",
         "success": true
       },
       "index_identity": {
-        "captured_at": "2026-07-27T05:33:37.494221Z",
-        "checkout_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
+        "captured_at": "2026-08-10T10:00:24.801865Z",
+        "checkout_id": "d5ceb403c6d41fb71e2502af53956caffcdd260ea0155ea2b4617d7bcd35042f",
         "dirty_fingerprint": "clean",
-        "index_generation": "c31fe48ce786cbe5d0787097e94369728b9705eae0dc44fe8bba60d86277cb98",
-        "repository_id": "b8625adf3f50d8d0c5d621151853fa594d874517480a30701148e5b6f6247147",
+        "index_generation": "be24aa1fef4c21094b61c0593a3260ae517557253e4b1624b9c89372e8dfd9b2",
+        "repository_id": "d5ceb403c6d41fb71e2502af53956caffcdd260ea0155ea2b4617d7bcd35042f",
         "schema_version": 1,
-        "source_revision": "65ed864fc73456428583b9bd7dcf3271095b0f21"
+        "source_revision": "4f385001dfc624938487520d363282aafdacd5d6"
       },
       "index_ready": true,
-      "version": "v0.2.1"
+      "install_descriptor_sha256": "d167877d4038e2deed93f0cb5a39292b1bf2d89c66924a3f72716012454e8d62",
+      "version": "v0.3.0"
     }
   },
   "evidence_mode": "promotion-candidate",

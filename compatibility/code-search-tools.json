@@ -7,9 +7,9 @@
   },
   "schema_version": 1,
   "source": {
-    "install_descriptor_sha256": "bc12fa687965a7aebeb19e1435df08bda12f08a72643fc606b81a33338983e79",
+    "install_descriptor_sha256": "d167877d4038e2deed93f0cb5a39292b1bf2d89c66924a3f72716012454e8d62",
     "kind": "github-release",
-    "version": "v0.2.1"
+    "version": "v0.3.0"
   },
   "tested_capabilities": {
     "outputs": {
@@ -311,6 +311,83 @@
         "type": "object"
       },
       "input_schema_sha256": "db631c229e27ae839b1f61f138e710f9f5c31eff6b062a52a7d8bd09b25f226a"
+    },
+    "search_code_evidence": {
+      "input_schema": {
+        "properties": {
+          "auto_reindex": {
+            "default": true,
+            "title": "Auto Reindex",
+            "type": "boolean"
+          },
+          "chunk_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Chunk Type"
+          },
+          "file_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Pattern"
+          },
+          "include_context": {
+            "default": true,
+            "title": "Include Context",
+            "type": "boolean"
+          },
+          "k": {
+            "default": 5,
+            "title": "K",
+            "type": "integer"
+          },
+          "max_age_minutes": {
+            "default": 5,
+            "title": "Max Age Minutes",
+            "type": "number"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "search_mode": {
+            "default": "auto",
+            "title": "Search Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_code_evidenceArguments",
+        "type": "object"
+      },
+      "input_schema_sha256": "49d10108aa3d520552052b9dc1eb1c56ad2ce284763ba1f2a196251d068d2835"
     },
     "switch_project": {
       "input_schema": {

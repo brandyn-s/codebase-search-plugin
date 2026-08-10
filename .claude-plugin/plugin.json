@@ -1,6 +1,6 @@
 {
   "name": "codebase-search",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Index and search codebases using semantic embeddings (code-search) and structural graph analysis (code-graph). Provides natural language querying with automatic tool routing.",
   "author": {
     "name": "redacted Security"
