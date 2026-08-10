@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "invariant": {
+    "id": "SEC-AUTH-001",
+    "description": "All administrative routes require authorization.",
+    "assertion": "all_subjects_satisfy"
+  },
+  "subjects": [
+    {
+      "id": "route:GET:/admin/users",
+      "status": "pass",
+      "observation_ids": [
+        "obs:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    },
+    {
+      "id": "route:POST:/admin/config",
+      "status": "pass",
+      "observation_ids": [
+        "obs:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ]
+    },
+    {
+      "id": "route:*:/admin/dynamic",
+      "status": "unresolved",
+      "observation_ids": []
+    }
+  ]
+}

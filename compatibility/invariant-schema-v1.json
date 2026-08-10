@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://redacted.com/code-intel/invariant-schema-v1.json",
+  "title": "Executable Engineering Invariant Bundle",
+  "type": "object",
+  "required": ["schema_version", "invariant", "subjects"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "invariant": {
+      "type": "object",
+      "required": ["id", "description", "assertion"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "assertion": {
+          "enum": ["all_subjects_satisfy", "no_counterexamples"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "observation_ids"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "status": {"enum": ["pass", "fail", "unresolved"]},
+          "observation_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^obs:v1:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

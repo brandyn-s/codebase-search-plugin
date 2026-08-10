@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "invariant": {
+    "id": "SEC-DATA-001",
+    "description": "No external input may reach an SQL execution sink without sanitization or authorization.",
+    "assertion": "no_counterexamples"
+  },
+  "subjects": [
+    {
+      "id": "path:SearchHandler->QueryExecutor",
+      "status": "pass",
+      "observation_ids": [
+        "obs:v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ]
+    },
+    {
+      "id": "path:DebugSearchHandler->RawQueryExecutor",
+      "status": "fail",
+      "observation_ids": [
+        "obs:v1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      ]
+    }
+  ]
+}

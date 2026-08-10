@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://redacted.com/code-intel/proof-schema-v1.json",
+  "title": "Code Intelligence Proof Bundle",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "claim",
+    "index_state",
+    "observations",
+    "contradiction_search",
+    "coverage"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "claim": {"$ref": "#/$defs/claim"},
+    "index_state": {
+      "type": "object",
+      "required": ["coherent", "freshness", "index_generation"],
+      "properties": {
+        "coherent": {"type": "boolean"},
+        "freshness": {"enum": ["current", "stale", "unknown"]},
+        "index_generation": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "observations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/observation"}
+    },
+    "contradiction_search": {
+      "type": "object",
+      "required": ["performed", "strategy", "candidate_count"],
+      "properties": {
+        "performed": {"type": "boolean"},
+        "strategy": {"type": "string", "minLength": 1},
+        "candidate_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["state", "examined", "expected", "unresolved"],
+      "properties": {
+        "state": {"enum": ["complete", "partial", "unknown"]},
+        "examined": {"type": "integer", "minimum": 0},
+        "expected": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "null"}
+          ]
+        },
+        "unresolved": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "invariant": {
+      "type": "object",
+      "required": ["id", "status", "checked", "violations", "unresolved"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["pass", "fail", "unresolved"]},
+        "checked": {"type": "integer", "minimum": 0},
+        "violations": {"type": "integer", "minimum": 0},
+        "unresolved": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "schema_version",
+        "repository_id",
+        "claim_kind",
+        "claim_text"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^claim:v1:[0-9a-f]{64}$"},
+        "schema_version": {"const": 1},
+        "repository_id": {"type": "string", "minLength": 1},
+        "claim_kind": {"type": "string", "minLength": 1},
+        "claim_text": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "required": [
+        "id",
+        "schema_version",
+        "evidence_ref",
+        "stance",
+        "source_engine",
+        "derivation",
+        "confidence_band"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^obs:v1:[0-9a-f]{64}$"},
+        "schema_version": {"const": 1},
+        "evidence_ref": {"$ref": "evidence-schema-v1.json"},
+        "stance": {"enum": ["support", "contradict"]},
+        "source_engine": {"type": "string", "minLength": 1},
+        "derivation": {"type": "string", "minLength": 1},
+        "confidence_band": {"enum": ["high", "medium", "low", "unknown"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
