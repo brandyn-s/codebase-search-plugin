@@ -35,8 +35,9 @@ unset VOYAGE_API_KEY
 export EMBEDDING_PROVIDER="jina"            # local code-search embeddings
 export CODE_GRAPH_SKIP_EMBEDDINGS=1         # disable graph cloud embeddings
 
-# 4. Install the plugin in Claude Code
-/install-plugin /path/to/codebase-search-plugin
+# 4. Register this installed clone and install the namespaced plugin
+claude plugin marketplace add "$PWD"
+claude plugin install codebase-search@redacted-code-intelligence
 
 # 5. Build and verify both indexes
 /index-repo /path/to/your/repo

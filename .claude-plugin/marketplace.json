@@ -1,0 +1,20 @@
+{
+  "name": "redacted-code-intelligence",
+  "owner": {
+    "name": "redacted Security"
+  },
+  "description": "redacted verifiable code-intelligence plugins",
+  "plugins": [
+    {
+      "name": "codebase-search",
+      "source": "./",
+      "description": "Verifiable code intelligence over an exact checkout with semantic discovery, structural understanding, and deterministic proofs.",
+      "version": "0.4.1",
+      "author": {
+        "name": "redacted Security"
+      },
+      "category": "development",
+      "tags": ["code-search", "code-graph", "code-intelligence", "verification"]
+    }
+  ]
+}
