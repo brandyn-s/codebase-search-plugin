@@ -17,14 +17,18 @@
   "properties": {
     "id": {"type": "string", "pattern": "^ev:v1:[0-9a-f]{64}$"},
     "schema_version": {"const": 1},
-    "repository_id": {"type": "string"},
-    "source_revision": {"type": "string"},
-    "index_generation": {"type": "string"},
+    "repository_id": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "string", "minLength": 1},
+    "index_generation": {"type": "string", "minLength": 1},
     "relative_path": {"type": "string", "minLength": 1},
     "start_line": {"type": "integer", "minimum": 0},
     "end_line": {"type": "integer", "minimum": 0},
     "evidence_type": {"type": "string", "minLength": 1},
-    "symbol_ref": {
+    "symbol_ref": {"$ref": "#/$defs/symbolRef"},
+    "relationship_ref": {"$ref": "#/$defs/relationshipRef"}
+  },
+  "$defs": {
+    "symbolRef": {
       "type": "object",
       "required": [
         "id",
@@ -40,13 +44,48 @@
       "properties": {
         "id": {"type": "string", "pattern": "^sym:v1:[0-9a-f]{64}$"},
         "schema_version": {"const": 1},
-        "repository_id": {"type": "string"},
-        "source_revision": {"type": "string"},
+        "repository_id": {"type": "string", "minLength": 1},
+        "source_revision": {"type": "string", "minLength": 1},
         "relative_path": {"type": "string", "minLength": 1},
         "symbol_kind": {"type": "string", "minLength": 1},
         "qualified_name": {"type": "string", "minLength": 1},
         "start_line": {"type": "integer", "minimum": 0},
         "end_line": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "relationshipRef": {
+      "type": "object",
+      "required": [
+        "id",
+        "schema_version",
+        "repository_id",
+        "source_revision",
+        "index_generation",
+        "relation_type",
+        "source_symbol_ref",
+        "target_symbol_ref",
+        "resolution_source",
+        "confidence_band",
+        "runtime_observed",
+        "observation_count"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^rel:v1:[0-9a-f]{64}$"},
+        "schema_version": {"const": 1},
+        "repository_id": {"type": "string", "minLength": 1},
+        "source_revision": {"type": "string", "minLength": 1},
+        "index_generation": {"type": "string", "minLength": 1},
+        "relation_type": {"type": "string", "minLength": 1},
+        "source_symbol_ref": {"$ref": "#/$defs/symbolRef"},
+        "target_symbol_ref": {"$ref": "#/$defs/symbolRef"},
+        "resolution_source": {"type": "string", "minLength": 1},
+        "confidence_band": {
+          "type": "string",
+          "enum": ["high", "medium", "low", "speculative", "unknown"]
+        },
+        "runtime_observed": {"type": "boolean"},
+        "observation_count": {"type": "integer", "minimum": 0}
       },
       "additionalProperties": false
     }

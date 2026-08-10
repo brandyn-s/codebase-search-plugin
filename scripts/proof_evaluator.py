@@ -6,6 +6,11 @@ canonical claim/observation records produced by the retrieval engines and
 applies fail-closed proof rules. A claim can be ``verified`` only when the
 indexes are coherent and current, supporting evidence exists, coverage is
 complete, and an explicit contradiction search was performed.
+
+Relationship evidence is validated recursively. Resolver provenance, runtime
+confirmation, source/target symbol identity, and index generation therefore
+participate in the canonical observation ID and cannot be edited after the
+fact without invalidating the proof bundle.
 """
 
 from __future__ import annotations
@@ -23,7 +28,8 @@ STANCES = {"support", "contradict"}
 FRESHNESS = {"current", "stale", "unknown"}
 COVERAGE_STATES = {"complete", "partial", "unknown"}
 INVARIANT_STATES = {"pass", "fail", "unresolved"}
-CONFIDENCE_BANDS = {"high", "medium", "low", "unknown"}
+CONFIDENCE_BANDS = {"high", "medium", "low", "speculative", "unknown"}
+TRUSTED_SUPPORT_BANDS = {"high", "medium"}
 
 
 class ProofInputError(ValueError):
@@ -65,6 +71,12 @@ def _string(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ProofInputError(f"{field} must be a non-empty string")
     return value.strip()
+
+
+def _boolean(value: object, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise ProofInputError(f"{field} must be a boolean")
+    return value
 
 
 def _nonnegative_int(value: object, field: str) -> int:
@@ -110,6 +122,102 @@ def _validate_symbol_ref(value: object, field: str) -> dict[str, Any]:
     return {"id": expected_id, **payload}
 
 
+def _validate_relationship_ref(
+    value: object,
+    field: str,
+) -> dict[str, Any]:
+    relationship = _object(value, field)
+    if relationship.get("schema_version") != SCHEMA_VERSION:
+        raise ProofInputError(f"{field}.schema_version must equal 1")
+
+    repository_id = _string(
+        relationship.get("repository_id"),
+        f"{field}.repository_id",
+    )
+    source_revision = _string(
+        relationship.get("source_revision"),
+        f"{field}.source_revision",
+    )
+    index_generation = _string(
+        relationship.get("index_generation"),
+        f"{field}.index_generation",
+    )
+    source_symbol = _validate_symbol_ref(
+        relationship.get("source_symbol_ref"),
+        f"{field}.source_symbol_ref",
+    )
+    target_symbol = _validate_symbol_ref(
+        relationship.get("target_symbol_ref"),
+        f"{field}.target_symbol_ref",
+    )
+    for role, symbol in (
+        ("source", source_symbol),
+        ("target", target_symbol),
+    ):
+        if symbol["repository_id"] != repository_id:
+            raise ProofInputError(
+                f"{field}.{role}_symbol_ref belongs to a different repository"
+            )
+        if symbol["source_revision"] != source_revision:
+            raise ProofInputError(
+                f"{field}.{role}_symbol_ref belongs to a different source revision"
+            )
+
+    confidence_band = _canonical_token(
+        _string(
+            relationship.get("confidence_band"),
+            f"{field}.confidence_band",
+        )
+    )
+    if confidence_band not in CONFIDENCE_BANDS:
+        raise ProofInputError(f"{field}.confidence_band is invalid")
+    runtime_observed = _boolean(
+        relationship.get("runtime_observed"),
+        f"{field}.runtime_observed",
+    )
+    observation_count = _nonnegative_int(
+        relationship.get("observation_count"),
+        f"{field}.observation_count",
+    )
+    if runtime_observed and observation_count == 0:
+        raise ProofInputError(
+            f"{field}.runtime_observed requires a positive observation_count"
+        )
+    if not runtime_observed and observation_count != 0:
+        raise ProofInputError(
+            f"{field}.observation_count requires runtime_observed=true"
+        )
+
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "repository_id": repository_id,
+        "source_revision": source_revision,
+        "index_generation": index_generation,
+        "relation_type": _canonical_token(
+            _string(
+                relationship.get("relation_type"),
+                f"{field}.relation_type",
+            )
+        ),
+        "source_symbol_ref": source_symbol,
+        "target_symbol_ref": target_symbol,
+        "resolution_source": _canonical_token(
+            _string(
+                relationship.get("resolution_source"),
+                f"{field}.resolution_source",
+            )
+        ),
+        "confidence_band": confidence_band,
+        "runtime_observed": runtime_observed,
+        "observation_count": observation_count,
+    }
+    expected_id = _stable_id("rel", payload)
+    actual_id = _string(relationship.get("id"), f"{field}.id")
+    if actual_id != expected_id:
+        raise ProofInputError(f"{field}.id does not match canonical contents")
+    return {"id": expected_id, **payload}
+
+
 def _validate_evidence_ref(value: object, field: str) -> dict[str, Any]:
     evidence = _object(value, field)
     if evidence.get("schema_version") != SCHEMA_VERSION:
@@ -140,10 +248,63 @@ def _validate_evidence_ref(value: object, field: str) -> dict[str, Any]:
     }
     if payload["end_line"] < payload["start_line"]:
         raise ProofInputError(f"{field}.end_line cannot precede start_line")
+
+    symbol_ref = None
     if evidence.get("symbol_ref") is not None:
-        payload["symbol_ref"] = _validate_symbol_ref(
+        symbol_ref = _validate_symbol_ref(
             evidence.get("symbol_ref"), f"{field}.symbol_ref"
         )
+        if symbol_ref["repository_id"] != payload["repository_id"]:
+            raise ProofInputError(
+                f"{field}.symbol_ref belongs to a different repository"
+            )
+        if symbol_ref["source_revision"] != payload["source_revision"]:
+            raise ProofInputError(
+                f"{field}.symbol_ref belongs to a different source revision"
+            )
+        if (
+            symbol_ref["relative_path"] != payload["relative_path"]
+            or symbol_ref["start_line"] != payload["start_line"]
+            or symbol_ref["end_line"] != payload["end_line"]
+        ):
+            raise ProofInputError(
+                f"{field}.symbol_ref does not match the evidence location"
+            )
+        payload["symbol_ref"] = symbol_ref
+
+    if evidence.get("relationship_ref") is not None:
+        relationship_ref = _validate_relationship_ref(
+            evidence.get("relationship_ref"),
+            f"{field}.relationship_ref",
+        )
+        for key in (
+            "repository_id",
+            "source_revision",
+            "index_generation",
+        ):
+            if relationship_ref[key] != payload[key]:
+                raise ProofInputError(
+                    f"{field}.relationship_ref has a different {key}"
+                )
+        source_symbol = relationship_ref["source_symbol_ref"]
+        if (
+            source_symbol["relative_path"] != payload["relative_path"]
+            or source_symbol["start_line"] != payload["start_line"]
+            or source_symbol["end_line"] != payload["end_line"]
+        ):
+            raise ProofInputError(
+                f"{field}.relationship_ref source does not match the evidence location"
+            )
+        if symbol_ref is None:
+            raise ProofInputError(
+                f"{field}.relationship_ref requires the source symbol_ref"
+            )
+        if source_symbol["id"] != symbol_ref["id"]:
+            raise ProofInputError(
+                f"{field}.relationship_ref source does not match symbol_ref"
+            )
+        payload["relationship_ref"] = relationship_ref
+
     expected_id = _stable_id("ev", payload)
     actual_id = _string(evidence.get("id"), f"{field}.id")
     if actual_id != expected_id:
@@ -187,6 +348,18 @@ def _validate_observation(
         raise ProofInputError(f"{field} belongs to a different repository")
     if evidence["index_generation"] != index_generation:
         raise ProofInputError(f"{field} belongs to a different index generation")
+
+    relationship = evidence.get("relationship_ref")
+    if relationship is not None:
+        if relationship["confidence_band"] != band:
+            raise ProofInputError(
+                f"{field}.confidence_band disagrees with relationship_ref"
+            )
+        expected_derivation = relationship["resolution_source"]
+        if derivation != expected_derivation:
+            raise ProofInputError(
+                f"{field}.derivation disagrees with relationship_ref"
+            )
 
     payload = {
         "schema_version": SCHEMA_VERSION,
@@ -354,6 +527,30 @@ def validate_bundle(bundle: object) -> dict[str, Any]:
     }
 
 
+def _runtime_confirmed(observation: dict[str, Any]) -> bool:
+    relationship = observation["evidence_ref"].get("relationship_ref")
+    return bool(relationship and relationship["runtime_observed"])
+
+
+def _relationship_summary(
+    observations: list[dict[str, Any]],
+) -> dict[str, Any]:
+    relationships = [
+        item["evidence_ref"]["relationship_ref"]
+        for item in observations
+        if item["evidence_ref"].get("relationship_ref") is not None
+    ]
+    return {
+        "count": len(relationships),
+        "runtime_confirmed": sum(
+            1 for item in relationships if item["runtime_observed"]
+        ),
+        "resolution_sources": sorted(
+            {item["resolution_source"] for item in relationships}
+        ),
+    }
+
+
 def _confidence(
     verdict: str,
     supporting: list[dict[str, Any]],
@@ -365,8 +562,13 @@ def _confidence(
             "rationale": ["proof evaluation was blocked before evidence could be trusted"],
         }
     if verdict == "contradicted":
+        trusted_counterexample = any(
+            item["confidence_band"] in TRUSTED_SUPPORT_BANDS
+            or _runtime_confirmed(item)
+            for item in contradicting
+        )
         return {
-            "band": "high" if contradicting else "medium",
+            "band": "high" if trusted_counterexample else "medium",
             "rationale": [
                 "a counterexample or invariant violation directly contradicts the claim"
             ],
@@ -379,20 +581,24 @@ def _confidence(
 
     engines = {item["source_engine"] for item in supporting}
     derivations = {item["derivation"] for item in supporting}
+    runtime_corroborated = any(_runtime_confirmed(item) for item in supporting)
     independent = len(engines) >= 2 or len(derivations) >= 2
-    if independent:
-        return {
-            "band": "high",
-            "rationale": [
-                "complete proof with an explicit contradiction pass",
-                "support is corroborated by independent engines or derivations",
-            ],
-        }
+    if independent or runtime_corroborated:
+        rationale = ["complete proof with an explicit contradiction pass"]
+        if independent:
+            rationale.append(
+                "support is corroborated by independent engines or derivations"
+            )
+        if runtime_corroborated:
+            rationale.append(
+                "at least one static relationship is confirmed by runtime traces"
+            )
+        return {"band": "high", "rationale": rationale}
     return {
         "band": "medium",
         "rationale": [
             "complete proof with an explicit contradiction pass",
-            "support comes from one engine and derivation",
+            "support comes from one trusted engine and derivation",
         ],
     }
 
@@ -448,6 +654,12 @@ def evaluate(bundle: object) -> dict[str, Any]:
             caveats.append("invariant_unresolved")
         if not supporting:
             caveats.append("no_supporting_evidence")
+        elif not any(
+            item["confidence_band"] in TRUSTED_SUPPORT_BANDS
+            or _runtime_confirmed(item)
+            for item in supporting
+        ):
+            caveats.append("supporting_evidence_not_trustworthy")
         verdict = "unresolved" if caveats else "verified"
 
     if verdict not in VERDICTS:  # defensive guard for future edits
@@ -472,6 +684,7 @@ def evaluate(bundle: object) -> dict[str, Any]:
         "coverage": coverage,
         "contradiction_search": contradiction,
         "invariant": invariant,
+        "relationship_evidence": _relationship_summary(observations),
     }
 
 

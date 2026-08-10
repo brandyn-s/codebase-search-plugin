@@ -24,6 +24,27 @@ def _claim():
     return {"id": module._stable_id("claim", payload), **payload}
 
 
+def _symbol(
+    *,
+    path: str,
+    qualified_name: str,
+    symbol_kind: str = "function",
+    start_line: int = 1,
+    end_line: int = 10,
+):
+    payload = {
+        "schema_version": 1,
+        "repository_id": REPOSITORY_ID,
+        "source_revision": SOURCE_REVISION,
+        "relative_path": path,
+        "symbol_kind": symbol_kind,
+        "qualified_name": qualified_name,
+        "start_line": start_line,
+        "end_line": end_line,
+    }
+    return {"id": module._stable_id("sym", payload), **payload}
+
+
 def _observation(
     *,
     path: str,
@@ -32,18 +53,9 @@ def _observation(
     derivation: str,
     stance: str = "support",
     generation: str = INDEX_GENERATION,
+    confidence_band: str = "high",
 ):
-    symbol_payload = {
-        "schema_version": 1,
-        "repository_id": REPOSITORY_ID,
-        "source_revision": SOURCE_REVISION,
-        "relative_path": path,
-        "symbol_kind": "function",
-        "qualified_name": qualified_name,
-        "start_line": 1,
-        "end_line": 10,
-    }
-    symbol = {"id": module._stable_id("sym", symbol_payload), **symbol_payload}
+    symbol = _symbol(path=path, qualified_name=qualified_name)
     evidence_payload = {
         "schema_version": 1,
         "repository_id": REPOSITORY_ID,
@@ -65,7 +77,76 @@ def _observation(
         "stance": stance,
         "source_engine": source_engine,
         "derivation": derivation,
-        "confidence_band": "high",
+        "confidence_band": confidence_band,
+    }
+    return {
+        "id": module._stable_id("obs", observation_payload),
+        **observation_payload,
+    }
+
+
+def _relationship_observation(
+    *,
+    relationship_generation: str = INDEX_GENERATION,
+    evidence_generation: str = INDEX_GENERATION,
+    resolution_source: str = "go_lsp_cross_file+runtime_trace",
+    confidence_band: str = "high",
+    runtime_observed: bool = True,
+    observation_count: int = 17,
+):
+    source = _symbol(
+        path="src/api/admin.py",
+        qualified_name="repo.src.api.admin.admin_handler",
+    )
+    target = _symbol(
+        path="src/auth/middleware.py",
+        qualified_name="repo.src.auth.middleware.AuthMiddleware.verify",
+        symbol_kind="method",
+    )
+    relationship_payload = {
+        "schema_version": 1,
+        "repository_id": REPOSITORY_ID,
+        "source_revision": SOURCE_REVISION,
+        "index_generation": relationship_generation,
+        "relation_type": "calls",
+        "source_symbol_ref": source,
+        "target_symbol_ref": target,
+        "resolution_source": resolution_source,
+        "confidence_band": confidence_band,
+        "runtime_observed": runtime_observed,
+        "observation_count": observation_count,
+    }
+    relationship = {
+        "id": module._stable_id("rel", relationship_payload),
+        **relationship_payload,
+    }
+    evidence_payload = {
+        "schema_version": 1,
+        "repository_id": REPOSITORY_ID,
+        "source_revision": SOURCE_REVISION,
+        "index_generation": evidence_generation,
+        "relative_path": source["relative_path"],
+        "start_line": source["start_line"],
+        "end_line": source["end_line"],
+        "evidence_type": (
+            "runtime_validated_relationship"
+            if runtime_observed
+            else "static_relationship"
+        ),
+        "symbol_ref": source,
+        "relationship_ref": relationship,
+    }
+    evidence = {
+        "id": module._stable_id("ev", evidence_payload),
+        **evidence_payload,
+    }
+    observation_payload = {
+        "schema_version": 1,
+        "evidence_ref": evidence,
+        "stance": "support",
+        "source_engine": "code-graph",
+        "derivation": resolution_source,
+        "confidence_band": confidence_band,
     }
     return {
         "id": module._stable_id("obs", observation_payload),
@@ -127,6 +208,34 @@ class ProofEvaluatorTests(unittest.TestCase):
             "proof:v1:5ad05cdd391d4c55f3bc7bbf6cabecefea17d423d9c7802c886ed29b44175df7",
         )
         self.assertEqual(len(result["supporting_observation_ids"]), 2)
+        self.assertEqual(
+            result["relationship_evidence"],
+            {
+                "count": 0,
+                "runtime_confirmed": 0,
+                "resolution_sources": [],
+            },
+        )
+
+    def test_runtime_confirmed_relationship_can_corroborate_one_engine(self):
+        bundle = _bundle()
+        bundle["observations"] = [_relationship_observation()]
+        result = module.evaluate(bundle)
+        self.assertEqual(result["verdict"], "verified")
+        self.assertEqual(result["confidence"]["band"], "high")
+        self.assertEqual(result["relationship_evidence"]["count"], 1)
+        self.assertEqual(
+            result["relationship_evidence"]["runtime_confirmed"],
+            1,
+        )
+        self.assertEqual(
+            result["relationship_evidence"]["resolution_sources"],
+            ["go_lsp_cross_file+runtime_trace"],
+        )
+        self.assertIn(
+            "at least one static relationship is confirmed by runtime traces",
+            result["confidence"]["rationale"],
+        )
 
     def test_counterexample_contradicts_claim(self):
         bundle = _bundle()
@@ -203,6 +312,84 @@ class ProofEvaluatorTests(unittest.TestCase):
             "different index generation",
         ):
             module.evaluate(bundle)
+
+    def test_relationship_from_other_generation_is_rejected(self):
+        bundle = _bundle()
+        bundle["observations"] = [
+            _relationship_observation(
+                relationship_generation="x" * 64,
+                evidence_generation=INDEX_GENERATION,
+            )
+        ]
+        with self.assertRaisesRegex(
+            module.ProofInputError,
+            "relationship_ref has a different index_generation",
+        ):
+            module.evaluate(bundle)
+
+    def test_runtime_relationship_requires_observations(self):
+        bundle = _bundle()
+        bundle["observations"] = [
+            _relationship_observation(observation_count=0)
+        ]
+        with self.assertRaisesRegex(
+            module.ProofInputError,
+            "requires a positive observation_count",
+        ):
+            module.evaluate(bundle)
+
+    def test_relationship_derivation_must_match_canonical_ref(self):
+        bundle = _bundle()
+        observation = _relationship_observation()
+        observation["derivation"] = "rewritten_after_capture"
+        payload = {
+            key: observation[key]
+            for key in (
+                "schema_version",
+                "evidence_ref",
+                "stance",
+                "source_engine",
+                "derivation",
+                "confidence_band",
+            )
+        }
+        observation["id"] = module._stable_id("obs", payload)
+        bundle["observations"] = [observation]
+        with self.assertRaisesRegex(
+            module.ProofInputError,
+            "derivation disagrees with relationship_ref",
+        ):
+            module.evaluate(bundle)
+
+    def test_forged_relationship_provenance_is_rejected(self):
+        bundle = _bundle()
+        observation = _relationship_observation()
+        observation["evidence_ref"]["relationship_ref"][
+            "resolution_source"
+        ] = "forged_compiler_result"
+        bundle["observations"] = [observation]
+        with self.assertRaisesRegex(
+            module.ProofInputError,
+            "canonical contents",
+        ):
+            module.evaluate(bundle)
+
+    def test_speculative_only_support_cannot_verify_claim(self):
+        bundle = _bundle()
+        bundle["observations"] = [
+            _relationship_observation(
+                resolution_source="fuzzy_suffix_match",
+                confidence_band="speculative",
+                runtime_observed=False,
+                observation_count=0,
+            )
+        ]
+        result = module.evaluate(bundle)
+        self.assertEqual(result["verdict"], "unresolved")
+        self.assertIn(
+            "supporting_evidence_not_trustworthy",
+            result["caveats"],
+        )
 
     def test_forged_reference_id_is_rejected(self):
         bundle = _bundle()

@@ -26,9 +26,11 @@ conceptual implementations, similar code, or files relevant to an issue.
 - Evidence-backed conceptual search: prefer the additive
   `search_code_evidence` tool when the installed code-search component exposes
   it. It uses the same retrieval pipeline and emits generation-bound
-  `evidence_ref`, `symbol_ref`, and `observation_ref` objects only when the
-  semantic index identity is ready. Until the tested component BOM includes
-  that tool, use the ordinary search tool and do not manufacture references.
+  `evidence_ref` and `observation_ref` objects only when the semantic index
+  identity is unchanged across the search. It emits `symbol_ref` only when a
+  canonical qualified name is available; never convert a short or merged chunk
+  name into a graph identity. Until the tested component BOM includes that
+  tool, use the ordinary search tool and do not manufacture references.
 - Issue-to-file localization: `mcp__code-search__code_localize`.
 
 Return the smallest sufficient set of file/line evidence.
@@ -46,6 +48,13 @@ to fuzzy short-name matching. For `search_graph`, set `include_source=true`
 when generation-bound graph evidence is required; ordinary searches retain the
 fast metadata-only path.
 
+When the installed code-graph component exposes `get_relationship_evidence`,
+use it after resolving an exact qualified symbol whenever the answer depends on
+an edge rather than only a source location. Preserve its `relationship_ref`,
+resolver source, confidence tier/band, and runtime-observation fields. A
+runtime-confirmed edge corroborates a static relationship; it does not erase
+coverage gaps elsewhere in the graph.
+
 ## PROVE
 
 Use when the user asks for a security/compliance assertion, exhaustive
@@ -58,7 +67,9 @@ A PROVE answer is a deterministic proof workflow, not ordinary retrieval:
 1. Pass the coherence gate below before gathering mixed evidence.
 2. Create one canonical claim record with a stable `claim:v1` identity.
 3. Gather supporting observations. Preserve backend-emitted `observation_ref`
-   objects without editing their IDs or nested evidence.
+   objects without editing their IDs or nested evidence. For relationship
+   claims, prefer canonical relationship observations over prose assembled from
+   separate source and target results.
 4. Run an explicit contradiction search designed to falsify the claim. Record
    the strategy and the number of counterexample candidates examined.
 5. For exhaustive assertions, enumerate the complete subject set. Classify each
@@ -91,12 +102,19 @@ surfaces, and relationships excluded by the primary query. A result with no
 counterexample is not verified when coverage is partial, an index is stale,
 subjects are unresolved, or the contradiction pass was skipped.
 
+For relationship claims, the contradiction pass must not inspect only the
+selected edge type or resolver tier. Search alternate direct edges, unresolved
+call sites, ambiguous/fuzzy relationships, runtime-only service paths, and
+subjects omitted by the primary direction/filter.
+
 ### Confidence rules
 
 Do not infer confidence from a semantic score alone. The proof evaluator derives
-confidence from index coherence, completeness, contradiction outcomes, and
-independent engines or derivations. Report its rationale rather than replacing
-it with a subjective estimate.
+confidence from index coherence, completeness, contradiction outcomes,
+independent engines or derivations, resolver provenance, and runtime
+corroboration. Runtime-confirmed static relationships may provide independent
+corroboration, but low/speculative-only support cannot verify a claim. Report
+the evaluator rationale rather than replacing it with a subjective estimate.
 
 ## Coherence gate
 
@@ -109,10 +127,13 @@ using mixed evidence must return `blocked` when this gate fails.
 
 ## Evidence contract
 
-When a backend returns canonical `symbol_ref`, `evidence_ref`, or
-`observation_ref` fields, preserve them through chaining rather than
-re-resolving by short symbol name. References are content-addressed; changing a
-field without recomputing the canonical ID invalidates the proof bundle.
+When a backend returns canonical `symbol_ref`, `relationship_ref`,
+`evidence_ref`, or `observation_ref` fields, preserve them through chaining
+rather than re-resolving by short symbol name. References are content-addressed;
+changing a field without recomputing the canonical ID invalidates the proof
+bundle. Relationship references also bind source and target symbols, edge type,
+resolver source, confidence, runtime confirmation, observation count, and index
+generation.
 
 ## Output
 
@@ -122,6 +143,7 @@ For PROVE, include:
 - proof ID and verdict;
 - confidence band and rationale;
 - supporting and contradicting evidence locations;
+- relationship resolver sources and runtime-confirmed count when present;
 - coverage counts and unresolved subjects;
 - contradiction-search strategy;
 - material freshness, fallback, or index-coherence caveats.

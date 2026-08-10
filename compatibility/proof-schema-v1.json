@@ -104,7 +104,9 @@
         "stance": {"enum": ["support", "contradict"]},
         "source_engine": {"type": "string", "minLength": 1},
         "derivation": {"type": "string", "minLength": 1},
-        "confidence_band": {"enum": ["high", "medium", "low", "unknown"]}
+        "confidence_band": {
+          "enum": ["high", "medium", "low", "speculative", "unknown"]
+        }
       },
       "additionalProperties": false
     }
