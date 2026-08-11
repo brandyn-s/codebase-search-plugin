@@ -56,7 +56,7 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                 " {'type':'system','subtype':'init','model':'claude-sonnet-5',"
                 "'plugins':[{'name':'codebase-search',"
                 "'source':'codebase-search@redacted-code-intelligence',"
-                "'version':'0.4.9'}],'mcp_servers':["
+                "'version':'0.4.10'}],'mcp_servers':["
                 "{'name':'plugin:codebase-search:code-search','status':'connected'},"
                 "{'name':'plugin:codebase-search:code-graph','status':'connected'}]},\n"
                 " {'type':'assistant','message':{'content':["
@@ -100,7 +100,7 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                     "--marketplace-root",
                     str(marketplace),
                     "--plugin-version",
-                    "0.4.9",
+                    "0.4.10",
                 ],
                 cwd=ROOT,
                 capture_output=True,
@@ -116,7 +116,7 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                 receipt["plugin_id"],
                 "codebase-search@redacted-code-intelligence",
             )
-            self.assertEqual(receipt["plugin_version"], "0.4.9")
+            self.assertEqual(receipt["plugin_version"], "0.4.10")
             self.assertEqual(receipt["marketplace_root"], str(marketplace.resolve()))
             self.assertTrue(receipt["checkout_unchanged"])
             self.assertEqual(receipt["denied_tool_calls"], 0)
@@ -140,7 +140,7 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                     {
                         "name": "codebase-search",
                         "source": "codebase-search@redacted-code-intelligence",
-                        "version": "0.4.9",
+                        "version": "0.4.10",
                     }
                 ],
                 "mcp_servers": [
@@ -197,7 +197,7 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
         with self.assertRaisesRegex(
             CAPTURE_MODULE.CaptureError, "required MCP call failed"
         ):
-            CAPTURE_MODULE._validate_trace(events, "0.4.9")
+            CAPTURE_MODULE._validate_trace(events, "0.4.10")
 
 
 if __name__ == "__main__":
