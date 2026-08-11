@@ -948,10 +948,12 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         settings = json.loads(command[command.index("--settings") + 1])
 
         pre = settings["hooks"]["PreToolUse"][0]
+        terminal = settings["hooks"]["PreToolUse"][1]
         post = settings["hooks"]["PostToolUse"][0]
         failure = settings["hooks"]["PostToolUseFailure"][0]
         stop = settings["hooks"]["Stop"][0]
         self.assertEqual(pre["matcher"], "mcp__code-graph__trace_call_path")
+        self.assertEqual(terminal["matcher"], "StructuredOutput")
         self.assertIn(
             "code_intel_trace_guard.py pre-tool-use",
             pre["hooks"][0]["command"],
@@ -963,6 +965,10 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn(
             "code_intel_trace_guard.py post-tool-failure",
             failure["hooks"][0]["command"],
+        )
+        self.assertIn(
+            "code_intel_trace_guard.py pre-terminal-output",
+            terminal["hooks"][0]["command"],
         )
         self.assertIn("code_intel_trace_guard.py stop", stop["hooks"][0]["command"])
 
@@ -991,7 +997,15 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             schema["properties"]["evidence_ids"]["description"],
         )
         self.assertIn(
-            "unnamed upstream",
+            "Inspected locations",
+            schema["properties"]["evidence_ids"]["description"],
+        )
+        self.assertIn(
+            "sole direct implementation",
+            schema["properties"]["evidence_ids"]["description"],
+        )
+        self.assertIn(
+            "candidate-named endpoint",
             schema["properties"]["evidence_ids"]["description"],
         )
 
@@ -1050,17 +1064,21 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         )
         self.assertIn("Do not call trace_call_path in any other direction", prompt)
         self.assertIn("use Read to corroborate", prompt)
-        self.assertIn("every named relationship endpoint", prompt)
+        self.assertIn("definition of every named endpoint", prompt)
         self.assertIn("Before setting disposition to supported", prompt)
-        self.assertIn("An import or call site does not substitute", prompt)
         self.assertIn("synthetic terminal line", prompt)
         self.assertIn("smallest sufficient evidence set", prompt)
         self.assertIn("Shrink each path:start-end range", prompt)
         self.assertIn("imports, blank lines, or surrounding context", prompt)
         self.assertIn("deletion test", prompt)
         self.assertIn("claim-scoped, not flow-scoped", prompt)
-        self.assertIn("imports or aliases are discovery context", prompt)
+        self.assertIn("imports and aliases are discovery context", prompt)
         self.assertIn("upstream or downstream", prompt)
+        self.assertIn("Finish the required retrieval route before any Read", prompt)
+        self.assertIn("Inspecting a location does not make it answer evidence", prompt)
+        self.assertIn("do not cite an unnamed helper", prompt)
+        self.assertIn("Endpoint resolution is an adjudication check", prompt)
+        self.assertIn("every candidate-named endpoint", prompt)
         self.assertIn("Use not_supported only when", prompt)
         self.assertIn("directly contradicts at least one atomic clause", prompt)
         self.assertIn("disposition must be supported", prompt)

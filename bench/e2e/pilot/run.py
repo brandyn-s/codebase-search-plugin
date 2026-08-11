@@ -154,9 +154,11 @@ def _response_schema(case: dict[str, Any]) -> dict[str, Any]:
         "Repeat the exact candidate only for supported; otherwise return null."
     )
     schema["properties"]["evidence_ids"]["description"] = (
-        "Return a deletion-tested, claim-scoped minimum. Exclude imports, aliases, "
-        "and unnamed upstream or downstream endpoints and relationships unless "
-        "they are the only direct implementation of an atomic clause."
+        "Return a deletion-tested, claim-scoped minimum. Inspected locations are "
+        "not automatically evidence. Include minimal source evidence for every "
+        "candidate-named endpoint. Exclude imports, aliases, and unnamed upstream "
+        "or downstream helpers, endpoints, and relationships unless one is the "
+        "sole direct implementation of an otherwise unsupported atomic clause."
     )
     return schema
 
@@ -555,8 +557,10 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
     discovery = (
         " MCP tools are deferred. Before any Read, call ToolSearch exactly once "
         "to load every route-required code-search and code-graph tool in one "
-        "discovery call, then use the required MCP route. Never guess a repository "
-        "path; Read only paths returned by retrieval."
+        "discovery call, then use the required MCP route. Finish the required "
+        "retrieval route before any Read; for mixed work this means semantic "
+        "retrieval followed by the directed graph relationship call. Never guess "
+        "a repository path; Read only paths returned by retrieval."
         if arm != "native"
         else ""
     )
@@ -608,20 +612,25 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         "lines, or surrounding context unless they are necessary for an atomic "
         "claim or named relationship endpoint. Before returning JSON, apply a "
         "deletion test to every evidence ID: remove it unless its deletion would "
-        "leave an atomic clause or named endpoint unsupported. Do not return "
+        "leave an atomic clause or candidate-named endpoint unsupported. Do not return "
         "discovery, contextual, or duplicate corroborating locations. Evidence is "
-        "claim-scoped, not flow-scoped. For a direct relationship, imports or "
-        "aliases are discovery context, not evidence; cite the direct call site and "
-        "named endpoint definitions only. Do not cite extra upstream or downstream "
-        "endpoints, call sites, or relationships not named by the candidate unless "
-        "an unnamed helper is the only direct implementation of an atomic clause. "
-        "For a relationship claim, include source evidence for every named "
-        "relationship endpoint, both caller and callee or source and target."
+        "claim-scoped, not flow-scoped. Inspecting a location does not make it "
+        "answer evidence. For a direct relationship, imports and aliases are "
+        "discovery context; the direct call site is edge evidence. Include the "
+        "minimal definition or implementation evidence for every candidate-named "
+        "endpoint; one location may satisfy both the edge and endpoint roles. In "
+        "particular, do not cite an "
+        "unnamed helper merely because retrieval found it or you read it; cite it "
+        "only when it is the sole direct implementation of an atomic clause and no "
+        "candidate-named or direct-call location supports that clause. Do not cite "
+        "extra upstream or downstream endpoints, call sites, or relationships."
         " Before setting disposition to supported, decompose the candidate into "
         "atomic relationships and read or retrieve the definition of every named "
-        "endpoint. An import or call site does not substitute for the other "
-        "endpoint's definition. If any endpoint is missing and cannot be resolved, "
-        "set disposition to unresolved and asserted_claim to null. Read can display "
+        "endpoint. Endpoint resolution is an adjudication check; cite minimal source "
+        "evidence for every candidate-named endpoint, but do not promote other "
+        "inspected definitions into evidence. If any endpoint is missing and cannot "
+        "be resolved, set disposition to unresolved and asserted_claim to null. Read "
+        "can display "
         "one extra numbered empty line after a file-ending newline; never include "
         "that synthetic terminal line in an evidence range. Use not_supported only "
         "when cited code directly contradicts at least one atomic clause. If direct "
@@ -647,25 +656,29 @@ def _trace_guard_settings(
     guard = ROOT / "scripts" / "code_intel_trace_guard.py"
     command = shlex.join([sys.executable, str(guard)])
 
-    def command_hook(mode: str) -> list[dict[str, Any]]:
-        return [
-            {
-                "matcher": "mcp__code-graph__trace_call_path",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": f"{command} {mode}",
-                        "timeout": 5,
-                    }
-                ],
-            }
-        ]
+    def command_hook(mode: str, matcher: str) -> dict[str, Any]:
+        return {
+            "matcher": matcher,
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"{command} {mode}",
+                    "timeout": 5,
+                }
+            ],
+        }
+
+    def trace_hook(mode: str) -> list[dict[str, Any]]:
+        return [command_hook(mode, "mcp__code-graph__trace_call_path")]
 
     return {
         "hooks": {
-            "PreToolUse": command_hook("pre-tool-use"),
-            "PostToolUse": command_hook("post-tool-use"),
-            "PostToolUseFailure": command_hook("post-tool-failure"),
+            "PreToolUse": [
+                command_hook("pre-tool-use", "mcp__code-graph__trace_call_path"),
+                command_hook("pre-terminal-output", "StructuredOutput"),
+            ],
+            "PostToolUse": trace_hook("post-tool-use"),
+            "PostToolUseFailure": trace_hook("post-tool-failure"),
             "Stop": [
                 {
                     "hooks": [

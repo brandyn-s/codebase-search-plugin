@@ -122,9 +122,10 @@ For an exact function relationship, make one `trace_call_path` call with
 `direction="inbound"` for callers or `direction="outbound"` for callees.
 Do not add `search_graph` before or after a trace that resolves the exact
 symbol; use it only when the symbol is unresolved. Use `Read` to corroborate returned
-relationships and pin source lines without repeating graph discovery. Cite
-every named relationship endpoint, both caller and callee or source and target,
-even when the trace already shows one endpoint.
+relationships and pin source lines without repeating graph discovery. Resolve
+every named relationship endpoint before asserting the edge. Cite the direct
+call site as edge evidence and minimal source evidence for every candidate-named
+endpoint. One location may satisfy both the edge and endpoint roles.
 
 ### Step 3: Auto-chain if the answer needs the other tool
 
@@ -140,12 +141,15 @@ even when the trace already shows one endpoint.
 ### Step 4: Evidence Closure Gate
 
 Before treating a relationship as verified, decompose the candidate into
-atomic relationships and make a source-evidence ledger for every named
-endpoint. Read or retrieve the definition of each caller and callee, or each
-source and target. An import or call site does not substitute for the other
-endpoint's definition. If any endpoint is missing, retrieve it before
-answering; if it cannot be resolved, do not present the relationship as
-supported and state that it remains unresolved.
+atomic relationships and make an inspection ledger for every named endpoint.
+Read or retrieve the definition of each caller and callee, or each source and
+target. Endpoint resolution is an adjudication check, but inspected locations
+do not automatically become answer evidence. Include minimal source evidence
+for every candidate-named endpoint. Apply a deletion test to the remaining
+answer evidence: omit unnamed definitions, helpers, and context unless removing
+the location would leave an atomic claim unsupported. If any endpoint is missing,
+retrieve it before answering; if it cannot be resolved, do not present the
+relationship as supported and state that it remains unresolved.
 
 When pinning coordinates, do not copy a synthetic terminal line from `Read`.
 `Read` can display one extra numbered empty line after a file-ending newline;

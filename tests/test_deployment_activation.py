@@ -23,7 +23,7 @@ def write_fake_claude(
     marketplace_root: str,
     install_root: str = (
         "/Users/example/.claude/plugins/cache/redacted-code-intelligence/"
-        "codebase-search/0.4.10"
+        "codebase-search/0.4.11"
     ),
 ) -> None:
     path.write_text(
@@ -31,7 +31,7 @@ def write_fake_claude(
         "import json, sys\n"
         "args = sys.argv[1:]\n"
         "if args == ['plugin', 'list', '--json']:\n"
-        f"    print(json.dumps([{{'id':'codebase-search@redacted-code-intelligence','version':'0.4.10','scope':'user','enabled':True,'installPath':'{install_root}'}}]))\n"
+        f"    print(json.dumps([{{'id':'codebase-search@redacted-code-intelligence','version':'0.4.11','scope':'user','enabled':True,'installPath':'{install_root}'}}]))\n"
         "elif args == ['plugin', 'marketplace', 'list', '--json']:\n"
         f"    print(json.dumps([{{'name':'redacted-code-intelligence','source':'{marketplace_source}','installLocation':'{marketplace_root}'}}]))\n"
         "elif args == ['mcp', 'list']:\n"
@@ -56,7 +56,7 @@ def write_runtime_receipt(
             "subtype": "init",
             "model": "claude-sonnet-5",
             "plugins": [
-                {"id": "codebase-search@redacted-code-intelligence", "version": "0.4.10"}
+                {"id": "codebase-search@redacted-code-intelligence", "version": "0.4.11"}
             ],
             "mcp_servers": [
                 {"name": "plugin:codebase-search:code-search", "status": "connected"},
@@ -112,7 +112,7 @@ def write_runtime_receipt(
                 "schema_version": 1,
                 "receipt_type": "installed-plugin-runtime",
                 "plugin_id": "codebase-search@redacted-code-intelligence",
-                "plugin_version": "0.4.10",
+                "plugin_version": "0.4.11",
                 "marketplace_root": marketplace_root,
                 "checkout_unchanged": True,
                 "canary_violations": 0,

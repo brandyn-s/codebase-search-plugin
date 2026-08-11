@@ -24,7 +24,9 @@ Classify the question before calling tools. Use the first matching route:
 2. A question combining conceptual explanation with callers or relationships
    uses code-search semantic/default retrieval first, then exactly one directed
    graph relationship query. An explicit symbol does not waive this mixed route
-   when explanation and relationship are both requested.
+   when explanation and relationship are both requested. When retrieval resolves
+   the exact structural target, complete both route steps before reading source;
+   a discovery result is not answer evidence merely because it was inspected.
 3. A callers-only or relationship-only question with an explicit symbol uses
    the narrowest graph tool directly.
 4. Pure literal or location lookup for an exact identifier or config key uses
@@ -61,14 +63,18 @@ Return the smallest sufficient set of file/line evidence. Shrink every
 `path:start-end` range to only the lines needed to prove the answer; omit
 imports, blank lines, or surrounding context unless they are necessary for an
 atomic claim or named relationship endpoint. Apply a deletion test to every
-location: remove it unless its deletion would leave an atomic clause or named
-endpoint unsupported. Do not return discovery, contextual, or duplicate
+location: remove it unless its deletion would leave an atomic clause or
+candidate-named endpoint unsupported. Do not return discovery, contextual, or duplicate
 corroborating locations. Evidence is claim-scoped, not flow-scoped. For a
-direct relationship, imports or aliases are discovery context, not evidence;
-cite the direct call site and named endpoint definitions only. Do not cite
-extra upstream or downstream endpoints, call sites, or relationships not named
-by the candidate unless an unnamed helper is the only direct implementation of
-an atomic clause.
+direct relationship, imports and aliases are discovery context; the direct
+call site is edge evidence. Include minimal definition or implementation
+evidence for every candidate-named endpoint; one location may satisfy both the
+edge and endpoint roles. Inspecting a location does not make it answer evidence.
+Do not cite an unnamed helper
+merely because retrieval found it or you read it; cite it only when it is the
+sole direct implementation of an atomic clause and no candidate-named or
+direct-call location supports that clause. Do not cite extra upstream or
+downstream endpoints, call sites, or relationships.
 
 ## UNDERSTAND
 
@@ -88,9 +94,11 @@ Callers of an exact function use `mcp__code-graph__trace_call_path` with
 Call the directed trace once. Do not add `search_graph` before or after it when
 the exact symbol resolves; use `search_graph` only when the exact function name
 is unresolved. Use `Read` only to corroborate the returned relationship and pin
-source lines. For a relationship claim, cite every named relationship endpoint,
-both caller and callee or source and target, even when the trace already shows
-one endpoint. Do not replace those narrow operations with ad hoc `query_graph`
+source lines. Resolve every named relationship endpoint before asserting the
+edge, but keep inspection separate from answer evidence. Cite the direct call
+site for the edge and minimal source evidence for every candidate-named
+endpoint. Endpoint resolution is an adjudication check; do not promote other
+inspected definitions into answer evidence. Do not replace those narrow operations with ad hoc `query_graph`
 queries. The installed query evaluator accepts the documented Cypher subset
 and does not support the full Cypher function surface (for example, `type(r)`).
 

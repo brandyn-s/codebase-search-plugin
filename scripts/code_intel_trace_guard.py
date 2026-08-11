@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Any
 
 SESSION_ID = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
-MODES = {"pre-tool-use", "post-tool-use", "post-tool-failure", "stop"}
+MODES = {
+    "pre-tool-use",
+    "pre-terminal-output",
+    "post-tool-use",
+    "post-tool-failure",
+    "stop",
+}
 
 
 def _load_input() -> dict[str, Any]:
@@ -84,7 +90,8 @@ def main() -> int:
     if len(sys.argv) != 2 or sys.argv[1] not in MODES:
         print(
             "usage: code_intel_trace_guard.py "
-            "pre-tool-use|post-tool-use|post-tool-failure|stop",
+            "pre-tool-use|pre-terminal-output|post-tool-use|"
+            "post-tool-failure|stop",
             file=sys.stderr,
         )
         return 2
@@ -99,6 +106,13 @@ def main() -> int:
         root = _state_root()
         state_path = root / f"{value['session_id']}.json"
         state = _read_state(state_path)
+        if mode == "pre-terminal-output":
+            if state is not None and state.get("status") == "completed":
+                return 0
+            return _block(
+                "Call trace_call_path exactly once as required before returning "
+                "structured output"
+            )
         if mode == "pre-tool-use":
             if state is None:
                 try:

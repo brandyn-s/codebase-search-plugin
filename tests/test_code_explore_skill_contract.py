@@ -11,6 +11,7 @@ SKILL = ROOT / "skills" / "code-explore" / "SKILL.md"
 class CodeExploreSkillContractTests(unittest.TestCase):
     def test_exact_relationships_use_one_directed_trace_then_source_read(self):
         text = SKILL.read_text(encoding="utf-8")
+        normalized = " ".join(text.split())
 
         self.assertIn("one `trace_call_path` call", text)
         self.assertIn('`direction="inbound"` for callers', text)
@@ -18,6 +19,8 @@ class CodeExploreSkillContractTests(unittest.TestCase):
         self.assertIn("Do not add `search_graph`", text)
         self.assertIn("Use `Read` to corroborate", text)
         self.assertIn("every named relationship endpoint", text)
+        self.assertIn("direct call site as edge evidence", normalized)
+        self.assertIn("every candidate-named endpoint", normalized)
 
     def test_supported_relationships_require_endpoint_evidence_closure(self):
         text = SKILL.read_text(encoding="utf-8")
@@ -25,10 +28,12 @@ class CodeExploreSkillContractTests(unittest.TestCase):
 
         self.assertIn("Evidence Closure Gate", text)
         self.assertIn("decompose the candidate into atomic relationships", normalized)
-        self.assertIn("An import or call site does not substitute", normalized)
+        self.assertIn("inspection ledger", normalized)
+        self.assertIn("inspected locations do not automatically become", normalized)
+        self.assertIn("Apply a deletion test", normalized)
         self.assertIn("do not present the relationship as supported", normalized)
         self.assertIn("synthetic terminal line", normalized)
-        self.assertIn("both caller and callee", text)
+        self.assertIn("each caller and callee", text)
 
     def test_conceptual_security_and_mixed_queries_have_unambiguous_precedence(self):
         text = SKILL.read_text(encoding="utf-8")

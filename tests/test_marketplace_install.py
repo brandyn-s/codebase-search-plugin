@@ -15,7 +15,7 @@ class MarketplaceInstallTests(unittest.TestCase):
             (ROOT / ".claude-plugin" / "plugin.json").read_text()
         )
 
-        self.assertEqual(plugin["version"], "0.4.10")
+        self.assertEqual(plugin["version"], "0.4.11")
         self.assertEqual(marketplace["name"], "redacted-code-intelligence")
         self.assertEqual(len(marketplace["plugins"]), 1)
         entry = marketplace["plugins"][0]

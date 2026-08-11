@@ -103,8 +103,10 @@ def test_code_intel_skill_binds_relationship_evidence_and_claim_identity():
     )
     normalized = " ".join(skill.split())
 
-    assert "every named relationship endpoint" in normalized
-    assert "both caller and callee" in normalized
+    assert "Resolve every named relationship endpoint" in normalized
+    assert "inspection separate from answer evidence" in normalized
+    assert "Endpoint resolution is an adjudication check" in normalized
+    assert "every candidate-named endpoint" in normalized
     assert "byte-for-byte, including terminal punctuation" in normalized
 
 
@@ -119,7 +121,7 @@ def test_code_intel_skill_requires_minimal_exact_evidence_ranges():
     assert "imports, blank lines, or surrounding context" in normalized
     assert "deletion test" in normalized
     assert "claim-scoped, not flow-scoped" in normalized
-    assert "imports or aliases are discovery context" in normalized
+    assert "imports and aliases are discovery context" in normalized
     assert "upstream or downstream" in normalized
     assert "directly contradicts at least one atomic clause" in normalized
     assert "disposition must be supported" in normalized

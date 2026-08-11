@@ -23,6 +23,7 @@ class TraceGuardTests(unittest.TestCase):
     def _run(self, mode: str, **overrides: object):
         event_names = {
             "pre-tool-use": "PreToolUse",
+            "pre-terminal-output": "PreToolUse",
             "post-tool-use": "PostToolUse",
             "post-tool-failure": "PostToolUseFailure",
             "stop": "Stop",
@@ -86,6 +87,31 @@ class TraceGuardTests(unittest.TestCase):
         self.assertIn("before stopping", missing.stderr)
         self.assertEqual(complete.returncode, 0, complete.stderr)
         self.assertEqual(reentry.returncode, 0, reentry.stderr)
+
+    def test_terminal_output_requires_completed_trace(self):
+        missing = self._run(
+            "pre-terminal-output",
+            tool_name="StructuredOutput",
+            tool_use_id="output-1",
+        )
+        self.assertEqual(self._run("pre-tool-use").returncode, 0)
+        pending = self._run(
+            "pre-terminal-output",
+            tool_name="StructuredOutput",
+            tool_use_id="output-2",
+        )
+        self.assertEqual(self._run("post-tool-use").returncode, 0)
+        complete = self._run(
+            "pre-terminal-output",
+            tool_name="StructuredOutput",
+            tool_use_id="output-3",
+        )
+
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("before returning structured output", missing.stderr)
+        self.assertEqual(pending.returncode, 2)
+        self.assertIn("before returning structured output", pending.stderr)
+        self.assertEqual(complete.returncode, 0, complete.stderr)
 
 
 if __name__ == "__main__":
