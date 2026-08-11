@@ -57,7 +57,10 @@ conceptual implementations, similar code, or files relevant to an issue.
   tool, use the ordinary search tool and do not manufacture references.
 - Issue-to-file localization: `mcp__code-search__code_localize`.
 
-Return the smallest sufficient set of file/line evidence.
+Return the smallest sufficient set of file/line evidence. Shrink every
+`path:start-end` range to only the lines needed to prove the answer; omit
+imports, blank lines, or surrounding context unless they are necessary for an
+atomic claim or named relationship endpoint.
 
 ## UNDERSTAND
 

@@ -106,3 +106,14 @@ def test_code_intel_skill_binds_relationship_evidence_and_claim_identity():
     assert "every named relationship endpoint" in normalized
     assert "both caller and callee" in normalized
     assert "byte-for-byte, including terminal punctuation" in normalized
+
+
+def test_code_intel_skill_requires_minimal_exact_evidence_ranges():
+    skill = (ROOT / "skills" / "code-intel" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    normalized = " ".join(skill.split())
+
+    assert "smallest sufficient set" in normalized
+    assert "Shrink every `path:start-end` range" in normalized
+    assert "imports, blank lines, or surrounding context" in normalized
