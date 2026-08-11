@@ -1370,6 +1370,17 @@ class TranscriptProjectionTests(unittest.TestCase):
             ).encode("utf-8")
         ).hexdigest()
         evidence_ref = {"id": evidence_id, **evidence_payload}
+        structured_result = json.dumps(
+            {
+                "results": [
+                    {
+                        "evidence_candidates": [
+                            {"evidence_ref": evidence_ref}
+                        ]
+                    }
+                ]
+            }
+        )
         claim = "Authentication checks the token signature."
         case = {
             "case_id": "typed-evidence",
@@ -1402,14 +1413,16 @@ class TranscriptProjectionTests(unittest.TestCase):
             },
             {
                 "type": "user",
+                "tool_use_result": {
+                    "content": structured_result,
+                    "structuredContent": {"result": structured_result},
+                },
                 "message": {
                     "content": [
                         {
                             "type": "tool_result",
                             "tool_use_id": "tool-search",
-                            "content": json.dumps(
-                                {"results": [{"evidence_ref": evidence_ref}]}
-                            ),
+                            "content": "Search completed; rendered preview truncated.",
                         }
                     ]
                 },
@@ -1441,6 +1454,72 @@ class TranscriptProjectionTests(unittest.TestCase):
         self.assertEqual(record["evidence_false_positives"], 0)
         self.assertEqual(record["evidence_false_negatives"], 0)
         self.assertTrue(record["adjudication_correct"])
+
+        legacy = deepcopy(transcript)
+        legacy[2].pop("tool_use_result")
+        legacy[2]["message"]["content"][0]["content"] = structured_result
+        legacy_record = project_transcript(
+            legacy,
+            case=case,
+            arm="composed",
+            run_id="pilot-typed-evidence-legacy",
+        )
+        self.assertEqual(legacy_record["evidence"], ["src/auth.py:7-9"])
+
+        read_payload = {
+            **evidence_payload,
+            "relative_path": "src/untrusted.py",
+            "start_line": 1,
+            "end_line": 1,
+        }
+        read_id = "ev:v1:" + hashlib.sha256(
+            json.dumps(
+                read_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        read_ref = {"id": read_id, **read_payload}
+        with_read_decoy = deepcopy(transcript)
+        with_read_decoy[-1]["structured_output"]["evidence_ids"] = [read_id]
+        with_read_decoy[-1:-1] = [
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-read",
+                            "name": "Read",
+                            "input": {"file_path": "src/untrusted.py"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "tool_use_result": {
+                    "type": "text",
+                    "file": {"content": json.dumps({"evidence_ref": read_ref})},
+                },
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "tool-read",
+                            "content": json.dumps({"evidence_ref": read_ref}),
+                        }
+                    ]
+                },
+            },
+        ]
+        with self.assertRaisesRegex(ValueError, "unseen backend evidence ID"):
+            project_transcript(
+                with_read_decoy,
+                case=case,
+                arm="composed",
+                run_id="pilot-read-decoy",
+            )
 
     def test_model_declared_canary_is_non_gating_without_host_evidence(self):
         case = {

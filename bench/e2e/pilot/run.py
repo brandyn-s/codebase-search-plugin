@@ -397,32 +397,70 @@ def _source_location(value: object) -> str | None:
 def _backend_evidence_registry(
     transcript: list[dict[str, Any]],
 ) -> dict[str, set[str]]:
-    registry: dict[str, set[str]] = {}
+    backend_tool_use_ids: set[str] = set()
     for event in transcript:
+        if event.get("type") != "assistant":
+            continue
         message = event.get("message")
         content = message.get("content") if isinstance(message, dict) else None
         for block in content if isinstance(content, list) else []:
-            if not isinstance(block, dict) or block.get("type") != "tool_result":
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
                 continue
-            for value in _walk_json(block.get("content")):
-                evidence = value.get("evidence_ref")
-                if not isinstance(evidence, dict):
-                    continue
-                evidence_id = evidence.get("id")
-                location = _source_location(evidence)
-                if (
-                    not isinstance(evidence_id, str)
-                    or BACKEND_EVIDENCE_ID.fullmatch(evidence_id) is None
-                    or location is None
-                ):
-                    continue
-                locations = {location}
-                relationship = evidence.get("relationship_ref")
-                if isinstance(relationship, dict):
-                    for role in ("source_symbol_ref", "target_symbol_ref"):
-                        endpoint = _source_location(relationship.get(role))
-                        if endpoint is not None:
-                            locations.add(endpoint)
+            tool_use_id = block.get("id")
+            tool_name = block.get("name")
+            if (
+                isinstance(tool_use_id, str)
+                and tool_use_id
+                and isinstance(tool_name, str)
+                and tool_name.startswith(("mcp__code-search__", "mcp__code-graph__"))
+            ):
+                backend_tool_use_ids.add(tool_use_id)
+
+    registry: dict[str, set[str]] = {}
+
+    def collect(value: object) -> dict[str, set[str]]:
+        collected: dict[str, set[str]] = {}
+        for item in _walk_json(value):
+            evidence = item.get("evidence_ref")
+            if not isinstance(evidence, dict):
+                continue
+            evidence_id = evidence.get("id")
+            location = _source_location(evidence)
+            if (
+                not isinstance(evidence_id, str)
+                or BACKEND_EVIDENCE_ID.fullmatch(evidence_id) is None
+                or location is None
+            ):
+                continue
+            locations = {location}
+            relationship = evidence.get("relationship_ref")
+            if isinstance(relationship, dict):
+                for role in ("source_symbol_ref", "target_symbol_ref"):
+                    endpoint = _source_location(relationship.get(role))
+                    if endpoint is not None:
+                        locations.add(endpoint)
+            collected.setdefault(evidence_id, set()).update(locations)
+        return collected
+
+    for event in transcript:
+        message = event.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        result_blocks = [
+            block
+            for block in (content if isinstance(content, list) else [])
+            if isinstance(block, dict)
+            and block.get("type") == "tool_result"
+            and block.get("tool_use_id") in backend_tool_use_ids
+            and block.get("is_error") is not True
+        ]
+        for block in result_blocks:
+            structured = event.get("tool_use_result") if len(result_blocks) == 1 else None
+            if isinstance(structured, dict) and structured.get("is_error") is True:
+                continue
+            observed = collect(structured)
+            if not observed:
+                observed = collect(block.get("content"))
+            for evidence_id, locations in observed.items():
                 registry.setdefault(evidence_id, set()).update(locations)
     return registry
 
