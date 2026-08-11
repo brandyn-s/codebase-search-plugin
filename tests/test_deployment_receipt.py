@@ -33,7 +33,7 @@ class DeploymentReceiptWriterTests(unittest.TestCase):
                     "--evidence-root",
                     str(evidence_root),
                     "--plugin-version",
-                    "0.4.16",
+                    "0.4.17",
                     "--runtime-manifest",
                     str(runtime_manifest),
                     "--holdout-manifest",
@@ -55,7 +55,7 @@ class DeploymentReceiptWriterTests(unittest.TestCase):
             {
                 "schema_version": 1,
                 "receipt_type": "code-intelligence-deployment",
-                "plugin_version": "0.4.16",
+                "plugin_version": "0.4.17",
                 "runtime_manifest": {
                     "path": "runtime/manifest.json",
                     "sha256": runtime_sha256,

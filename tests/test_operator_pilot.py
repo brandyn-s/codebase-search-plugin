@@ -43,7 +43,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             "fallback_model": None,
             "max_turns": 8,
             "timeout_seconds": 180.0,
-            "max_budget_usd_per_case": 1.0,
+            "max_budget_usd_per_case": 2.5,
         }
         preregistration = {
             "run_type": "bounded_operator_authorized_fresh_holdout_confirmation",
@@ -88,6 +88,10 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         cases[2]["routing_contract"] = {"trace_call_path": {"count": 1}}
         _validate_fresh_holdout_corpus(preregistration, cases)
 
+        controls["max_budget_usd_per_case"] = 1.0
+        with self.assertRaisesRegex(ValueError, "execution controls"):
+            _validate_fresh_holdout_corpus(preregistration, cases)
+
     def test_new_fresh_holdout_contract_schema_requires_positive_routes(self):
         controls = {
             "arms": ["composed"],
@@ -97,7 +101,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             "fallback_model": None,
             "max_turns": 8,
             "timeout_seconds": 180.0,
-            "max_budget_usd_per_case": 1.0,
+            "max_budget_usd_per_case": 2.5,
             "routing_contract_schema_version": 1,
         }
         preregistration = {
@@ -1189,7 +1193,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("search_code_evidence", prompt)
         self.assertIn('search_mode="semantic"', prompt)
         self.assertIn(
-            "then exactly one graph relationship tool",
+            "then complete the required graph relationship sequence",
             prompt,
         )
         self.assertIn("Do not use keyword mode or graph text search", prompt)

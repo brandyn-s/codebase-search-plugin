@@ -138,6 +138,7 @@ BACKEND_EVIDENCE_ID = re.compile(r"^ev:v1:[0-9a-f]{64}$")
 FRESH_HOLDOUT_RUN_TYPE = (
     "bounded_operator_authorized_fresh_holdout_confirmation"
 )
+FRESH_HOLDOUT_MAX_BUDGET_USD = 2.5
 FRESH_HOLDOUT_GATES = {
     "arm": "composed",
     "min_evidence_precision": 0.9,
@@ -690,8 +691,8 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
             "mixed": (
                 "The host selected the mixed route. Call code-search "
                 "search_code_evidence with search_mode=\"semantic\" first, then "
-                "exactly one graph relationship tool. Do not use keyword mode or "
-                "graph text search."
+                "complete the required graph relationship sequence. Do not use "
+                "keyword mode or graph text search."
             ),
             "security": (
                 "The host selected the security route. Use only code-graph "
@@ -1505,7 +1506,8 @@ def _validate_fresh_holdout_corpus(
         or controls.get("fallback_model") is not None
         or controls.get("max_turns") != 8
         or controls.get("timeout_seconds") != 180.0
-        or controls.get("max_budget_usd_per_case") != 1.0
+        or controls.get("max_budget_usd_per_case")
+        != FRESH_HOLDOUT_MAX_BUDGET_USD
         or preregistration.get("outcome_gates") != FRESH_HOLDOUT_GATES
     ):
         raise ValueError("fresh holdout execution controls or gates drifted")

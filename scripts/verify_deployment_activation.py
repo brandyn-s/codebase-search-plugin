@@ -18,6 +18,7 @@ PLUGIN_ID = "codebase-search@redacted-code-intelligence"
 SEMANTIC_TOOL = "mcp__plugin_codebase-search_code-search__search_code_evidence"
 RELATIONSHIP_TOOL = "mcp__plugin_codebase-search_code-graph__trace_call_path"
 ALLOWED_RUNTIME_TOOLS = {"ToolSearch", SEMANTIC_TOOL, RELATIONSHIP_TOOL}
+FRESH_HOLDOUT_MAX_BUDGET_USD = 2.5
 
 
 class VerificationError(RuntimeError):
@@ -425,7 +426,8 @@ def _passing_holdout(
         or controls.get("fallback_model") is not None
         or controls.get("max_turns") != 8
         or controls.get("timeout_seconds") != 180.0
-        or controls.get("max_budget_usd_per_case") != 1.0
+        or controls.get("max_budget_usd_per_case")
+        != FRESH_HOLDOUT_MAX_BUDGET_USD
         or controls.get("routing_contract_schema_version") != 1
         or bindings.get("schema_version") != 2
         or bindings.get("state_guard_sha256") != state_guard_sha256

@@ -43,12 +43,20 @@ python3 bench/e2e/pilot/run.py \
   --local-model /verified/local-model
 ```
 
-The preregistration records a $1.00 per-case hard ceiling. It was amended after
-the first operator attempt produced structured output but exhausted the prior
-$0.50 ceiling before the terminal result; cases, hypotheses, thresholds, and
-scoring did not change. Two repetitions over this small fixture improve
-stability evidence and expose route variance. They are still not enough for
-statistical rankings or a comparative accuracy grade.
+Historical preregistrations retain their original $1.00 per-case ceiling. Fresh
+deployment holdouts use a $2.50 per-case hard ceiling after calibration showed
+that valid eight-round-trip mixed-route work could require $1.30 and that
+repeated-case cost varied materially. This is a ceiling, not an expected spend;
+the unchanged eight-round-trip and 180-second limits remain the primary
+execution bounds. Two repetitions over this small fixture improve stability
+evidence and expose route variance. They are still not enough for statistical
+rankings or a comparative accuracy grade.
+The measurements and retained constraints are recorded in
+[`BUDGET_CALIBRATION.md`](BUDGET_CALIBRATION.md).
+
+Run broad deterministic checks in CI. For an empirical release decision, run
+one fresh five-route, two-repetition holdout exactly once; do not add canary
+holdouts or tune against a consumed bank.
 
 After a completed primary run identifies a bounded failure cell, use the
 separate targeted registration without changing the adjudicated cases:
