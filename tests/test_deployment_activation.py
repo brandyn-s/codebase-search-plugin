@@ -16,18 +16,22 @@ def write_fake_claude(
     *,
     marketplace_source: str,
     marketplace_root: str,
+    install_root: str = (
+        "/Users/example/.claude/plugins/cache/redacted-code-intelligence/"
+        "codebase-search/0.4.9"
+    ),
 ) -> None:
     path.write_text(
         "#!/usr/bin/env python3\n"
         "import json, sys\n"
         "args = sys.argv[1:]\n"
         "if args == ['plugin', 'list', '--json']:\n"
-        "    print(json.dumps([{'id':'codebase-search@redacted-code-intelligence','version':'0.4.9','scope':'user','enabled':True,'installPath':'/tmp/cache/0.4.9'}]))\n"
+        f"    print(json.dumps([{{'id':'codebase-search@redacted-code-intelligence','version':'0.4.9','scope':'user','enabled':True,'installPath':'{install_root}'}}]))\n"
         "elif args == ['plugin', 'marketplace', 'list', '--json']:\n"
         f"    print(json.dumps([{{'name':'redacted-code-intelligence','source':'{marketplace_source}','installLocation':'{marketplace_root}'}}]))\n"
         "elif args == ['mcp', 'list']:\n"
-        f"    print('plugin:codebase-search:code-search: {marketplace_root}/bin/run-code-search  - ✔ Connected')\n"
-        f"    print('plugin:codebase-search:code-graph: {marketplace_root}/bin/codebase-memory-mcp  - ✔ Connected')\n"
+        f"    print('plugin:codebase-search:code-search: {install_root}/bin/run-code-search  - ✔ Connected')\n"
+        f"    print('plugin:codebase-search:code-graph: {install_root}/bin/codebase-memory-mcp  - ✔ Connected')\n"
         "else:\n"
         "    raise SystemExit(2)\n",
         encoding="utf-8",

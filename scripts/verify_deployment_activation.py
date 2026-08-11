@@ -49,20 +49,28 @@ def _json_output(claude: Path, *arguments: str) -> list[dict]:
 def _durable_runtime_connected(
     plugin: dict, marketplace: dict, mcp_output: str, expected_version: str
 ) -> bool:
-    root = marketplace.get("installLocation")
+    marketplace_root = marketplace.get("installLocation")
+    install_root = plugin.get("installPath")
+    expected_install_suffix = (
+        "/.claude/plugins/cache/redacted-code-intelligence/"
+        f"codebase-search/{expected_version}"
+    )
     if (
         plugin.get("version") != expected_version
         or plugin.get("scope") != "user"
         or plugin.get("enabled") is not True
         or marketplace.get("source") != "github"
-        or not isinstance(root, str)
-        or "/.claude/plugins/marketplaces/" not in root
-        or "/worktrees/" in root
+        or not isinstance(marketplace_root, str)
+        or "/.claude/plugins/marketplaces/" not in marketplace_root
+        or "/worktrees/" in marketplace_root
+        or not isinstance(install_root, str)
+        or not install_root.endswith(expected_install_suffix)
+        or "/worktrees/" in install_root
     ):
         return False
     expected = {
-        "code-search": f"{root.rstrip('/')}/bin/run-code-search",
-        "code-graph": f"{root.rstrip('/')}/bin/codebase-memory-mcp",
+        "code-search": f"{install_root.rstrip('/')}/bin/run-code-search",
+        "code-graph": f"{install_root.rstrip('/')}/bin/codebase-memory-mcp",
     }
     for component, command in expected.items():
         matching = [
