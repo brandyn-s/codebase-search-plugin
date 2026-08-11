@@ -54,6 +54,10 @@ GRAPH_TOOL_SUFFIXES = {
     "__get_review_context",
     "__get_relationship_evidence",
 }
+SECURITY_TOOL_SUFFIXES = {
+    "__query_security_surfaces",
+    "__trace_data_flow",
+}
 
 
 def _parse_args() -> argparse.Namespace:
@@ -150,7 +154,7 @@ def _locked_state(session_id: str) -> Iterator[tuple[Path, dict[str, Any]]]:
 
 
 def _route_capabilities(tool_name: str, tool_input: dict[str, Any]) -> set[str]:
-    if tool_name.endswith("__query_security_surfaces"):
+    if any(tool_name.endswith(suffix) for suffix in SECURITY_TOOL_SUFFIXES):
         return {"security"}
     if tool_name.endswith("__search_code"):
         if tool_input.get("search_mode") == "keyword" or "code-graph" in tool_name:

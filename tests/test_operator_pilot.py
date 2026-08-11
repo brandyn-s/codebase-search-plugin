@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import unittest
 
 from bench.e2e.pilot.run import (
+    _arm_tools,
     _claude_command,
     _claude_environment,
     _host_canary_violation,
@@ -398,6 +399,23 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             readiness_evidence.write_text(
                 json.dumps(readiness, indent=2) + "\n", encoding="utf-8"
             )
+            selected_case = next(
+                json.loads(line)
+                for line in cases.read_text(encoding="utf-8").splitlines()
+                if json.loads(line)["case_id"] == "semantic-auth"
+            )
+            canonical_selected_cases = (
+                json.dumps(
+                    selected_case,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n"
+            ).encode("utf-8")
+            self.assertNotEqual(
+                hashlib.sha256(cases.read_bytes()).hexdigest(),
+                hashlib.sha256(canonical_selected_cases).hexdigest(),
+            )
             preregistration = {
                 "controls": {
                     "arms": ["composed"],
@@ -411,7 +429,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 "bindings": {
                     "schema_version": 2,
                     "cases_sha256": hashlib.sha256(
-                        cases.read_bytes()
+                        canonical_selected_cases
                     ).hexdigest(),
                     "target_manifest_sha256": hashlib.sha256(
                         target_manifest.read_bytes()
@@ -1230,6 +1248,17 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         ]
 
         self.assertTrue(_route_satisfies("mixed", tool_calls))
+
+    def test_trace_data_flow_counts_as_security_and_is_available(self):
+        tool_calls = [
+            {
+                "tool": "mcp__code-graph__trace_data_flow",
+                "arguments": {"source": "request.body", "max_depth": 6},
+            }
+        ]
+
+        self.assertTrue(_route_satisfies("security", tool_calls))
+        self.assertIn("mcp__code-graph__trace_data_flow", _arm_tools("composed"))
 
     def test_keyword_evidence_search_is_lexical_not_semantic(self):
         tool_calls = [

@@ -97,7 +97,7 @@ Callers of an exact function use `mcp__code-graph__trace_call_path` with
 `direction="inbound"`; callees use the same tool with `direction="outbound"`.
 Call the directed trace once. Do not add `search_graph` before or after it when
 the exact symbol resolves; use `search_graph` only when the exact function name
-is unresolved. Use `Read` only to inspect or corroborate the returned
+is unresolved. Use `Read` only to corroborate or inspect the returned
 relationship; it cannot create or alter answer evidence. Resolve every named
 relationship endpoint before asserting the
 edge, but keep inspection separate from answer evidence. Cite the direct call

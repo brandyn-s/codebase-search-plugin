@@ -51,7 +51,10 @@ GRAPH_TOOLS = {
     "mcp__code-graph__get_review_context",
     "mcp__code-graph__get_relationship_evidence",
 }
-SECURITY_TOOLS = {"mcp__code-graph__query_security_surfaces"}
+SECURITY_TOOLS = {
+    "mcp__code-graph__query_security_surfaces",
+    "mcp__code-graph__trace_data_flow",
+}
 READ_ONLY_SEARCH_TOOLS = (
     "mcp__code-search__search_code",
     "mcp__code-search__search_code_evidence",
@@ -76,6 +79,7 @@ READ_ONLY_GRAPH_TOOLS = (
     "mcp__code-graph__get_code_snippet",
     "mcp__code-graph__get_architecture",
     "mcp__code-graph__query_security_surfaces",
+    "mcp__code-graph__trace_data_flow",
     "mcp__code-graph__get_review_context",
     "mcp__code-graph__get_relationship_evidence",
 )
@@ -602,6 +606,13 @@ def _load_cases(path: Path, selected: tuple[str, ...]) -> list[dict[str, Any]]:
     if missing:
         raise ValueError("unknown case IDs: " + ", ".join(missing))
     return [cases[case_id] for case_id in selected]
+
+
+def _canonical_cases_bytes(cases: list[dict[str, Any]]) -> bytes:
+    return "".join(
+        json.dumps(case, sort_keys=True, separators=(",", ":")) + "\n"
+        for case in cases
+    ).encode("utf-8")
 
 
 def _arm_tools(arm: str) -> tuple[str, ...]:
@@ -1570,6 +1581,12 @@ def _validate_preregistered_controls(
     if bindings is not None:
         if not isinstance(bindings, dict):
             raise ValueError("preregistration bindings must be an object")
+        binding_schema_version = bindings.get("schema_version")
+        if (
+            binding_schema_version is not None
+            and binding_schema_version not in {1, 2}
+        ):
+            raise ValueError("preregistration binding schema is unsupported")
         expected_cases_sha256 = bindings.get("cases_sha256")
         if (
             not isinstance(expected_cases_sha256, str)
@@ -1578,7 +1595,14 @@ def _validate_preregistered_controls(
             raise ValueError(
                 "preregistration bindings.cases_sha256 must be a lowercase SHA-256"
             )
-        if _sha256(args.cases) != expected_cases_sha256:
+        if binding_schema_version == 2:
+            selected_cases = _load_cases(args.cases, tuple(observed_cases))
+            observed_cases_sha256 = hashlib.sha256(
+                _canonical_cases_bytes(selected_cases)
+            ).hexdigest()
+        else:
+            observed_cases_sha256 = _sha256(args.cases)
+        if observed_cases_sha256 != expected_cases_sha256:
             raise ValueError("cases SHA-256 differs from preregistration")
         expected_target_manifest_sha256 = bindings.get("target_manifest_sha256")
         if (
@@ -1595,10 +1619,7 @@ def _validate_preregistered_controls(
                 "target manifest SHA-256 differs from preregistration"
             )
         _validate_target_fixture(args.target, args.target_manifest)
-        binding_schema_version = bindings.get("schema_version")
         if binding_schema_version is not None:
-            if binding_schema_version not in {1, 2}:
-                raise ValueError("preregistration binding schema is unsupported")
             if args.max_turns != controls.get("max_turns"):
                 raise ValueError("execution max turns differs from preregistration")
             if args.timeout_seconds != controls.get("timeout_seconds"):
@@ -1716,13 +1737,7 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     raw_root = args.output_dir / "raw"
     raw_root.mkdir()
     selected_cases = args.output_dir / "cases.jsonl"
-    selected_cases.write_text(
-        "".join(
-            json.dumps(case, sort_keys=True, separators=(",", ":")) + "\n"
-            for case in cases
-        ),
-        encoding="utf-8",
-    )
+    selected_cases.write_bytes(_canonical_cases_bytes(cases))
     preregistration_copy = args.output_dir / args.preregistration.name
     shutil.copy2(args.preregistration, preregistration_copy)
     runner_copy = args.output_dir / "pilot-runner.py"

@@ -183,6 +183,36 @@ class CodeIntelStateGuardTests(unittest.TestCase):
         self.assertEqual(recorded.returncode, 0, recorded.stderr)
         self.assertEqual(terminal.returncode, 0, terminal.stderr)
 
+    def test_data_flow_evidence_completes_the_security_route(self) -> None:
+        evidence = canonical_evidence_ref()
+        recorded = self.run_guard(
+            "post-tool-use",
+            {
+                "session_id": "session-data-flow",
+                "tool_use_id": "tool-data-flow",
+                "tool_name": "mcp__code-graph__trace_data_flow",
+                "tool_input": {"source": "request.body", "max_depth": 6},
+                "tool_response": {"flows": [{"evidence_ref": evidence}]},
+            },
+            expected_route="security",
+        )
+        terminal = self.run_guard(
+            "pre-terminal-output",
+            {
+                "session_id": "session-data-flow",
+                "tool_use_id": "terminal-data-flow",
+                "tool_name": "StructuredOutput",
+                "tool_input": {
+                    "evidence_ids": [evidence["id"]],
+                    "answer": f"Supported by {evidence['id']}",
+                },
+            },
+            expected_route="security",
+        )
+
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        self.assertEqual(terminal.returncode, 0, terminal.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
