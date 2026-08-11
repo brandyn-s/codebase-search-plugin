@@ -22,7 +22,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _binding(evidence_root: Path, manifest: Path, *, label: str) -> dict[str, str]:
+def _binding(
+    evidence_root: Path,
+    manifest: Path,
+    *,
+    label: str,
+    allowed_schema_versions: tuple[int, ...],
+) -> dict[str, str]:
     if manifest.name != "manifest.json" or manifest.is_symlink() or not manifest.is_file():
         raise ReceiptError(f"{label} must be a real manifest.json file")
     try:
@@ -41,12 +47,23 @@ def _binding(evidence_root: Path, manifest: Path, *, label: str) -> dict[str, st
         value = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ReceiptError(f"{label} is invalid JSON") from exc
-    if (
-        not isinstance(value, dict)
-        or value.get("schema_version") != 1
-        or not isinstance(value.get("artifacts"), dict)
-    ):
+    artifacts = value.get("artifacts") if isinstance(value, dict) else None
+    schema_version = value.get("schema_version") if isinstance(value, dict) else None
+    if schema_version not in allowed_schema_versions or not isinstance(artifacts, dict):
         raise ReceiptError(f"{label} has an unsupported artifact-manifest shape")
+    if schema_version == 2:
+        artifact_roles = value.get("artifact_roles")
+        if (
+            not isinstance(artifact_roles, dict)
+            or not artifact_roles
+            or any(
+                not isinstance(role, str)
+                or not isinstance(relative, str)
+                or relative not in artifacts
+                for role, relative in artifact_roles.items()
+            )
+        ):
+            raise ReceiptError(f"{label} has invalid explicit artifact roles")
     return {"path": parsed.as_posix(), "sha256": _sha256(manifest)}
 
 
@@ -63,9 +80,19 @@ def write_receipt(
         raise ReceiptError("evidence root must be a real directory")
     if re.fullmatch(r"\d+\.\d+\.\d+", plugin_version) is None:
         raise ReceiptError("plugin version must be semantic x.y.z")
-    runtime = _binding(root, runtime_manifest.resolve(strict=True), label="runtime manifest")
+    runtime = _binding(
+        root,
+        runtime_manifest.resolve(strict=True),
+        label="runtime manifest",
+        allowed_schema_versions=(1,),
+    )
     holdout = (
-        _binding(root, holdout_manifest.resolve(strict=True), label="holdout manifest")
+        _binding(
+            root,
+            holdout_manifest.resolve(strict=True),
+            label="holdout manifest",
+            allowed_schema_versions=(1, 2),
+        )
         if holdout_manifest is not None
         else None
     )

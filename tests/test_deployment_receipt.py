@@ -67,6 +67,48 @@ class DeploymentReceiptWriterTests(unittest.TestCase):
             },
         )
 
+    def test_cli_binds_schema_two_holdout_with_explicit_artifact_roles(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence_root = Path(temporary) / "evidence"
+            runtime_manifest = evidence_root / "runtime" / "manifest.json"
+            holdout_manifest = evidence_root / "holdout" / "manifest.json"
+            runtime_manifest.parent.mkdir(parents=True)
+            holdout_manifest.parent.mkdir(parents=True)
+            runtime_manifest.write_text(
+                '{"schema_version":1,"artifacts":{}}\n', encoding="utf-8"
+            )
+            holdout_manifest.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "artifacts": {"summary.json": "a" * 64},
+                        "artifact_roles": {"summary": "summary.json"},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(WRITER),
+                    "--evidence-root",
+                    str(evidence_root),
+                    "--plugin-version",
+                    "0.4.19",
+                    "--runtime-manifest",
+                    str(runtime_manifest),
+                    "--holdout-manifest",
+                    str(holdout_manifest),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
