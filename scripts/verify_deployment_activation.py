@@ -14,6 +14,9 @@ import sys
 
 
 PLUGIN_ID = "codebase-search@redacted-code-intelligence"
+SEMANTIC_TOOL = "mcp__plugin_codebase-search_code-search__search_code_evidence"
+RELATIONSHIP_TOOL = "mcp__plugin_codebase-search_code-graph__trace_call_path"
+ALLOWED_RUNTIME_TOOLS = {"ToolSearch", SEMANTIC_TOOL, RELATIONSHIP_TOOL}
 
 
 class VerificationError(RuntimeError):
@@ -171,35 +174,38 @@ def _runtime_trace_uses_both_families(raw_path: Path) -> bool:
         "code-graph" in str(name) for name in connected_names
     ):
         return False
-    calls: list[dict] = []
+    blocks: list[dict] = []
     for event in events:
         message = event.get("message")
         content = message.get("content") if isinstance(message, dict) else None
         for block in content if isinstance(content, list) else []:
-            if isinstance(block, dict) and block.get("type") == "tool_use":
-                calls.append(block)
-    semantic = any(
-        "code-search" in str(call.get("name"))
-        and str(call.get("name", "")).endswith(
-            ("search_code", "search_code_evidence", "code_localize")
-        )
-        and call.get("input", {}).get("search_mode") != "keyword"
-        for call in calls
-    )
-    relationship = any(
-        "code-graph" in str(call.get("name"))
-        and str(call.get("name", "")).endswith(
-            (
-                "trace_call_path",
-                "explain_symbol",
-                "get_relationship_evidence",
-                "query_graph",
-            )
-        )
-        for call in calls
-    )
+            if isinstance(block, dict):
+                blocks.append(block)
+    calls = [block for block in blocks if block.get("type") == "tool_use"]
+    if any(call.get("name") not in ALLOWED_RUNTIME_TOOLS for call in calls):
+        return False
+    results_by_id: dict[str, list[dict]] = {}
+    for block in blocks:
+        tool_use_id = block.get("tool_use_id")
+        if block.get("type") == "tool_result" and isinstance(tool_use_id, str):
+            results_by_id.setdefault(tool_use_id, []).append(block)
+    required_calls_succeeded = True
+    for required_name in (SEMANTIC_TOOL, RELATIONSHIP_TOOL):
+        matches = [call for call in calls if call.get("name") == required_name]
+        if len(matches) != 1:
+            required_calls_succeeded = False
+            break
+        tool_use_id = matches[0].get("id")
+        results = results_by_id.get(tool_use_id, []) if isinstance(tool_use_id, str) else []
+        if len(results) != 1 or results[0].get("is_error") is True:
+            required_calls_succeeded = False
+            break
     terminal = next((event for event in reversed(events) if event.get("type") == "result"), None)
-    return semantic and relationship and isinstance(terminal, dict) and terminal.get("is_error") is False
+    return (
+        required_calls_succeeded
+        and isinstance(terminal, dict)
+        and terminal.get("is_error") is False
+    )
 
 
 def _valid_runtime_receipt_manifest(

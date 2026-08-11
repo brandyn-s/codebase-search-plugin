@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import hashlib
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,10 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 VERIFIER = ROOT / "scripts" / "verify_deployment_activation.py"
+SPEC = importlib.util.spec_from_file_location("verify_deployment_activation", VERIFIER)
+assert SPEC is not None and SPEC.loader is not None
+VERIFIER_MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(VERIFIER_MODULE)
 
 
 def write_fake_claude(
@@ -64,13 +69,32 @@ def write_runtime_receipt(
                 "content": [
                     {
                         "type": "tool_use",
+                        "id": "tool-semantic",
                         "name": "mcp__plugin_codebase-search_code-search__search_code_evidence",
                         "input": {"query": "request authentication"},
                     },
                     {
                         "type": "tool_use",
+                        "id": "tool-relationship",
                         "name": "mcp__plugin_codebase-search_code-graph__trace_call_path",
                         "input": {"function_name": "login", "direction": "inbound"},
+                    },
+                ]
+            },
+        },
+        {
+            "type": "user",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-semantic",
+                        "content": "ok",
+                    },
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-relationship",
+                        "content": "ok",
                     },
                 ]
             },
@@ -519,6 +543,87 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 2)
         self.assertNotIn("Traceback", completed.stderr)
         self.assertIn("runtime trace does not prove both MCP families", completed.stderr)
+
+    def test_cli_fails_closed_when_a_required_runtime_call_returns_an_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence_root = root / "evidence"
+            evidence_root.mkdir()
+            marketplace_root = (
+                "/Users/example/.claude/plugins/marketplaces/"
+                "redacted-code-intelligence"
+            )
+            runtime_root = write_runtime_receipt(
+                evidence_root, marketplace_root=marketplace_root
+            )
+            raw = runtime_root / "raw.jsonl"
+            events = [json.loads(line) for line in raw.read_text().splitlines()]
+            events[2]["message"]["content"][1]["is_error"] = True
+            raw.write_text(
+                "".join(json.dumps(event, sort_keys=True) + "\n" for event in events),
+                encoding="utf-8",
+            )
+            manifest = json.loads((runtime_root / "manifest.json").read_text())
+            manifest["artifacts"]["raw.jsonl"] = hashlib.sha256(
+                raw.read_bytes()
+            ).hexdigest()
+            (runtime_root / "manifest.json").write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            fake_claude = root / "claude"
+            write_fake_claude(
+                fake_claude,
+                marketplace_source="github",
+                marketplace_root=marketplace_root,
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(VERIFIER),
+                    "--repo",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(evidence_root),
+                    "--claude",
+                    str(fake_claude),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("runtime trace does not prove both MCP families", completed.stderr)
+
+    def test_runtime_trace_rejects_an_extra_mcp_call(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence_root = Path(temporary) / "evidence"
+            evidence_root.mkdir()
+            runtime_root = write_runtime_receipt(
+                evidence_root,
+                marketplace_root=(
+                    "/Users/example/.claude/plugins/marketplaces/"
+                    "redacted-code-intelligence"
+                ),
+            )
+            raw = runtime_root / "raw.jsonl"
+            events = [json.loads(line) for line in raw.read_text().splitlines()]
+            events[1]["message"]["content"].append(
+                {
+                    "type": "tool_use",
+                    "id": "tool-extra",
+                    "name": "mcp__plugin_codebase-search_code-graph__list_projects",
+                    "input": {},
+                }
+            )
+            raw.write_text(
+                "".join(json.dumps(event, sort_keys=True) + "\n" for event in events),
+                encoding="utf-8",
+            )
+
+            self.assertFalse(VERIFIER_MODULE._runtime_trace_uses_both_families(raw))
 
     def test_cli_reports_stage_four_for_fresh_nonvacuous_passing_holdout(self):
         with tempfile.TemporaryDirectory() as temporary:

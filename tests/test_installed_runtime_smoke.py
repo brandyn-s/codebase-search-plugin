@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -9,6 +10,10 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 CAPTURE = ROOT / "scripts" / "capture_installed_runtime_smoke.py"
+SPEC = importlib.util.spec_from_file_location("capture_installed_runtime_smoke", CAPTURE)
+assert SPEC is not None and SPEC.loader is not None
+CAPTURE_MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(CAPTURE_MODULE)
 
 
 class InstalledRuntimeSmokeTests(unittest.TestCase):
@@ -42,9 +47,11 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                 "#!/usr/bin/env python3\n"
                 "import json, sys\n"
                 "args = sys.argv[1:]\n"
+                "prompt = sys.stdin.read()\n"
                 "required = ['-p', '--output-format', 'stream-json', '--verbose', "
                 "'--setting-sources', 'user', '--no-session-persistence']\n"
                 "if any(item not in args for item in required): raise SystemExit(9)\n"
+                "if 'Both MCP calls are required' not in prompt: raise SystemExit(10)\n"
                 "events = [\n"
                 " {'type':'system','subtype':'init','model':'claude-sonnet-5',"
                 "'plugins':[{'name':'codebase-search',"
@@ -53,12 +60,24 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                 "{'name':'plugin:codebase-search:code-search','status':'connected'},"
                 "{'name':'plugin:codebase-search:code-graph','status':'connected'}]},\n"
                 " {'type':'assistant','message':{'content':["
+                "{'type':'tool_use','id':'tool-discovery','name':'ToolSearch',"
+                "'input':{'query':'select:mcp__plugin_codebase-search'}}]}},\n"
+                " {'type':'user','message':{'content':["
+                "{'type':'tool_result','tool_use_id':'tool-discovery',"
+                "'content':[{'type':'tool_reference','tool_name':"
+                "'mcp__plugin_codebase-search_code-search__search_code_evidence'}]}]}},\n"
+                " {'type':'assistant','message':{'content':["
                 "{'type':'tool_use','name':"
                 "'mcp__plugin_codebase-search_code-search__search_code_evidence',"
+                "'id':'tool-semantic',"
                 "'input':{'query':'request authentication'}},"
                 "{'type':'tool_use','name':"
                 "'mcp__plugin_codebase-search_code-graph__trace_call_path',"
+                "'id':'tool-relationship',"
                 "'input':{'function_name':'login','direction':'inbound'}}]}},\n"
+                " {'type':'user','message':{'content':["
+                "{'type':'tool_result','tool_use_id':'tool-semantic','content':'ok'},"
+                "{'type':'tool_result','tool_use_id':'tool-relationship','content':'ok'}]}},\n"
                 " {'type':'result','is_error':False}\n"
                 "]\n"
                 "for event in events: print(json.dumps(event), flush=True)\n",
@@ -111,6 +130,74 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                     hashlib.sha256((receipt_root / relative).read_bytes()).hexdigest(),
                     expected,
                 )
+
+    def test_validate_trace_rejects_an_error_from_a_required_mcp_call(self):
+        events = [
+            {
+                "type": "system",
+                "subtype": "init",
+                "plugins": [
+                    {
+                        "name": "codebase-search",
+                        "source": "codebase-search@redacted-code-intelligence",
+                        "version": "0.4.9",
+                    }
+                ],
+                "mcp_servers": [
+                    {
+                        "name": "plugin:codebase-search:code-search",
+                        "status": "connected",
+                    },
+                    {
+                        "name": "plugin:codebase-search:code-graph",
+                        "status": "connected",
+                    },
+                ],
+            },
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-semantic",
+                            "name": CAPTURE_MODULE.SEMANTIC_TOOL,
+                            "input": {},
+                        },
+                        {
+                            "type": "tool_use",
+                            "id": "tool-relationship",
+                            "name": CAPTURE_MODULE.RELATIONSHIP_TOOL,
+                            "input": {},
+                        },
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "tool-semantic",
+                            "content": "ok",
+                        },
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "tool-relationship",
+                            "is_error": True,
+                            "content": "missing project",
+                        },
+                    ]
+                },
+            },
+            {"type": "result", "is_error": False},
+        ]
+
+        with self.assertRaisesRegex(
+            CAPTURE_MODULE.CaptureError, "required MCP call failed"
+        ):
+            CAPTURE_MODULE._validate_trace(events, "0.4.9")
 
 
 if __name__ == "__main__":

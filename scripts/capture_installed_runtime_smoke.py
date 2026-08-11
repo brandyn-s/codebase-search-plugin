@@ -23,12 +23,15 @@ SEMANTIC_TOOL = (
 RELATIONSHIP_TOOL = (
     "mcp__plugin_codebase-search_code-graph__trace_call_path"
 )
-ALLOWED_TOOLS = (SEMANTIC_TOOL, RELATIONSHIP_TOOL)
+DISCOVERY_TOOL = "ToolSearch"
+REQUIRED_TOOLS = (SEMANTIC_TOOL, RELATIONSHIP_TOOL)
+ALLOWED_TOOLS = (DISCOVERY_TOOL, *REQUIRED_TOOLS)
 DEFAULT_PROMPT = (
     "Use the installed codebase-search plugin against this already indexed "
-    "checkout. First call search_code_evidence for request authentication. "
-    "Then call trace_call_path once for login with direction inbound. Both MCP "
-    "calls are required; give a short answer only after both return."
+    "checkout. First call search_code_evidence for webhook signature verification. "
+    "Then call trace_call_path once for verify_webhook_signature with direction "
+    "inbound. Both MCP calls are required; give a short answer only after both "
+    "return successfully. Do not call any other MCP tool."
 )
 
 
@@ -73,17 +76,43 @@ def _parse_stream(text: str) -> list[dict[str, Any]]:
     return events
 
 
-def _tool_calls(events: list[dict[str, Any]]) -> list[str]:
-    calls: list[str] = []
+def _message_blocks(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    blocks: list[dict[str, Any]] = []
     for event in events:
         message = event.get("message")
         content = message.get("content") if isinstance(message, dict) else None
         for block in content if isinstance(content, list) else []:
-            if isinstance(block, dict) and block.get("type") == "tool_use":
-                name = block.get("name")
-                if isinstance(name, str):
-                    calls.append(name)
-    return calls
+            if isinstance(block, dict):
+                blocks.append(block)
+    return blocks
+
+
+def _validated_tool_calls(events: list[dict[str, Any]]) -> tuple[list[str], int]:
+    blocks = _message_blocks(events)
+    tool_uses = [block for block in blocks if block.get("type") == "tool_use"]
+    calls = [
+        block["name"] for block in tool_uses if isinstance(block.get("name"), str)
+    ]
+    denied = sum(name not in ALLOWED_TOOLS for name in calls)
+    if denied:
+        raise CaptureError("fresh session attempted a tool outside the smoke contract")
+
+    results_by_id: dict[str, list[dict[str, Any]]] = {}
+    for block in blocks:
+        tool_use_id = block.get("tool_use_id")
+        if block.get("type") == "tool_result" and isinstance(tool_use_id, str):
+            results_by_id.setdefault(tool_use_id, []).append(block)
+    for required_name in REQUIRED_TOOLS:
+        required_uses = [block for block in tool_uses if block.get("name") == required_name]
+        if len(required_uses) != 1:
+            raise CaptureError("fresh session did not invoke each installed MCP family exactly once")
+        tool_use_id = required_uses[0].get("id")
+        matching_results = (
+            results_by_id.get(tool_use_id, []) if isinstance(tool_use_id, str) else []
+        )
+        if len(matching_results) != 1 or matching_results[0].get("is_error") is True:
+            raise CaptureError(f"required MCP call failed or returned no result: {required_name}")
+    return calls, denied
 
 
 def _validate_trace(events: list[dict[str, Any]], plugin_version: str) -> int:
@@ -122,18 +151,13 @@ def _validate_trace(events: list[dict[str, Any]], plugin_version: str) -> int:
         "plugin:codebase-search:code-graph",
     }.issubset(connected):
         raise CaptureError("fresh session did not connect both installed MCP servers")
-    calls = _tool_calls(events)
-    denied = sum(name not in ALLOWED_TOOLS for name in calls)
-    if SEMANTIC_TOOL not in calls or RELATIONSHIP_TOOL not in calls:
-        raise CaptureError("fresh session did not invoke both installed MCP families")
+    _, denied = _validated_tool_calls(events)
     terminal = next(
         (event for event in reversed(events) if event.get("type") == "result"),
         None,
     )
     if not isinstance(terminal, dict) or terminal.get("is_error") is not False:
         raise CaptureError("fresh session did not finish successfully")
-    if denied:
-        raise CaptureError("fresh session attempted a tool outside the smoke contract")
     return denied
 
 
@@ -201,7 +225,6 @@ def capture(args: argparse.Namespace) -> Path:
         "--no-session-persistence",
         "--allowed-tools",
         ",".join(ALLOWED_TOOLS),
-        args.prompt,
     ]
     environment = dict(os.environ)
     environment.pop("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB", None)
@@ -212,6 +235,7 @@ def capture(args: argparse.Namespace) -> Path:
             env=environment,
             capture_output=True,
             text=True,
+            input=args.prompt,
             timeout=args.timeout_seconds,
             check=False,
         )
