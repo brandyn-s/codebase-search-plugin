@@ -80,7 +80,7 @@ READINESS_REQUIREMENTS = {
     "code-search": {
         "completion.success": True,
         "completion.error": "empty",
-        "evidence_coordinate": "src/config.py:1-3",
+        "evidence_coordinate": "src/config.py:3-3",
         "index_ready": True,
     },
     "code-graph": {
@@ -230,7 +230,7 @@ class ReadinessContractTests(unittest.TestCase):
         graph_identity["captured_at"] = "2026-07-26T18:00:01Z"
         evidence = {
             "schema_version": 1,
-            "producer": "scripts/generate_live_readiness_evidence.py:v2",
+            "producer": "scripts/generate_live_readiness_evidence.py:v3",
             "evidence_mode": "promotion-candidate",
             "bom_readiness_status": "blocked",
             "components": {
@@ -244,7 +244,7 @@ class ReadinessContractTests(unittest.TestCase):
                     "evidence_coordinate": {
                         "status": "verified",
                         "relative_path": "src/config.py",
-                        "start_line": 1,
+                        "start_line": 3,
                         "end_line": 3,
                         "index_generation": identity[
                             "index_generation"

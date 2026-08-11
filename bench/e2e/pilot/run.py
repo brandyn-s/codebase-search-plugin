@@ -165,9 +165,10 @@ def _response_schema(case: dict[str, Any]) -> dict[str, Any]:
     )
     schema["properties"]["evidence_ids"]["description"] = (
         "Select a deletion-tested, claim-scoped minimum of backend-issued "
-        "evidence_ref.id values observed in successful tool results. Never invent, "
-        "edit, or translate an ID. Exclude discovery context and duplicate or "
-        "surplus evidence. Cite every selected evidence ID verbatim in the answer."
+        "evidence_candidates[].evidence_ref.id values observed in successful "
+        "tool results. Never invent, edit, or translate an ID. Exclude spans "
+        "marked retrieval_context, discovery context, and duplicate or surplus "
+        "evidence. Cite every selected evidence ID verbatim in the answer."
     )
     return schema
 
@@ -776,7 +777,9 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         "byte-for-byte, including terminal punctuation, as candidate_assertion. "
         "If supported, repeat it again as asserted_claim; otherwise set "
         "asserted_claim to null. Evidence IDs must be backend-issued canonical "
-        "ev:v1: identifiers from evidence_ref.id fields in successful MCP results. "
+        "ev:v1: identifiers from evidence_candidates[].evidence_ref.id fields in "
+        "successful MCP results. A result marked span_role=retrieval_context is "
+        "discovery context only; never select or translate its broad chunk range. "
         "Select only IDs observed in this session; never invent, edit, or translate "
         "an ID into a path or range. Return the smallest sufficient evidence set. "
         "Before returning JSON, apply a deletion test to every selected ID: remove "

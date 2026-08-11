@@ -16,13 +16,15 @@ prove output behavior. `/index-repo` revalidates every live input-schema
 fingerprint before either index starts.
 
 `readiness-evidence.json` is the committed `promotion-candidate` record. It
-declares producer v2, a blocked candidate BOM, the expected component
-install-descriptor hashes, and a smoke result covering both engines. The v2 generator emits a
-record only after calling `skip_report=true`, binding final status responses
-to the same project and checkout root, observing semantic and graph readiness,
-and preserving `checkout_unchanged: true`. Static validation checks the
-producer and mode labels, canonical component install descriptors, ready outcomes,
-identity shape and equality, UTC capture times, and unchanged-checkout flag.
+declares producer v3, a blocked candidate BOM, the expected component
+install-descriptor hashes, and a smoke result covering both engines. The v3
+generator emits a record only after calling `skip_report=true`, binding final
+status responses to the same project and checkout root, observing semantic and
+graph readiness, requiring an exact backend-issued atomic evidence candidate
+instead of a retrieval-context range, and preserving `checkout_unchanged:
+true`. Static validation checks the producer and mode labels, canonical
+component install descriptors, ready outcomes, identity shape and equality,
+UTC capture times, and unchanged-checkout flag.
 
 Because this file is stored in the same repository as the BOM and validator,
 those internal consistency checks do not independently prove which
@@ -44,7 +46,7 @@ server for a blocked BOM unless a reviewer explicitly supplies
 ## Code-search release promotion
 
 The production BOM pins code-search release
-[`v0.3.0`](https://github.com/redacted-org/code-search/releases/tag/v0.3.0),
+[`v0.3.2`](https://github.com/redacted-org/code-search/releases/tag/v0.3.2),
 its exact source commit, wheel, and offline attestation bundle. Contract
 capture and validation support future GitHub Release wheel candidates without
 weakening readiness: capture preserves the complete release descriptor,

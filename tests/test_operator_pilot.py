@@ -346,7 +346,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             code_graph_home.mkdir()
             readiness = {
                 "schema_version": 1,
-                "producer": "scripts/generate_live_readiness_evidence.py:v2",
+                "producer": "scripts/generate_live_readiness_evidence.py:v3",
                 "evidence_mode": "ready-validation",
                 "bom_readiness_status": "ready",
                 "checkout_unchanged": True,
@@ -364,7 +364,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                             "status": "verified",
                             "relative_path": "src/auth/token.py",
                             "start_line": 1,
-                            "end_line": 4,
+                            "end_line": 1,
                             "index_generation": index_generation,
                         },
                         "index_identity": deepcopy(identity),
@@ -1148,11 +1148,17 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             schema["properties"]["evidence_ids"]["description"],
         )
         self.assertIn(
+            "evidence_candidates",
+            schema["properties"]["evidence_ids"]["description"],
+        )
+        self.assertIn(
             "^ev:v1:[0-9a-f]{64}$",
             schema["properties"]["evidence_ids"]["items"]["pattern"],
         )
         self.assertNotIn("Read pin", schema["properties"]["evidence_ids"]["description"])
         self.assertIn("backend-issued", prompt)
+        self.assertIn("evidence_candidates", prompt)
+        self.assertIn("retrieval_context", prompt)
         self.assertIn("ev:v1:", prompt)
         self.assertIn("never invent", prompt)
         self.assertNotIn("path:start-end", prompt)
@@ -1214,6 +1220,8 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("Before setting disposition to supported", prompt)
         self.assertIn("smallest sufficient evidence set", prompt)
         self.assertIn("backend-issued canonical", prompt)
+        self.assertIn("evidence_candidates", prompt)
+        self.assertIn("retrieval_context", prompt)
         self.assertIn("ev:v1:", prompt)
         self.assertIn("never invent", prompt)
         self.assertIn("deletion test", prompt)

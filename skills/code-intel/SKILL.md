@@ -52,19 +52,23 @@ conceptual implementations, similar code, or files relevant to an issue.
   hybrid/default retrieval.
 - Discovery-only search may use `search_code`, but terminal evidence must come
   from `search_code_evidence`. The evidence-capable tool uses the same retrieval
-  pipeline and emits generation-bound
-  `evidence_ref` and `observation_ref` objects only when the semantic index
-  identity is unchanged across the search. It emits `symbol_ref` only when a
-  canonical qualified name is available; never convert a short or merged chunk
-  name into a graph identity.
+  pipeline. Treat a result marked `span_role="retrieval_context"` as discovery
+  context only; never select its broad chunk range. Select the smallest directly
+  supporting `evidence_candidates[].evidence_ref.id`, using the candidate's
+  exact line and snippet to distinguish it from neighboring context. Candidates
+  are emitted only when the semantic index identity is unchanged across the
+  indexed metadata read. The tool emits `symbol_ref` only when a canonical
+  qualified name is available; never convert a short or merged chunk name into
+  a graph identity.
 - Issue-to-file localization: `mcp__code-search__code_localize`.
 
 Return the smallest sufficient set of backend-issued evidence. The backends
 own each immutable evidence ID and its exact source coordinates; select IDs
 from successful evidence-capable tool results rather than translating tool
 output into locations. Never manufacture or edit source coordinates, evidence
-IDs, or nested reference fields. If available evidence is too broad, ask the
-backend for narrower evidence or return `unresolved`; do not synthesize a range.
+IDs, or nested reference fields. If no exact candidate directly supports the
+atomic clause, return `unresolved`; do not promote retrieval context or
+synthesize a range.
 
 Apply a deletion test to every selected ID: remove it unless its deletion would
 leave an atomic clause or candidate-named endpoint unsupported. Do not return

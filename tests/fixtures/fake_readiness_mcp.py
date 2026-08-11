@@ -171,6 +171,20 @@ def identity() -> dict:
     }
 
 
+def stable_reference_id(prefix: str, reference: dict) -> str:
+    payload = {key: value for key, value in reference.items() if key != "id"}
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return (
+        f"{prefix}:v{payload['schema_version']}:"
+        + hashlib.sha256(encoded).hexdigest()
+    )
+
+
 def call_tool(request_id, name: str, arguments: dict) -> None:
     global repository
     if COMPONENT == "code-search" and name == "index_directory":
@@ -248,7 +262,41 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
         }:
             raise RuntimeError("unexpected evidence-coordinate query")
         search_identity = identity()
-        end_line = PROBE_END + 1 if BEHAVIOR == "search-evidence-past-eof" else PROBE_END
+        source_lines = (repository / PROBE_PATH).read_text(
+            encoding="utf-8"
+        ).splitlines()
+        matching_lines = [
+            line_number
+            for line_number in range(PROBE_START, PROBE_END + 1)
+            if source_lines[line_number - 1].strip()
+            and PROBE_QUERY in source_lines[line_number - 1]
+        ]
+        if len(matching_lines) != 1:
+            raise RuntimeError("fixture probe must identify one source line")
+        candidate_line = (
+            PROBE_END + 1
+            if BEHAVIOR == "search-evidence-past-eof"
+            else matching_lines[0]
+        )
+        candidate_snippet = (
+            "out-of-range " + PROBE_QUERY
+            if candidate_line > len(source_lines)
+            else source_lines[candidate_line - 1].strip()
+        )
+        evidence_ref = {
+            "schema_version": 1,
+            "repository_id": search_identity["repository_id"],
+            "source_revision": search_identity["source_revision"],
+            "index_generation": search_identity["index_generation"],
+            "relative_path": PROBE_PATH,
+            "start_line": candidate_line,
+            "end_line": candidate_line,
+            "evidence_type": "lexical_match",
+        }
+        evidence_ref["id"] = stable_reference_id("ev", evidence_ref)
+        if BEHAVIOR == "search-evidence-invalid-id":
+            evidence_ref["id"] = "ev:v1:" + "0" * 64
+        context_end = max(PROBE_END, candidate_line)
         tool_result(
             request_id,
             {
@@ -256,24 +304,35 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
                 "results": [
                     {
                         "file": PROBE_PATH,
-                        "lines": f"{PROBE_START}-{end_line}",
-                        "evidence_ref": {
+                        "lines": f"{PROBE_START}-{context_end}",
+                        "span_role": "retrieval_context",
+                        "context_span": {
                             "relative_path": PROBE_PATH,
                             "start_line": PROBE_START,
-                            "end_line": end_line,
-                            "index_generation": search_identity[
-                                "index_generation"
-                            ],
+                            "end_line": context_end,
                         },
+                        "evidence_candidates": [
+                            {
+                                "role": "atomic_source_line",
+                                "lines": f"{candidate_line}-{candidate_line}",
+                                "snippet": candidate_snippet,
+                                "evidence_ref": evidence_ref,
+                            }
+                        ],
                     }
                 ],
                 "_metadata": {
                     "evidence_refs": {
+                        "schema_version": 2,
                         "emitted": True,
                         "count": 1,
+                        "result_count": 1,
+                        "symbol_count": 0,
                         "index_generation": search_identity[
                             "index_generation"
                         ],
+                        "candidate_policy": "atomic_nonblank_source_line",
+                        "symbol_ref_policy": "canonical_qualified_name_only",
                     }
                 },
             },

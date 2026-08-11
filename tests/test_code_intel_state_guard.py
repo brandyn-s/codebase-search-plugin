@@ -79,7 +79,24 @@ class CodeIntelStateGuardTests(unittest.TestCase):
                 "tool_use_id": "tool-a",
                 "tool_name": "mcp__code-search__search_code_evidence",
                 "tool_input": {"query": "authentication"},
-                "tool_response": {"results": [{"evidence_ref": evidence}]},
+                "tool_response": {
+                    "results": [
+                        {
+                            "span_role": "retrieval_context",
+                            "context_span": {
+                                "relative_path": "src/auth.py",
+                                "start_line": 1,
+                                "end_line": 20,
+                            },
+                            "evidence_candidates": [
+                                {
+                                    "role": "atomic_source_line",
+                                    "evidence_ref": evidence,
+                                }
+                            ],
+                        }
+                    ]
+                },
             },
         )
         terminal = self.run_guard(

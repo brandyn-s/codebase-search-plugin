@@ -4,13 +4,13 @@
   "components": {
     "code-graph": {
       "index_identity": {
-        "captured_at": "2026-08-10T22:50:57Z",
-        "checkout_id": "192e70b42700c6c72b159028043d05824f4927be531e0daa85171fea15e0163b",
+        "captured_at": "2026-08-11T20:27:22Z",
+        "checkout_id": "1e2b0fc64c19c507a8acbb30e885bb97d0d44e517c441b3dbc84c2e4c4629e74",
         "dirty_fingerprint": "clean",
-        "index_generation": "fe72792a26da774c5cd9e7f65d1a3deb712151a308029a66b2a67e7f7cd804e2",
-        "repository_id": "192e70b42700c6c72b159028043d05824f4927be531e0daa85171fea15e0163b",
+        "index_generation": "5ef9492432da22805583801c78e4a102fd6ea50a8067769705acb9f60c42f876",
+        "repository_id": "1e2b0fc64c19c507a8acbb30e885bb97d0d44e517c441b3dbc84c2e4c4629e74",
         "schema_version": 1,
-        "source_revision": "10146ad70e34e482f2ef536192fb4b48769d1b2b"
+        "source_revision": "6cdd8a27ca80fd36c7f27f20dd8c5ce4aaab485e"
       },
       "install_descriptor_sha256": "6dcc9483f35523e31281578a953ecbc36c8542f00f4caa913fdcf160fa0f5cf4",
       "status": "ready",
@@ -23,31 +23,31 @@
         "files_added": 11,
         "index_identity_status": "ready",
         "index_ready": true,
-        "pipeline_version": "416d1031791551d4",
+        "pipeline_version": "fd95888d3109eaca",
         "success": true
       },
       "evidence_coordinate": {
         "end_line": 3,
-        "index_generation": "fe72792a26da774c5cd9e7f65d1a3deb712151a308029a66b2a67e7f7cd804e2",
+        "index_generation": "5ef9492432da22805583801c78e4a102fd6ea50a8067769705acb9f60c42f876",
         "relative_path": "src/config.py",
-        "start_line": 1,
+        "start_line": 3,
         "status": "verified"
       },
       "index_identity": {
-        "captured_at": "2026-08-10T22:50:57.418720Z",
-        "checkout_id": "192e70b42700c6c72b159028043d05824f4927be531e0daa85171fea15e0163b",
+        "captured_at": "2026-08-11T20:27:21.997183Z",
+        "checkout_id": "1e2b0fc64c19c507a8acbb30e885bb97d0d44e517c441b3dbc84c2e4c4629e74",
         "dirty_fingerprint": "clean",
-        "index_generation": "fe72792a26da774c5cd9e7f65d1a3deb712151a308029a66b2a67e7f7cd804e2",
-        "repository_id": "192e70b42700c6c72b159028043d05824f4927be531e0daa85171fea15e0163b",
+        "index_generation": "5ef9492432da22805583801c78e4a102fd6ea50a8067769705acb9f60c42f876",
+        "repository_id": "1e2b0fc64c19c507a8acbb30e885bb97d0d44e517c441b3dbc84c2e4c4629e74",
         "schema_version": 1,
-        "source_revision": "10146ad70e34e482f2ef536192fb4b48769d1b2b"
+        "source_revision": "6cdd8a27ca80fd36c7f27f20dd8c5ce4aaab485e"
       },
       "index_ready": true,
-      "install_descriptor_sha256": "cc991de9f920a8e20d6c7279db8f91e8bdafd7de0d691205d7ed0b8e10cd176a",
-      "version": "v0.3.1"
+      "install_descriptor_sha256": "d407cfe190654a774efff256cc54590f0a7d2fb47bb475a16e9aa470980f6929",
+      "version": "v0.3.2"
     }
   },
   "evidence_mode": "promotion-candidate",
-  "producer": "scripts/generate_live_readiness_evidence.py:v2",
+  "producer": "scripts/generate_live_readiness_evidence.py:v3",
   "schema_version": 1
 }

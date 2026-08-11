@@ -11,6 +11,8 @@ class CodeIntelSkillContractTests(unittest.TestCase):
 
         self.assertIn("deletion test", normalized)
         self.assertIn("backend-issued", normalized)
+        self.assertIn("evidence_candidates", normalized)
+        self.assertIn("retrieval_context", normalized)
         self.assertIn("Never manufacture or edit source coordinates", normalized)
         self.assertIn("Read is inspection-only and never creates evidence", normalized)
         self.assertIn("Cite every final evidence ID verbatim", normalized)

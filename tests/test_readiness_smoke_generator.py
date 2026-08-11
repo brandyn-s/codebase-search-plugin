@@ -394,7 +394,7 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
                     coordinate["start_line"],
                     coordinate["end_line"],
                 ),
-                ("src/auth/token.py", 1, 4),
+                ("src/auth/token.py", 1, 1),
             )
 
     def test_generator_indexes_fixture_with_both_just_installed_servers(self):
@@ -418,7 +418,7 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         self.assertEqual(evidence["bom_readiness_status"], "ready")
         self.assertEqual(
             evidence["producer"],
-            "scripts/generate_live_readiness_evidence.py:v2",
+            "scripts/generate_live_readiness_evidence.py:v3",
         )
         self.assertTrue(evidence["checkout_unchanged"])
         search = evidence["components"]["code-search"]
@@ -431,7 +431,7 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
                     "index_generation"
                 ],
                 "relative_path": "src/config.py",
-                "start_line": 1,
+                "start_line": 3,
                 "status": "verified",
             },
         )
@@ -568,6 +568,7 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
             "graph-completion-failed",
             "graph-completion-null",
             "search-status-wrong-project",
+            "search-evidence-invalid-id",
             "search-evidence-past-eof",
             "graph-status-wrong-project",
             "graph-status-wrong-root",

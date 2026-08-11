@@ -219,7 +219,7 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.3.1`](https://github.com/redacted-org/code-search/releases/tag/v0.3.1)
+[`v0.3.2`](https://github.com/redacted-org/code-search/releases/tag/v0.3.2)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;

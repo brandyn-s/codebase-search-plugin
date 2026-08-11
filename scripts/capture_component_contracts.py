@@ -82,7 +82,7 @@ READINESS_REQUIREMENTS = {
     "code-search": {
         "completion.success": True,
         "completion.error": "empty",
-        "evidence_coordinate": "src/config.py:1-3",
+        "evidence_coordinate": "src/config.py:3-3",
         "index_ready": True,
     },
     "code-graph": {

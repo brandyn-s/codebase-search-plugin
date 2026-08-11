@@ -83,6 +83,18 @@ def load_json(path: Path) -> dict:
     return value
 
 
+def stable_reference_id(prefix: str, reference: dict) -> str:
+    payload = {key: value for key, value in reference.items() if key != "id"}
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    schema_version = payload.get("schema_version")
+    return f"{prefix}:v{schema_version}:" + hashlib.sha256(encoded).hexdigest()
+
+
 def validate_local_model(path: Path) -> None:
     if not path.is_dir():
         raise SmokeError(f"local readiness model is missing: {path}")
@@ -708,6 +720,17 @@ def run_smoke(
             not in "\n".join(probe_lines[probe_start_line - 1 : probe_end_line])
         ):
             raise SmokeError("readiness probe does not match the declared source range")
+        matching_probe_lines = [
+            line_number
+            for line_number in range(probe_start_line, probe_end_line + 1)
+            if probe_lines[line_number - 1].strip()
+            and probe_query in probe_lines[line_number - 1]
+        ]
+        if len(matching_probe_lines) != 1:
+            raise SmokeError(
+                "readiness probe must identify one exact nonblank source line"
+            )
+        expected_evidence_line = matching_probe_lines[0]
         before = checkout_state(checkout, runtime_environment)
         if before[1]:
             raise SmokeError("fresh readiness fixture checkout is dirty")
@@ -900,32 +923,84 @@ def run_smoke(
                 else []
             )
             result = matches[0] if len(matches) == 1 else {}
-            evidence_ref = result.get("evidence_ref", {})
+            context_span = result.get("context_span", {})
+            candidates = result.get("evidence_candidates", [])
+            exact_candidates = (
+                [
+                    item
+                    for item in candidates
+                    if isinstance(item, dict)
+                    and item.get("role") == "atomic_source_line"
+                    and item.get("lines")
+                    == f"{expected_evidence_line}-{expected_evidence_line}"
+                    and isinstance(item.get("snippet"), str)
+                    and probe_query in item["snippet"]
+                ]
+                if isinstance(candidates, list)
+                else []
+            )
+            candidate = exact_candidates[0] if len(exact_candidates) == 1 else {}
+            evidence_ref = candidate.get("evidence_ref", {})
             refs_metadata = evidence_search.get("_metadata", {}).get(
                 "evidence_refs", {}
             )
             expected_generation = search_identity["index_generation"]
             if (
-                result.get("lines") != f"{probe_start_line}-{probe_end_line}"
+                result.get("span_role") != "retrieval_context"
+                or "evidence_ref" in result
+                or not isinstance(context_span, dict)
+                or context_span.get("relative_path") != probe_relative_path
+                or isinstance(context_span.get("start_line"), bool)
+                or not isinstance(context_span.get("start_line"), int)
+                or isinstance(context_span.get("end_line"), bool)
+                or not isinstance(context_span.get("end_line"), int)
+                or result.get("lines")
+                != (
+                    f"{context_span['start_line']}-"
+                    f"{context_span['end_line']}"
+                )
+                or context_span["start_line"] > expected_evidence_line
+                or context_span["end_line"] < expected_evidence_line
+                or len(exact_candidates) != 1
                 or not isinstance(evidence_ref, dict)
+                or isinstance(evidence_ref.get("schema_version"), bool)
+                or evidence_ref.get("schema_version") != 1
+                or evidence_ref.get("repository_id")
+                != search_identity["repository_id"]
+                or evidence_ref.get("source_revision")
+                != search_identity["source_revision"]
                 or evidence_ref.get("relative_path") != probe_relative_path
-                or evidence_ref.get("start_line") != probe_start_line
-                or evidence_ref.get("end_line") != probe_end_line
+                or isinstance(evidence_ref.get("start_line"), bool)
+                or evidence_ref.get("start_line") != expected_evidence_line
+                or isinstance(evidence_ref.get("end_line"), bool)
+                or evidence_ref.get("end_line") != expected_evidence_line
+                or evidence_ref.get("evidence_type") != "lexical_match"
                 or evidence_ref.get("index_generation")
                 != expected_generation
+                or evidence_ref.get("id")
+                != stable_reference_id("ev", evidence_ref)
                 or not isinstance(refs_metadata, dict)
+                or refs_metadata.get("schema_version") != 2
                 or refs_metadata.get("emitted") is not True
+                or isinstance(refs_metadata.get("count"), bool)
+                or not isinstance(refs_metadata.get("count"), int)
+                or refs_metadata["count"] < 1
+                or isinstance(refs_metadata.get("result_count"), bool)
+                or not isinstance(refs_metadata.get("result_count"), int)
+                or refs_metadata["result_count"] < 1
+                or refs_metadata.get("candidate_policy")
+                != "atomic_nonblank_source_line"
                 or refs_metadata.get("index_generation")
                 != expected_generation
             ):
                 raise SmokeError(
-                    "code-search: exact EOF evidence coordinate check failed"
+                    "code-search: exact atomic evidence candidate check failed"
                 )
             evidence_coordinate = {
                 "status": "verified",
                 "relative_path": probe_relative_path,
-                "start_line": probe_start_line,
-                "end_line": probe_end_line,
+                "start_line": expected_evidence_line,
+                "end_line": expected_evidence_line,
                 "index_generation": expected_generation,
             }
         finally:
@@ -937,7 +1012,7 @@ def run_smoke(
             raise SmokeError("installed servers changed the readiness checkout")
         evidence = {
             "schema_version": 1,
-            "producer": "scripts/generate_live_readiness_evidence.py:v2",
+            "producer": "scripts/generate_live_readiness_evidence.py:v3",
             "evidence_mode": evidence_mode,
             "bom_readiness_status": readiness_status,
             "components": {

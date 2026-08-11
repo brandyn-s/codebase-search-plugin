@@ -83,7 +83,7 @@ READINESS_REQUIREMENTS = {
     "code-search": {
         "completion.success": True,
         "completion.error": "empty",
-        "evidence_coordinate": "src/config.py:1-3",
+        "evidence_coordinate": "src/config.py:3-3",
         "index_ready": True,
     },
     "code-graph": {
@@ -886,7 +886,7 @@ if snapshots:
                 )
             if (
                 evidence.get("producer")
-                != "scripts/generate_live_readiness_evidence.py:v2"
+                != "scripts/generate_live_readiness_evidence.py:v3"
             ):
                 errors.append(
                     f"{evidence_label}: readiness evidence producer is invalid"
@@ -990,7 +990,7 @@ if snapshots:
                     }
                     or coordinate.get("status") != "verified"
                     or coordinate.get("relative_path") != "src/config.py"
-                    or coordinate.get("start_line") != 1
+                    or coordinate.get("start_line") != 3
                     or coordinate.get("end_line") != 3
                     or not isinstance(expected_generation, str)
                     or coordinate.get("index_generation")
@@ -998,7 +998,7 @@ if snapshots:
                 ):
                     errors.append(
                         f"{evidence_label}: code-search evidence coordinate "
-                        "must verify src/config.py:1-3 against the indexed "
+                        "must verify src/config.py:3-3 against the indexed "
                         "generation"
                     )
 
