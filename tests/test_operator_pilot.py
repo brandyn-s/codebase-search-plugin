@@ -85,6 +85,68 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         cases[2]["routing_contract"] = {"trace_call_path": {"count": 1}}
         _validate_fresh_holdout_corpus(preregistration, cases)
 
+    def test_new_fresh_holdout_contract_schema_requires_positive_routes(self):
+        controls = {
+            "arms": ["composed"],
+            "case_ids": [f"case-{index}" for index in range(5)],
+            "repetitions": 2,
+            "model": "sonnet",
+            "fallback_model": None,
+            "max_turns": 8,
+            "timeout_seconds": 180.0,
+            "max_budget_usd_per_case": 1.0,
+            "routing_contract_schema_version": 1,
+        }
+        preregistration = {
+            "run_type": "bounded_operator_authorized_fresh_holdout_confirmation",
+            "controls": controls,
+            "bindings": {
+                "schema_version": 1,
+                "bank_id": "opaque-bank-b",
+                "corpus_pack_sha256": "a" * 64,
+                "runtime_receipt_manifest_sha256": "b" * 64,
+                "contract_guard_sha256": "c" * 64,
+            },
+            "outcome_gates": {
+                "arm": "composed",
+                "min_evidence_precision": 0.9,
+                "min_evidence_recall": 0.9,
+                "min_adjudication_accuracy": 1.0,
+                "max_unsupported_asserted_claim_rate": 0.0,
+                "min_routing_contract_accuracy": 1.0,
+                "max_errors": 0,
+                "max_canary_violations": 0,
+            },
+        }
+        routes = ("semantic", "lexical", "graph", "mixed", "security")
+        cases = [
+            {
+                "case_id": f"case-{index}",
+                "expected_route": route,
+                "routing_contract": {"required_route": route},
+                "expected_evidence": [f"src/case_{index}.py:1-2"],
+                "expected_claims": [
+                    {
+                        "text": f"claim {index}",
+                        "required_evidence_ids": [f"src/case_{index}.py:1-2"],
+                    }
+                ],
+            }
+            for index, route in enumerate(routes)
+        ]
+
+        _validate_fresh_holdout_corpus(preregistration, cases)
+        del preregistration["bindings"]["contract_guard_sha256"]
+
+        with self.assertRaisesRegex(ValueError, "contract guard binding"):
+            _validate_fresh_holdout_corpus(preregistration, cases)
+
+        preregistration["bindings"]["contract_guard_sha256"] = "c" * 64
+        cases[0]["routing_contract"]["required_route"] = "graph"
+
+        with self.assertRaisesRegex(ValueError, "positive route contract"):
+            _validate_fresh_holdout_corpus(preregistration, cases)
+
     def test_code_graph_home_is_scoped_to_the_graph_mcp_child(self):
         arguments = SimpleNamespace(
             code_search=Path("/usr/bin/code-search"),
@@ -904,9 +966,11 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             model="sonnet",
             max_turns=8,
             max_budget_usd=0.5,
+            target=Path("/tmp/target"),
         )
         case = {
             "query": "What calls process_order?",
+            "expected_route": "graph",
             "expected_claims": [{"text": "The orders API calls process_order."}],
         }
 
@@ -935,9 +999,11 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             model="sonnet",
             max_turns=8,
             max_budget_usd=0.5,
+            target=Path("/tmp/target"),
         )
         case = {
             "query": "What calls login?",
+            "expected_route": "graph",
             "expected_claims": [{"text": "Session creation calls login."}],
             "routing_contract": {
                 "trace_call_path": {"count": 1, "direction": "inbound"}
@@ -971,6 +1037,48 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             terminal["hooks"][0]["command"],
         )
         self.assertIn("code_intel_trace_guard.py stop", stop["hooks"][0]["command"])
+        contract_route = settings["hooks"]["PreToolUse"][2]
+        contract_read = settings["hooks"]["PreToolUse"][3]
+        contract_terminal = settings["hooks"]["PreToolUse"][4]
+        route = settings["hooks"]["PostToolUse"][1]
+        read = settings["hooks"]["PostToolUse"][2]
+        cleanup = settings["hooks"]["PostToolUse"][3]
+        self.assertEqual(
+            contract_route["matcher"],
+            "mcp__code-search__.*|mcp__code-graph__.*",
+        )
+        self.assertEqual(contract_read["matcher"], "Read")
+        self.assertEqual(contract_terminal["matcher"], "StructuredOutput")
+        self.assertEqual(
+            route["matcher"], "mcp__code-search__.*|mcp__code-graph__.*"
+        )
+        self.assertEqual(read["matcher"], "Read")
+        self.assertEqual(cleanup["matcher"], "StructuredOutput")
+        self.assertIn(
+            "code_intel_contract_guard.py pre-route-tool",
+            contract_route["hooks"][0]["command"],
+        )
+        self.assertIn(
+            "code_intel_contract_guard.py pre-read",
+            contract_read["hooks"][0]["command"],
+        )
+        self.assertIn(
+            "code_intel_contract_guard.py pre-terminal-output",
+            contract_terminal["hooks"][0]["command"],
+        )
+        self.assertIn("--expected-route graph", contract_terminal["hooks"][0]["command"])
+        self.assertIn(
+            "--target " + str(Path("/tmp/target").resolve()),
+            contract_terminal["hooks"][0]["command"],
+        )
+        self.assertIn(
+            "code_intel_contract_guard.py record-route",
+            route["hooks"][0]["command"],
+        )
+        self.assertIn(
+            "code_intel_contract_guard.py record-read",
+            read["hooks"][0]["command"],
+        )
 
     def test_response_schema_binds_claim_identity_without_unsupported_combinators(
         self,
@@ -1006,6 +1114,10 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         )
         self.assertIn(
             "candidate-named endpoint",
+            schema["properties"]["evidence_ids"]["description"],
+        )
+        self.assertIn(
+            "exact successful Read pin",
             schema["properties"]["evidence_ids"]["description"],
         )
 
@@ -1071,6 +1183,9 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("Shrink each path:start-end range", prompt)
         self.assertIn("imports, blank lines, or surrounding context", prompt)
         self.assertIn("deletion test", prompt)
+        self.assertIn("exact successful Read pin", prompt)
+        self.assertIn("offset=start", prompt)
+        self.assertIn("Cite every final evidence ID verbatim", prompt)
         self.assertIn("claim-scoped, not flow-scoped", prompt)
         self.assertIn("imports and aliases are discovery context", prompt)
         self.assertIn("upstream or downstream", prompt)
@@ -1124,6 +1239,31 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
         self.assertTrue(_routing_contract_satisfies(case, efficient))
         self.assertFalse(_routing_contract_satisfies(case, redundant))
+
+    def test_positive_route_contract_requires_the_exact_tool_family(self):
+        case = {"routing_contract": {"required_route": "semantic"}}
+        semantic = [
+            {
+                "tool": "mcp__code-search__search_code",
+                "arguments": {"query": "how login works"},
+            }
+        ]
+        graph_substitution = [
+            {
+                "tool": "mcp__code-graph__search_code",
+                "arguments": {"query": "login"},
+            }
+        ]
+        mixed_corroboration = semantic + [
+            {
+                "tool": "mcp__code-graph__search_graph",
+                "arguments": {"name": "login"},
+            }
+        ]
+
+        self.assertTrue(_routing_contract_satisfies(case, semantic))
+        self.assertFalse(_routing_contract_satisfies(case, graph_substitution))
+        self.assertFalse(_routing_contract_satisfies(case, mixed_corroboration))
 
 
 class TranscriptProjectionTests(unittest.TestCase):

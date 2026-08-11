@@ -38,7 +38,8 @@ Do not call graph security tools for conceptual behavior unless the question
 explicitly requests a path, sink reachability, trust boundary, or
 security-surface enumeration.
 Do not substitute graph text search for a required code-search semantic or
-keyword FIND step. Additional tools may corroborate the required route.
+keyword FIND step. Keep semantic and lexical work within the selected route;
+graph corroboration belongs only in graph, mixed, or security work.
 
 ## FIND
 
@@ -74,7 +75,11 @@ Do not cite an unnamed helper
 merely because retrieval found it or you read it; cite it only when it is the
 sole direct implementation of an atomic clause and no candidate-named or
 direct-call location supports that clause. Do not cite extra upstream or
-downstream endpoints, call sites, or relationships.
+downstream endpoints, call sites, or relationships. After the deletion test,
+pin every final `path:start-end` with one successful exact `Read` using
+`offset=start` and `limit=end-start+1`. A whole-file or unbounded Read is
+inspection-only. Cite every final evidence ID verbatim in the answer; an
+uncited location is not answer evidence.
 
 ## UNDERSTAND
 

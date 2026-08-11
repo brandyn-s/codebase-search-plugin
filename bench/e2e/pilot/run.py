@@ -158,7 +158,9 @@ def _response_schema(case: dict[str, Any]) -> dict[str, Any]:
         "not automatically evidence. Include minimal source evidence for every "
         "candidate-named endpoint. Exclude imports, aliases, and unnamed upstream "
         "or downstream helpers, endpoints, and relationships unless one is the "
-        "sole direct implementation of an otherwise unsupported atomic clause."
+        "sole direct implementation of an otherwise unsupported atomic clause. "
+        "Create an exact successful Read pin for every final range and cite every "
+        "evidence ID verbatim in the answer."
     )
     return schema
 
@@ -241,6 +243,10 @@ def _routing_contract_satisfies(
     names = [call.get("tool") for call in tool_calls]
     forbidden = contract.get("forbidden_tools", [])
     if any(tool in names for tool in forbidden):
+        return False
+
+    required_route = contract.get("required_route")
+    if required_route is not None and _derived_route(tool_calls) != required_route:
         return False
 
     trace_contract = contract.get("trace_call_path")
@@ -551,7 +557,8 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
             "conceptual behavior unless the question explicitly requests a path, "
             "sink reachability, trust boundary, or security-surface enumeration. Do not "
             "substitute graph text search for the required code-search semantic or "
-            "keyword FIND step. Other tools may corroborate after the required route."
+            "keyword FIND step. Keep semantic and lexical cases within their selected "
+            "route; graph corroboration belongs only in graph, mixed, or security work."
         ),
     }[arm]
     discovery = (
@@ -615,7 +622,11 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         "leave an atomic clause or candidate-named endpoint unsupported. Do not return "
         "discovery, contextual, or duplicate corroborating locations. Evidence is "
         "claim-scoped, not flow-scoped. Inspecting a location does not make it "
-        "answer evidence. For a direct relationship, imports and aliases are "
+        "answer evidence. After the deletion test, create one exact successful Read pin "
+        "for every final range with offset=start and limit=end-start+1. Whole-file or "
+        "unbounded Reads are inspection-only. Cite every final evidence ID verbatim in "
+        "the answer. "
+        "For a direct relationship, imports and aliases are "
         "discovery context; the direct call site is edge evidence. Include the "
         "minimal definition or implementation evidence for every candidate-named "
         "endpoint; one location may satisfy both the edge and endpoint roles. In "
@@ -641,57 +652,115 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
     )
 
 
-def _trace_guard_settings(
+def _runtime_guard_settings(
     case: dict[str, Any],
     arm: str,
+    target: Path,
 ) -> dict[str, Any] | None:
     contract = case.get("routing_contract")
     trace = contract.get("trace_call_path") if isinstance(contract, dict) else None
-    if (
-        arm not in {"code-graph", "composed"}
-        or not isinstance(trace, dict)
-        or trace.get("count") != 1
-    ):
-        return None
-    guard = ROOT / "scripts" / "code_intel_trace_guard.py"
-    command = shlex.join([sys.executable, str(guard)])
+    hooks: dict[str, list[dict[str, Any]]] = {}
 
-    def command_hook(mode: str, matcher: str) -> dict[str, Any]:
+    def command_hook(command: str, matcher: str) -> dict[str, Any]:
         return {
             "matcher": matcher,
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"{command} {mode}",
+                    "command": command,
                     "timeout": 5,
                 }
             ],
         }
 
-    def trace_hook(mode: str) -> list[dict[str, Any]]:
-        return [command_hook(mode, "mcp__code-graph__trace_call_path")]
+    if (
+        arm in {"code-graph", "composed"}
+        and isinstance(trace, dict)
+        and trace.get("count") == 1
+    ):
+        guard = ROOT / "scripts" / "code_intel_trace_guard.py"
+        base = [sys.executable, str(guard)]
+        hooks["PreToolUse"] = [
+            command_hook(
+                shlex.join([*base, "pre-tool-use"]),
+                "mcp__code-graph__trace_call_path",
+            ),
+            command_hook(
+                shlex.join([*base, "pre-terminal-output"]),
+                "StructuredOutput",
+            ),
+        ]
+        hooks["PostToolUse"] = [
+            command_hook(
+                shlex.join([*base, "post-tool-use"]),
+                "mcp__code-graph__trace_call_path",
+            )
+        ]
+        hooks["PostToolUseFailure"] = [
+            command_hook(
+                shlex.join([*base, "post-tool-failure"]),
+                "mcp__code-graph__trace_call_path",
+            )
+        ]
+        hooks["Stop"] = [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": shlex.join([*base, "stop"]),
+                        "timeout": 5,
+                    }
+                ]
+            }
+        ]
 
-    return {
-        "hooks": {
-            "PreToolUse": [
-                command_hook("pre-tool-use", "mcp__code-graph__trace_call_path"),
-                command_hook("pre-terminal-output", "StructuredOutput"),
-            ],
-            "PostToolUse": trace_hook("post-tool-use"),
-            "PostToolUseFailure": trace_hook("post-tool-failure"),
-            "Stop": [
-                {
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": f"{command} stop",
-                            "timeout": 5,
-                        }
-                    ]
-                }
-            ],
-        }
-    }
+    if arm == "composed":
+        expected_route = case.get("expected_route")
+        if expected_route not in {"semantic", "lexical", "graph", "mixed", "security"}:
+            raise ValueError("composed case expected_route is invalid")
+        guard = ROOT / "scripts" / "code_intel_contract_guard.py"
+        base = [
+            sys.executable,
+            str(guard),
+        ]
+
+        def contract_command(mode: str) -> str:
+            return shlex.join(
+                [
+                    *base,
+                    mode,
+                    "--expected-route",
+                    expected_route,
+                    "--target",
+                    str(target.resolve()),
+                ]
+            )
+
+        hooks.setdefault("PreToolUse", []).extend(
+            [
+                command_hook(
+                    contract_command("pre-route-tool"),
+                    "mcp__code-search__.*|mcp__code-graph__.*",
+                ),
+                command_hook(contract_command("pre-read"), "Read"),
+                command_hook(
+                    contract_command("pre-terminal-output"),
+                    "StructuredOutput",
+                ),
+            ]
+        )
+        hooks.setdefault("PostToolUse", []).extend(
+            [
+                command_hook(
+                    contract_command("record-route"),
+                    "mcp__code-search__.*|mcp__code-graph__.*",
+                ),
+                command_hook(contract_command("record-read"), "Read"),
+                command_hook(contract_command("cleanup"), "StructuredOutput"),
+            ]
+        )
+
+    return {"hooks": hooks} if hooks else None
 
 
 def _claude_command(
@@ -732,12 +801,12 @@ def _claude_command(
         "--mcp-config",
         json.dumps(_mcp_config(args, arm), sort_keys=True, separators=(",", ":")),
     ]
-    trace_settings = _trace_guard_settings(case, arm)
-    if trace_settings is not None:
+    runtime_settings = _runtime_guard_settings(case, arm, args.target)
+    if runtime_settings is not None:
         command.extend(
             [
                 "--settings",
-                json.dumps(trace_settings, sort_keys=True, separators=(",", ":")),
+                json.dumps(runtime_settings, sort_keys=True, separators=(",", ":")),
             ]
         )
     return command
@@ -1316,6 +1385,20 @@ def _validate_fresh_holdout_corpus(
         raise ValueError("fresh holdout corpus is incomplete")
     if not any(isinstance(case.get("routing_contract"), dict) for case in cases):
         raise ValueError("fresh holdout requires a nonvacuous routing contract")
+    if controls.get("routing_contract_schema_version") is not None:
+        contract_guard_sha256 = bindings.get("contract_guard_sha256")
+        if (
+            not isinstance(contract_guard_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", contract_guard_sha256) is None
+        ):
+            raise ValueError("fresh holdout contract guard binding is invalid")
+        if controls["routing_contract_schema_version"] != 1 or any(
+            not isinstance(case.get("routing_contract"), dict)
+            or case["routing_contract"].get("required_route")
+            != case.get("expected_route")
+            for case in cases
+        ):
+            raise ValueError("fresh holdout positive route contract is invalid")
     for case in cases:
         evidence = case.get("expected_evidence")
         claims = case.get("expected_claims")
@@ -1418,6 +1501,32 @@ def _validate_preregistered_controls(
                     raise ValueError(
                         f"preregistration bindings.{field} must be a lowercase "
                         "SHA-256"
+                    )
+                if _sha256(path) != expected_sha256:
+                    raise ValueError(
+                        f"{label} SHA-256 differs from preregistration"
+                    )
+            for field, path, label in (
+                (
+                    "contract_guard_sha256",
+                    ROOT / "scripts" / "code_intel_contract_guard.py",
+                    "contract guard",
+                ),
+                (
+                    "trace_guard_sha256",
+                    ROOT / "scripts" / "code_intel_trace_guard.py",
+                    "trace guard",
+                ),
+            ):
+                expected_sha256 = bindings.get(field)
+                if expected_sha256 is None:
+                    continue
+                if (
+                    not isinstance(expected_sha256, str)
+                    or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+                ):
+                    raise ValueError(
+                        f"preregistration bindings.{field} must be a lowercase SHA-256"
                     )
                 if _sha256(path) != expected_sha256:
                     raise ValueError(

@@ -94,6 +94,9 @@ boundary, or security-surface enumeration. Use keyword retrieval only for pure
 literal or location lookup, and graph-only routing only for an explicit
 relationship without a conceptual explanation.
 
+Keep semantic and lexical work within the selected route. Do not add graph text
+search as corroboration unless the question is graph, mixed, or security work.
+
 | Query pattern | Type | Primary tool |
 |--------------|------|-------------|
 | "Where is the X code?" | Conceptual | code-search |
@@ -150,6 +153,11 @@ answer evidence: omit unnamed definitions, helpers, and context unless removing
 the location would leave an atomic claim unsupported. If any endpoint is missing,
 retrieve it before answering; if it cannot be resolved, do not present the
 relationship as supported and state that it remains unresolved.
+
+After the deletion test, pin every final `path:start-end` with one successful
+exact `Read` using `offset=start` and `limit=end-start+1`. Whole-file or
+unbounded Reads remain inspection-only. Cite every final evidence ID verbatim
+in the answer; an uncited location is not answer evidence.
 
 When pinning coordinates, do not copy a synthetic terminal line from `Read`.
 `Read` can display one extra numbered empty line after a file-ending newline;
