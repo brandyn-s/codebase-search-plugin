@@ -244,6 +244,72 @@ class ContractGuardTests(unittest.TestCase):
         self.assertEqual(graph.returncode, 0, graph.stderr)
         self.assertEqual(complete.returncode, 0, complete.stderr)
 
+    def test_pre_read_requires_the_security_capability_first(self):
+        graph = self._run(
+            "record-route",
+            expected_route="security",
+            tool_name="mcp__code-graph__search_graph",
+            tool_input={"name": "endpoint"},
+        )
+        blocked = self._run(
+            "pre-read",
+            expected_route="security",
+            tool_name="Read",
+            tool_input={"file_path": str(self.source)},
+        )
+        security = self._run(
+            "record-route",
+            expected_route="security",
+            tool_name="mcp__code-graph__query_security_surfaces",
+            tool_input={"role": "boundary"},
+        )
+        allowed = self._run(
+            "pre-read",
+            expected_route="security",
+            tool_name="Read",
+            tool_input={"file_path": str(self.source)},
+        )
+
+        self.assertEqual(graph.returncode, 0, graph.stderr)
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn("missing capability family: security", blocked.stderr)
+        self.assertIn("security tool family", blocked.stderr)
+        self.assertEqual(security.returncode, 0, security.stderr)
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+
+    def test_pre_read_requires_both_mixed_route_capabilities(self):
+        semantic = self._run(
+            "record-route",
+            expected_route="mixed",
+            tool_name="mcp__code-search__search_code_evidence",
+            tool_input={"query": "endpoint callers"},
+        )
+        blocked = self._run(
+            "pre-read",
+            expected_route="mixed",
+            tool_name="Read",
+            tool_input={"file_path": str(self.source)},
+        )
+        graph = self._run(
+            "record-route",
+            expected_route="mixed",
+            tool_name="mcp__code-graph__trace_call_path",
+            tool_input={"function_name": "endpoint", "direction": "inbound"},
+        )
+        allowed = self._run(
+            "pre-read",
+            expected_route="mixed",
+            tool_name="Read",
+            tool_input={"file_path": str(self.source)},
+        )
+
+        self.assertEqual(semantic.returncode, 0, semantic.stderr)
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn("missing capability family: graph", blocked.stderr)
+        self.assertIn("graph tool family", blocked.stderr)
+        self.assertEqual(graph.returncode, 0, graph.stderr)
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+
     def test_keyword_search_is_lexical_not_semantic(self):
         keyword = self._run(
             "record-route",
@@ -292,6 +358,7 @@ class ContractGuardTests(unittest.TestCase):
             tool_name="Read",
             tool_input={"file_path": str(outside)},
         )
+        self.assertEqual(self._record_semantic_route().returncode, 0)
         target = self._run(
             "pre-read",
             tool_name="Read",

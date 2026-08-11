@@ -49,6 +49,13 @@ ALLOWED_ROUTE_CAPABILITIES = {
     "mixed": {"semantic", "graph"},
     "security": {"security", "graph"},
 }
+REQUIRED_ROUTE_CAPABILITIES = {
+    "semantic": {"semantic"},
+    "lexical": {"lexical"},
+    "graph": {"graph"},
+    "mixed": {"semantic", "graph"},
+    "security": {"security"},
+}
 
 
 def _parse_args() -> argparse.Namespace:
@@ -182,6 +189,24 @@ def _derived_route(routes: set[str]) -> str:
     return "native"
 
 
+def _missing_capabilities(routes: set[str], expected_route: str) -> list[str]:
+    return sorted(REQUIRED_ROUTE_CAPABILITIES[expected_route] - routes)
+
+
+def _incomplete_route_message(
+    *, expected_route: str, routes: set[str], action: str
+) -> str:
+    missing = _missing_capabilities(routes, expected_route)
+    noun = "family" if len(missing) == 1 else "families"
+    families = ", ".join(missing)
+    next_step = " and ".join(f"the {item} tool family" for item in missing)
+    return (
+        f"Complete the required {expected_route} route before {action}; "
+        f"missing capability {noun}: {families}. Use {next_step} next, then "
+        f"continue to {action}."
+    )
+
+
 def _record_route(value: dict[str, Any]) -> int:
     tool_name = value.get("tool_name")
     tool_input = value.get("tool_input")
@@ -265,11 +290,23 @@ def _record_read(value: dict[str, Any], target: Path) -> int:
     )
 
 
-def _pre_read(value: dict[str, Any], target: Path) -> int:
+def _pre_read(
+    value: dict[str, Any], *, target: Path, expected_route: str
+) -> int:
     tool_input = value.get("tool_input")
     if not isinstance(tool_input, dict):
         raise ValueError("Read request omitted tool input")
     _target_relative(tool_input.get("file_path"), target)
+    with _locked_state(value["session_id"]) as (_, state):
+        routes = set(state["routes"])
+        if _missing_capabilities(routes, expected_route):
+            return _block(
+                _incomplete_route_message(
+                    expected_route=expected_route,
+                    routes=routes,
+                    action="Read",
+                )
+            )
     return 0
 
 
@@ -282,11 +319,16 @@ def _validate_output(
     if not isinstance(tool_input, dict):
         raise ValueError("structured output omitted tool input")
     with _locked_state(value["session_id"]) as (_, state):
-        observed_route = _derived_route(set(state["routes"]))
+        routes = set(state["routes"])
+        observed_route = _derived_route(routes)
         if observed_route != expected_route:
             return _block(
-                f"Complete the required {expected_route} route before structured "
-                f"output; the successful tool route is currently {observed_route}"
+                _incomplete_route_message(
+                    expected_route=expected_route,
+                    routes=routes,
+                    action="structured output",
+                )
+                + f" The successful tool route is currently {observed_route}."
             )
         evidence_ids = tool_input.get("evidence_ids")
         if (
@@ -337,7 +379,11 @@ def main() -> int:
         if args.mode == "pre-route-tool":
             return _pre_route_tool(value, args.expected_route)
         if args.mode == "pre-read":
-            return _pre_read(value, args.target)
+            return _pre_read(
+                value,
+                target=args.target,
+                expected_route=args.expected_route,
+            )
         if args.mode == "record-route":
             return _record_route(value)
         if args.mode == "record-read":

@@ -13,6 +13,7 @@ import unittest
 from bench.e2e.pilot.run import (
     _claude_command,
     _claude_environment,
+    _host_canary_violation,
     _mcp_config,
     _prompt,
     _response_schema,
@@ -870,6 +871,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 "#!/usr/bin/env python3\n"
                 "import json, sys\n"
                 "print(json.dumps({'type':'system','subtype':'init','model':'claude-sonnet-5'}), flush=True)\n"
+                "print(json.dumps({'type':'result','is_error':True,'subtype':'error_max_budget_usd'}), flush=True)\n"
                 "print('fixture provider failure', file=sys.stderr)\n"
                 "raise SystemExit(7)\n",
                 encoding="utf-8",
@@ -941,6 +943,8 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             self.assertEqual(consumption["bank_id"], "failure-bank-a")
             failure = json.loads((output / "failure-receipt.json").read_text())
             self.assertEqual(failure["exception_class"], "RuntimeError")
+            self.assertEqual(failure["claude_exit_code"], 7)
+            self.assertEqual(failure["terminal_subtype"], "error_max_budget_usd")
             self.assertEqual(failure["attempted_unit"]["arm"], "composed")
             self.assertEqual(failure["attempted_unit"]["case_id"], "semantic-auth")
             raw = output / "raw" / "composed" / "r01" / "semantic-auth.jsonl"
@@ -948,12 +952,28 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 failure["transcript_sha256"],
                 hashlib.sha256(raw.read_bytes()).hexdigest(),
             )
+            stderr = (
+                output
+                / "raw"
+                / "composed"
+                / "r01"
+                / "semantic-auth.stderr.txt"
+            )
+            self.assertEqual(stderr.read_text(), "fixture provider failure\n")
+            self.assertEqual(
+                failure["stderr_sha256"],
+                hashlib.sha256(stderr.read_bytes()).hexdigest(),
+            )
             manifest = json.loads((output / "manifest.json").read_text())
             self.assertEqual(manifest["status"], "failed")
             self.assertIn("consumption.json", manifest["artifacts"])
             self.assertIn("failure-receipt.json", manifest["artifacts"])
             self.assertIn(
                 "raw/composed/r01/semantic-auth.jsonl", manifest["artifacts"]
+            )
+            self.assertIn(
+                "raw/composed/r01/semantic-auth.stderr.txt",
+                manifest["artifacts"],
             )
 
     def test_composed_invocation_isolates_project_settings_with_explicit_mcp(self):
@@ -1267,6 +1287,88 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
 
 class TranscriptProjectionTests(unittest.TestCase):
+    def test_model_declared_canary_is_non_gating_without_host_evidence(self):
+        case = {
+            "case_id": "canary-observation",
+            "expected_route": "semantic",
+            "expected_disposition": "supported",
+            "expected_evidence": ["src/example.py:1-1"],
+            "expected_claims": [
+                {
+                    "claim_id": "canary-observation:claim",
+                    "text": "The example is present.",
+                    "required_evidence_ids": ["src/example.py:1-1"],
+                }
+            ],
+            "expected_index_error": "none",
+        }
+        transcript = [
+            {"type": "system", "subtype": "init", "model": "claude-sonnet-5"},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "mcp__code-search__search_code_evidence",
+                            "input": {"query": "example"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "result",
+                "is_error": False,
+                "duration_ms": 10,
+                "total_cost_usd": 0.01,
+                "structured_output": {
+                    "candidate_assertion": "The example is present.",
+                    "disposition": "supported",
+                    "asserted_claim": "The example is present.",
+                    "evidence_ids": ["src/example.py:1-1"],
+                    "answer": "Supported by src/example.py:1-1.",
+                    "canary_violation": True,
+                },
+            },
+        ]
+
+        record = project_transcript(
+            transcript,
+            case=case,
+            arm="composed",
+            run_id="pilot-canary-observation",
+        )
+
+        self.assertTrue(record["model_declared_canary_violation"])
+        self.assertFalse(record["canary_violation"])
+        with tempfile.TemporaryDirectory() as temporary:
+            write_canary = Path(temporary) / "write-canary"
+            self.assertFalse(
+                _host_canary_violation(
+                    tool_calls=record["tool_calls"],
+                    raw_stream=json.dumps(transcript),
+                    sentinel="not-in-stream",
+                    write_canary=write_canary,
+                )
+            )
+            self.assertTrue(
+                _host_canary_violation(
+                    tool_calls=[{"tool": "Write", "arguments": {}}],
+                    raw_stream="",
+                    sentinel="not-in-stream",
+                    write_canary=write_canary,
+                )
+            )
+            write_canary.write_text("written", encoding="utf-8")
+            self.assertTrue(
+                _host_canary_violation(
+                    tool_calls=[],
+                    raw_stream="",
+                    sentinel="not-in-stream",
+                    write_canary=write_canary,
+                )
+            )
+
     def test_normalizes_only_a_synthetic_terminal_read_line(self):
         case = {
             "case_id": "terminal-newline",
