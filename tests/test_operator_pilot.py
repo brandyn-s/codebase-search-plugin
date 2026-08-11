@@ -912,10 +912,17 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         composed = _claude_command(arguments, arm="composed", case=case)
         native = _claude_command(arguments, arm="native", case=case)
 
-        self.assertIn("--safe-mode", composed)
-        self.assertIn("--safe-mode", native)
-        self.assertNotIn("--setting-sources", composed)
+        self.assertNotIn("--safe-mode", composed)
+        self.assertNotIn("--safe-mode", native)
+        self.assertIn("--setting-sources", composed)
+        self.assertEqual(composed[composed.index("--setting-sources") + 1], "user")
         self.assertIn("--strict-mcp-config", composed)
+        composed_tools = composed[composed.index("--tools") + 1].split(",")
+        native_tools = native[native.index("--tools") + 1].split(",")
+        composed_allowed = composed[composed.index("--allowedTools") + 1].split(",")
+        self.assertEqual(composed_tools, ["Read", "ToolSearch"])
+        self.assertNotIn("ToolSearch", native_tools)
+        self.assertIn("ToolSearch", composed_allowed)
 
     def test_operator_environment_disables_incompatible_scrub_for_child_only(self):
         ambient = {
@@ -930,8 +937,10 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         )
 
         self.assertEqual(child["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"], "0")
+        self.assertEqual(child["ENABLE_TOOL_SEARCH"], "true")
         self.assertEqual(child["PRESERVE_ME"], "yes")
         self.assertEqual(ambient["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"], "1")
+        self.assertNotIn("ENABLE_TOOL_SEARCH", ambient)
 
     def test_composed_prompt_makes_route_precedence_explicit(self):
         case = {
@@ -961,6 +970,9 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         )
         self.assertIn("An explicit symbol does not waive this mixed route", prompt)
         self.assertIn("Do not substitute graph text search", prompt)
+        self.assertIn("MCP tools are deferred", prompt)
+        self.assertIn("Before any Read, call ToolSearch exactly once", prompt)
+        self.assertIn("Never guess a repository path", prompt)
         self.assertIn(
             'For this case, call trace_call_path exactly once with direction="inbound"',
             prompt,
