@@ -15,7 +15,7 @@ class MarketplaceInstallTests(unittest.TestCase):
             (ROOT / ".claude-plugin" / "plugin.json").read_text()
         )
 
-        self.assertEqual(plugin["version"], "0.4.8")
+        self.assertEqual(plugin["version"], "0.4.9")
         self.assertEqual(marketplace["name"], "redacted-code-intelligence")
         self.assertEqual(len(marketplace["plugins"]), 1)
         entry = marketplace["plugins"][0]
@@ -25,13 +25,22 @@ class MarketplaceInstallTests(unittest.TestCase):
 
     def test_quick_start_uses_supported_namespaced_install_commands(self):
         readme = (ROOT / "README.md").read_text()
+        shell_installer = (ROOT / "install.sh").read_text()
+        powershell_installer = (ROOT / "install.ps1").read_text()
 
-        self.assertIn('claude plugin marketplace add "$PWD"', readme)
+        self.assertIn(
+            "claude plugin marketplace add "
+            "redacted-org/codebase-search-plugin",
+            readme,
+        )
         self.assertIn(
             "claude plugin install codebase-search@redacted-code-intelligence",
             readme,
         )
+        self.assertNotIn('claude plugin marketplace add "$PWD"', readme)
         self.assertNotIn("/install-plugin", readme)
+        self.assertNotIn("/install-plugin", shell_installer)
+        self.assertNotIn("/install-plugin", powershell_installer)
 
 
 if __name__ == "__main__":

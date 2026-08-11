@@ -620,7 +620,7 @@ case "$READINESS_STATUS" in
     ready)
         echo "=== INTEGRATED READINESS: READY ==="
         echo "1. Install the plugin in Claude Code:"
-        echo "  /install-plugin $PLUGIN_DIR"
+        echo "  claude plugin install codebase-search@redacted-code-intelligence --scope user"
         echo "2. Configure the embedding provider as described in README.md."
         echo "3. Index a repo:"
         echo "  /index-repo <repo-path>"

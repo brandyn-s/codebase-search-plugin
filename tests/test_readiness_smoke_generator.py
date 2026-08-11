@@ -171,6 +171,7 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         component: str,
         marker: Path | None = None,
         behavior: str = "",
+        probe: tuple[str, str, int, int] | None = None,
     ) -> Path:
         wrapper = directory / component
         marker_command = (
@@ -179,10 +180,20 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         behavior_command = (
             f"export FAKE_READINESS_BEHAVIOR={behavior}\n" if behavior else ""
         )
+        probe_command = ""
+        if probe is not None:
+            relative_path, query, start_line, end_line = probe
+            probe_command = (
+                f"export FAKE_READINESS_PROBE_PATH='{relative_path}'\n"
+                f"export FAKE_READINESS_PROBE_QUERY='{query}'\n"
+                f"export FAKE_READINESS_PROBE_START='{start_line}'\n"
+                f"export FAKE_READINESS_PROBE_END='{end_line}'\n"
+            )
         wrapper.write_text(
             "#!/bin/sh\n"
             f"{marker_command}"
             f"{behavior_command}"
+            f"{probe_command}"
             f'exec "{sys.executable}" "{FAKE_SERVER}" "{component}"\n',
             encoding="utf-8",
         )
@@ -209,6 +220,8 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         marker: Path | None = None,
         behavior: str = "",
         search_release: bool = False,
+        workspace_root: Path | None = None,
+        probe: tuple[str, str, int, int] | None = None,
     ):
         fixture = directory / "fixture"
         shutil.copytree(ROOT / "bench" / "e2e" / "target-repo", fixture)
@@ -224,8 +237,12 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
                 "tag": "v0.2.0",
             }
         bom_path.write_text(json.dumps(bom), encoding="utf-8")
-        code_search = self._wrapper(directory, "code-search", marker, behavior)
-        code_graph = self._wrapper(directory, "code-graph", marker, behavior)
+        code_search = self._wrapper(
+            directory, "code-search", marker, behavior, probe
+        )
+        code_graph = self._wrapper(
+            directory, "code-graph", marker, behavior, probe
+        )
         local_model = self._fake_local_model(directory)
         output = directory / "live-readiness-evidence.json"
         command = [
@@ -248,6 +265,22 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         ]
         if candidate_evidence:
             command.append("--candidate-evidence")
+        if workspace_root is not None:
+            command.extend(["--workspace-root", str(workspace_root)])
+        if probe is not None:
+            relative_path, query, start_line, end_line = probe
+            command.extend(
+                [
+                    "--probe-relative-path",
+                    relative_path,
+                    "--probe-query",
+                    query,
+                    "--probe-start-line",
+                    str(start_line),
+                    "--probe-end-line",
+                    str(end_line),
+                ]
+            )
         completed = subprocess.run(
             command,
             cwd=ROOT,
@@ -270,6 +303,99 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
             check=False,
         )
         return completed, output, bom
+
+    def test_generator_preserves_explicit_workspace_and_runtime_bindings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            workspace = directory / "persistent-workspace"
+
+            completed, output, _bom = self._run_generator(
+                directory,
+                "ready",
+                workspace_root=workspace,
+            )
+
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stdout + completed.stderr,
+            )
+            evidence = json.loads(output.read_text(encoding="utf-8"))
+            target = workspace / "target-repo"
+            runtime = workspace / "runtime"
+            self.assertTrue((target / ".git").is_dir())
+            self.assertTrue((runtime / "code-search-storage").is_dir())
+            self.assertTrue((runtime / "home").is_dir())
+            self.assertEqual(
+                evidence["runtime"]["target_root"], str(target.resolve())
+            )
+            self.assertEqual(
+                evidence["runtime"]["code_search_storage"],
+                str((runtime / "code-search-storage").resolve()),
+            )
+            self.assertEqual(
+                evidence["runtime"]["code_graph_home"],
+                str((runtime / "home").resolve()),
+            )
+            for component in ("code-search", "code-graph"):
+                server = evidence["runtime"]["servers"][component]
+                self.assertRegex(server["sha256"], r"^[0-9a-f]{64}$")
+                self.assertTrue(Path(server["path"]).is_file())
+
+    def test_materialized_fixture_revision_is_deterministic(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            revisions = []
+            for name in ("first", "second"):
+                directory = root / name
+                directory.mkdir()
+                completed, output, _bom = self._run_generator(
+                    directory,
+                    "ready",
+                    workspace_root=directory / "workspace",
+                )
+                self.assertEqual(
+                    completed.returncode,
+                    0,
+                    completed.stdout + completed.stderr,
+                )
+                evidence = json.loads(output.read_text(encoding="utf-8"))
+                revisions.append(
+                    evidence["components"]["code-search"]["index_identity"][
+                        "source_revision"
+                    ]
+                )
+
+        self.assertEqual(revisions[0], revisions[1])
+
+    def test_generator_accepts_a_manifest_declared_probe_coordinate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            probe = ("src/auth/token.py", "verify_signature", 1, 4)
+
+            completed, output, _bom = self._run_generator(
+                directory,
+                "ready",
+                probe=probe,
+            )
+
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stdout + completed.stderr,
+            )
+            evidence = json.loads(output.read_text(encoding="utf-8"))
+            coordinate = evidence["components"]["code-search"][
+                "evidence_coordinate"
+            ]
+            self.assertEqual(
+                (
+                    coordinate["relative_path"],
+                    coordinate["start_line"],
+                    coordinate["end_line"],
+                ),
+                ("src/auth/token.py", 1, 4),
+            )
 
     def test_generator_indexes_fixture_with_both_just_installed_servers(self):
         with tempfile.TemporaryDirectory() as tmp:

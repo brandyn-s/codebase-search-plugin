@@ -10,11 +10,13 @@ server changed the checkout.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 from datetime import datetime
 import hashlib
 import json
 import os
 from pathlib import Path
+from pathlib import PurePosixPath
 import queue
 import shutil
 import subprocess
@@ -175,6 +177,11 @@ def initialize_checkout(
         environment=environment,
     )
     run_git(checkout, "add", "--all", environment=environment)
+    commit_environment = {
+        **environment,
+        "GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z",
+        "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z",
+    }
     run_git(
         checkout,
         "-c",
@@ -183,7 +190,7 @@ def initialize_checkout(
         "--quiet",
         "-m",
         "readiness smoke fixture",
-        environment=environment,
+        environment=commit_environment,
     )
 
 
@@ -616,6 +623,11 @@ def run_smoke(
     timeout: float,
     local_model: Path,
     candidate_evidence: bool = False,
+    workspace_root: Path | None = None,
+    probe_relative_path: str = "src/config.py",
+    probe_query: str = "CODE_SEARCH_STORAGE",
+    probe_start_line: int = 1,
+    probe_end_line: int = 3,
 ) -> None:
     readiness = bom.get("integrated_readiness")
     readiness_status = (
@@ -659,9 +671,16 @@ def run_smoke(
     if os.path.lexists(output):
         raise SmokeError(f"readiness evidence output already exists: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix="code-intel-readiness-", dir=output.parent
-    ) as temporary:
+    if workspace_root is not None:
+        if os.path.lexists(workspace_root):
+            raise SmokeError(f"readiness workspace already exists: {workspace_root}")
+        workspace_root.mkdir()
+        workspace_context = nullcontext(str(workspace_root))
+    else:
+        workspace_context = tempfile.TemporaryDirectory(
+            prefix="code-intel-readiness-", dir=output.parent
+        )
+    with workspace_context as temporary:
         checkout = Path(temporary) / "target-repo"
         runtime_environment = isolated_environment(
             Path(temporary) / "runtime",
@@ -669,6 +688,26 @@ def run_smoke(
         )
         shutil.copytree(fixture, checkout)
         initialize_checkout(checkout, runtime_environment)
+        parsed_probe_path = PurePosixPath(probe_relative_path)
+        if (
+            parsed_probe_path.is_absolute()
+            or ".." in parsed_probe_path.parts
+            or parsed_probe_path.as_posix() != probe_relative_path
+        ):
+            raise SmokeError("readiness probe path must be canonical and repo-relative")
+        probe_file = checkout.joinpath(*parsed_probe_path.parts)
+        if probe_file.is_symlink() or not probe_file.is_file():
+            raise SmokeError("readiness probe file is unavailable")
+        probe_lines = probe_file.read_text(encoding="utf-8").splitlines()
+        if (
+            not probe_query
+            or probe_start_line < 1
+            or probe_end_line < probe_start_line
+            or probe_end_line > len(probe_lines)
+            or probe_query
+            not in "\n".join(probe_lines[probe_start_line - 1 : probe_end_line])
+        ):
+            raise SmokeError("readiness probe does not match the declared source range")
         before = checkout_state(checkout, runtime_environment)
         if before[1]:
             raise SmokeError("fresh readiness fixture checkout is dirty")
@@ -841,10 +880,10 @@ def run_smoke(
             evidence_search = search.call_tool(
                 "search_code_evidence",
                 {
-                    "query": "CODE_SEARCH_STORAGE",
+                    "query": probe_query,
                     "k": 5,
                     "search_mode": "keyword",
-                    "file_pattern": "src/config.py",
+                    "file_pattern": probe_relative_path,
                     "include_context": False,
                     "auto_reindex": False,
                 },
@@ -855,7 +894,7 @@ def run_smoke(
                     item
                     for item in results
                     if isinstance(item, dict)
-                    and item.get("file") == "src/config.py"
+                    and item.get("file") == probe_relative_path
                 ]
                 if isinstance(results, list)
                 else []
@@ -867,11 +906,11 @@ def run_smoke(
             )
             expected_generation = search_identity["index_generation"]
             if (
-                result.get("lines") != "1-3"
+                result.get("lines") != f"{probe_start_line}-{probe_end_line}"
                 or not isinstance(evidence_ref, dict)
-                or evidence_ref.get("relative_path") != "src/config.py"
-                or evidence_ref.get("start_line") != 1
-                or evidence_ref.get("end_line") != 3
+                or evidence_ref.get("relative_path") != probe_relative_path
+                or evidence_ref.get("start_line") != probe_start_line
+                or evidence_ref.get("end_line") != probe_end_line
                 or evidence_ref.get("index_generation")
                 != expected_generation
                 or not isinstance(refs_metadata, dict)
@@ -884,9 +923,9 @@ def run_smoke(
                 )
             evidence_coordinate = {
                 "status": "verified",
-                "relative_path": "src/config.py",
-                "start_line": 1,
-                "end_line": 3,
+                "relative_path": probe_relative_path,
+                "start_line": probe_start_line,
+                "end_line": probe_end_line,
                 "index_generation": expected_generation,
             }
         finally:
@@ -927,6 +966,24 @@ def run_smoke(
             },
             "checkout_unchanged": True,
         }
+        if workspace_root is not None:
+            runtime_root = Path(temporary) / "runtime"
+            evidence["runtime"] = {
+                "target_root": str(checkout.resolve()),
+                "code_search_storage": str(
+                    (runtime_root / "code-search-storage").resolve()
+                ),
+                "code_graph_home": str((runtime_root / "home").resolve()),
+                "servers": {
+                    component: {
+                        "path": command,
+                        "sha256": hashlib.sha256(
+                            Path(command).read_bytes()
+                        ).hexdigest(),
+                    }
+                    for component, command in servers.items()
+                },
+            }
         output.write_text(
             json.dumps(evidence, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -970,6 +1027,19 @@ def main() -> int:
     parser.add_argument("--server", action="append", default=[])
     parser.add_argument("--local-model", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        help="new persistent workspace retaining the exact checkout and MCP stores",
+    )
+    parser.add_argument(
+        "--probe-relative-path",
+        default="src/config.py",
+        help="repo-relative source file used for exact evidence-coordinate readiness",
+    )
+    parser.add_argument("--probe-query", default="CODE_SEARCH_STORAGE")
+    parser.add_argument("--probe-start-line", type=int, default=1)
+    parser.add_argument("--probe-end-line", type=int, default=3)
     parser.add_argument("--timeout", type=float, default=300.0)
     parser.add_argument(
         "--candidate-evidence",
@@ -992,6 +1062,15 @@ def main() -> int:
             args.timeout,
             local_model,
             candidate_evidence=args.candidate_evidence,
+            workspace_root=(
+                args.workspace_root.resolve()
+                if args.workspace_root is not None
+                else None
+            ),
+            probe_relative_path=args.probe_relative_path,
+            probe_query=args.probe_query,
+            probe_start_line=args.probe_start_line,
+            probe_end_line=args.probe_end_line,
         )
     except (OSError, SmokeError) as exc:
         print(f"Readiness smoke FAILED: {exc}", file=sys.stderr)

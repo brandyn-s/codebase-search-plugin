@@ -61,6 +61,10 @@ GRAPH_SCHEMAS = {
 repository: Path | None = None
 job_id = "readiness-smoke-job"
 BEHAVIOR = os.environ.get("FAKE_READINESS_BEHAVIOR", "")
+PROBE_PATH = os.environ.get("FAKE_READINESS_PROBE_PATH", "src/config.py")
+PROBE_QUERY = os.environ.get("FAKE_READINESS_PROBE_QUERY", "CODE_SEARCH_STORAGE")
+PROBE_START = int(os.environ.get("FAKE_READINESS_PROBE_START", "1"))
+PROBE_END = int(os.environ.get("FAKE_READINESS_PROBE_END", "3"))
 
 
 def isolated_runtime_is_valid() -> bool:
@@ -235,27 +239,27 @@ def call_tool(request_id, name: str, arguments: dict) -> None:
     elif COMPONENT == "code-search" and name == "search_code_evidence":
         assert repository is not None
         if arguments != {
-            "query": "CODE_SEARCH_STORAGE",
+            "query": PROBE_QUERY,
             "k": 5,
             "search_mode": "keyword",
-            "file_pattern": "src/config.py",
+            "file_pattern": PROBE_PATH,
             "include_context": False,
             "auto_reindex": False,
         }:
             raise RuntimeError("unexpected evidence-coordinate query")
         search_identity = identity()
-        end_line = 4 if BEHAVIOR == "search-evidence-past-eof" else 3
+        end_line = PROBE_END + 1 if BEHAVIOR == "search-evidence-past-eof" else PROBE_END
         tool_result(
             request_id,
             {
-                "query": "CODE_SEARCH_STORAGE",
+                "query": PROBE_QUERY,
                 "results": [
                     {
-                        "file": "src/config.py",
-                        "lines": f"1-{end_line}",
+                        "file": PROBE_PATH,
+                        "lines": f"{PROBE_START}-{end_line}",
                         "evidence_ref": {
-                            "relative_path": "src/config.py",
-                            "start_line": 1,
+                            "relative_path": PROBE_PATH,
+                            "start_line": PROBE_START,
                             "end_line": end_line,
                             "index_generation": search_identity[
                                 "index_generation"

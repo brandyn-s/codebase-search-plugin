@@ -13,9 +13,11 @@ import unittest
 from bench.e2e.pilot.run import (
     _claude_command,
     _claude_environment,
+    _mcp_config,
     _prompt,
     _route_satisfies,
     _routing_contract_satisfies,
+    _validate_fresh_holdout_corpus,
     _validate_preregistered_controls,
     build_parser,
     evaluate_outcome_gates,
@@ -28,6 +30,76 @@ RUNNER = ROOT / "bench" / "e2e" / "pilot" / "run.py"
 
 
 class OperatorPilotAcceptanceTests(unittest.TestCase):
+    def test_fresh_holdout_preflight_rejects_vacuous_corpus(self):
+        controls = {
+            "arms": ["composed"],
+            "case_ids": [f"case-{index}" for index in range(5)],
+            "repetitions": 2,
+            "model": "sonnet",
+            "fallback_model": None,
+            "max_turns": 8,
+            "timeout_seconds": 180.0,
+            "max_budget_usd_per_case": 1.0,
+        }
+        preregistration = {
+            "run_type": "bounded_operator_authorized_fresh_holdout_confirmation",
+            "controls": controls,
+            "bindings": {
+                "schema_version": 1,
+                "bank_id": "opaque-bank-a",
+                "corpus_pack_sha256": "a" * 64,
+                "runtime_receipt_manifest_sha256": "b" * 64,
+            },
+            "outcome_gates": {
+                "arm": "composed",
+                "min_evidence_precision": 0.9,
+                "min_evidence_recall": 0.9,
+                "min_adjudication_accuracy": 1.0,
+                "max_unsupported_asserted_claim_rate": 0.0,
+                "min_routing_contract_accuracy": 1.0,
+                "max_errors": 0,
+                "max_canary_violations": 0,
+            },
+        }
+        cases = [
+            {
+                "case_id": f"case-{index}",
+                "expected_route": route,
+                "expected_evidence": [f"src/case_{index}.py:1-2"],
+                "expected_claims": [
+                    {
+                        "text": f"claim {index}",
+                        "required_evidence_ids": [f"src/case_{index}.py:1-2"],
+                    }
+                ],
+            }
+            for index, route in enumerate(
+                ("semantic", "lexical", "graph", "mixed", "security")
+            )
+        ]
+
+        with self.assertRaisesRegex(ValueError, "routing contract"):
+            _validate_fresh_holdout_corpus(preregistration, cases)
+
+        cases[2]["routing_contract"] = {"trace_call_path": {"count": 1}}
+        _validate_fresh_holdout_corpus(preregistration, cases)
+
+    def test_code_graph_home_is_scoped_to_the_graph_mcp_child(self):
+        arguments = SimpleNamespace(
+            code_search=Path("/usr/bin/code-search"),
+            code_graph=Path("/usr/bin/code-graph"),
+            code_search_storage=Path("/tmp/search"),
+            code_graph_home=Path("/tmp/graph-home"),
+            local_model=Path("/tmp/model"),
+        )
+
+        config = _mcp_config(arguments, "composed")["mcpServers"]
+
+        self.assertEqual(
+            config["code-graph"].get("env", {}).get("HOME"), "/tmp/graph-home"
+        )
+        self.assertNotIn("HOME", config["code-search"]["env"])
+
     def test_preregistration_rejects_execution_control_drift(self):
         preregistration = json.loads(
             (
@@ -188,6 +260,20 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 "index_generation": index_generation,
                 "captured_at": "2026-08-10T23:59:00Z",
             }
+            code_search = root / "code-search"
+            code_graph = root / "code-graph"
+            alternate_search = root / "alternate-code-search"
+            for path, content in (
+                (code_search, b"search-runtime"),
+                (code_graph, b"graph-runtime"),
+                (alternate_search, b"different-runtime"),
+            ):
+                path.write_bytes(content)
+                path.chmod(0o755)
+            code_search_storage = root / "code-search-storage"
+            code_graph_home = root / "code-graph-home"
+            code_search_storage.mkdir()
+            code_graph_home.mkdir()
             readiness = {
                 "schema_version": 1,
                 "producer": "scripts/generate_live_readiness_evidence.py:v2",
@@ -206,9 +292,9 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                         "index_ready": True,
                         "evidence_coordinate": {
                             "status": "verified",
-                            "relative_path": "src/config.py",
+                            "relative_path": "src/auth/token.py",
                             "start_line": 1,
-                            "end_line": 3,
+                            "end_line": 4,
                             "index_generation": index_generation,
                         },
                         "index_identity": deepcopy(identity),
@@ -222,6 +308,25 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                         ),
                         "status": "ready",
                         "index_identity": deepcopy(identity),
+                    },
+                },
+                "runtime": {
+                    "target_root": str(target.resolve()),
+                    "code_search_storage": str(code_search_storage.resolve()),
+                    "code_graph_home": str(code_graph_home.resolve()),
+                    "servers": {
+                        "code-search": {
+                            "path": str(code_search.resolve()),
+                            "sha256": hashlib.sha256(
+                                code_search.read_bytes()
+                            ).hexdigest(),
+                        },
+                        "code-graph": {
+                            "path": str(code_graph.resolve()),
+                            "sha256": hashlib.sha256(
+                                code_graph.read_bytes()
+                            ).hexdigest(),
+                        },
                     },
                 },
             }
@@ -270,9 +375,16 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 target_manifest=target_manifest,
                 component_bom=component_bom,
                 readiness_evidence=readiness_evidence,
+                code_search=code_search,
+                code_graph=code_graph,
+                code_search_storage=code_search_storage,
+                code_graph_home=code_graph_home,
             )
 
-            _validate_preregistered_controls(arguments, preregistration)
+            try:
+                _validate_preregistered_controls(arguments, preregistration)
+            except ValueError as exc:
+                self.fail(str(exc))
 
             drift_cases = {
                 "max turns": ("control", "max_turns", 9, "max turns differs"),
@@ -300,12 +412,18 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     "0" * 64,
                     "readiness evidence SHA-256 differs",
                 ),
+                "code-search runtime": (
+                    "argument",
+                    "code_search",
+                    alternate_search,
+                    "runtime code-search executable differs",
+                ),
             }
             for label, (kind, field, value, error) in drift_cases.items():
                 with self.subTest(label=label):
                     drifted_preregistration = deepcopy(preregistration)
                     drifted_arguments = SimpleNamespace(**vars(arguments))
-                    if kind == "control":
+                    if kind in {"control", "argument"}:
                         setattr(drifted_arguments, field, value)
                     else:
                         drifted_preregistration["bindings"][field] = value
@@ -681,7 +799,101 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             self.assertIn("preregistration-v4.json", manifest["artifacts"])
             self.assertIn("outcome-gates.json", manifest["artifacts"])
 
-    def test_composed_invocation_does_not_disable_explicit_mcp(self):
+    def test_failed_model_launch_seals_consumption_and_failure_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fake_claude = root / "claude"
+            fake_claude.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, sys\n"
+                "print(json.dumps({'type':'system','subtype':'init','model':'claude-sonnet-5'}), flush=True)\n"
+                "print('fixture provider failure', file=sys.stderr)\n"
+                "raise SystemExit(7)\n",
+                encoding="utf-8",
+            )
+            fake_claude.chmod(0o755)
+            output = root / "failed-recording"
+            storage = root / "storage"
+            storage.mkdir()
+            model = root / "model"
+            model.mkdir()
+            preregistration_path = root / "preregistration-v4.json"
+            preregistration = json.loads(
+                (
+                    ROOT / "bench" / "e2e" / "pilot" / "preregistration-v4.json"
+                ).read_text()
+            )
+            preregistration["controls"]["case_ids"] = ["semantic-auth"]
+            preregistration["controls"]["repetitions"] = 1
+            preregistration["bindings"] = {
+                "bank_id": "failure-bank-a",
+                "corpus_pack_sha256": "b" * 64,
+                "cases_sha256": hashlib.sha256(
+                    (ROOT / "bench" / "e2e" / "pilot" / "cases-v2.jsonl").read_bytes()
+                ).hexdigest(),
+                "target_manifest_sha256": hashlib.sha256(
+                    (
+                        ROOT / "bench" / "e2e" / "target-repo-manifest.json"
+                    ).read_bytes()
+                ).hexdigest(),
+            }
+            preregistration_path.write_text(
+                json.dumps(preregistration), encoding="utf-8"
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(RUNNER),
+                    "--arms",
+                    "composed",
+                    "--case-ids",
+                    "semantic-auth",
+                    "--repetitions",
+                    "1",
+                    "--output-dir",
+                    str(output),
+                    "--claude",
+                    str(fake_claude),
+                    "--code-search",
+                    "/usr/bin/true",
+                    "--code-graph",
+                    "/usr/bin/true",
+                    "--code-search-storage",
+                    str(storage),
+                    "--local-model",
+                    str(model),
+                    "--preregistration",
+                    str(preregistration_path),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(completed.returncode, 2)
+            self.assertTrue((output / "consumption.json").is_file())
+            consumption = json.loads((output / "consumption.json").read_text())
+            self.assertEqual(consumption["state"], "consumed")
+            self.assertEqual(consumption["bank_id"], "failure-bank-a")
+            failure = json.loads((output / "failure-receipt.json").read_text())
+            self.assertEqual(failure["exception_class"], "RuntimeError")
+            self.assertEqual(failure["attempted_unit"]["arm"], "composed")
+            self.assertEqual(failure["attempted_unit"]["case_id"], "semantic-auth")
+            raw = output / "raw" / "composed" / "r01" / "semantic-auth.jsonl"
+            self.assertEqual(
+                failure["transcript_sha256"],
+                hashlib.sha256(raw.read_bytes()).hexdigest(),
+            )
+            manifest = json.loads((output / "manifest.json").read_text())
+            self.assertEqual(manifest["status"], "failed")
+            self.assertIn("consumption.json", manifest["artifacts"])
+            self.assertIn("failure-receipt.json", manifest["artifacts"])
+            self.assertIn(
+                "raw/composed/r01/semantic-auth.jsonl", manifest["artifacts"]
+            )
+
+    def test_composed_invocation_isolates_project_settings_with_explicit_mcp(self):
         arguments = SimpleNamespace(
             claude=Path("/usr/bin/claude"),
             code_search=Path("/usr/bin/code-search"),
@@ -700,8 +912,9 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         composed = _claude_command(arguments, arm="composed", case=case)
         native = _claude_command(arguments, arm="native", case=case)
 
-        self.assertNotIn("--safe-mode", composed)
+        self.assertIn("--safe-mode", composed)
         self.assertIn("--safe-mode", native)
+        self.assertNotIn("--setting-sources", composed)
         self.assertIn("--strict-mcp-config", composed)
 
     def test_operator_environment_disables_incompatible_scrub_for_child_only(self):

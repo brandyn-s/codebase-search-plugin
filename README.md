@@ -19,13 +19,13 @@ structural indexing workflow.
 ## Quick Start
 
 ```bash
-# 1. Clone the plugin
-git clone https://github.com/redacted-org/codebase-search-plugin.git
-cd codebase-search-plugin
+# 1. Add the GitHub-backed marketplace
+claude plugin marketplace add redacted-org/codebase-search-plugin
 
-# 2. Run the install script (downloads both MCP servers)
-bash install.sh            # Linux/Mac
-# pwsh install.ps1         # Windows (PowerShell)
+# 2. Resolve its durable checkout and install both MCP servers (Linux/Mac)
+PLUGIN_DIR="$(claude plugin marketplace list --json | python3 -c \
+  'import json,sys; print(next(x["installLocation"] for x in json.load(sys.stdin) if x["name"] == "redacted-code-intelligence"))')"
+bash "$PLUGIN_DIR/install.sh"
 
 # 3. Set your embedding provider
 export EMBEDDING_PROVIDER="voyage"          # Voyage 4 Large (cloud)
@@ -35,9 +35,8 @@ unset VOYAGE_API_KEY
 export EMBEDDING_PROVIDER="jina"            # local code-search embeddings
 export CODE_GRAPH_SKIP_EMBEDDINGS=1         # disable graph cloud embeddings
 
-# 4. Register this installed clone and install the namespaced plugin
-claude plugin marketplace add "$PWD"
-claude plugin install codebase-search@redacted-code-intelligence
+# 4. Install the namespaced plugin for your user
+claude plugin install codebase-search@redacted-code-intelligence --scope user
 
 # 5. Build and verify both indexes
 /index-repo /path/to/your/repo

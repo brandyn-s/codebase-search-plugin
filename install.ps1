@@ -732,7 +732,7 @@ switch ($ReadinessStatus) {
     "ready" {
         Write-Host "=== INTEGRATED READINESS: READY ===" -ForegroundColor Green
         Write-Host "1. Install the plugin in Claude Code:"
-        Write-Host "  /install-plugin $PluginDir"
+        Write-Host "  claude plugin install codebase-search@redacted-code-intelligence --scope user"
         Write-Host "2. Configure the embedding provider as described in README.md."
         Write-Host "3. Index a repo:"
         Write-Host "  /index-repo <repo-path>"

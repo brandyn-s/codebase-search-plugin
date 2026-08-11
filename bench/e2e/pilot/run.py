@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from pathlib import PurePosixPath
 import re
 import secrets
 import shutil
@@ -124,6 +125,19 @@ RESPONSE_SCHEMA = {
     "additionalProperties": False,
 }
 EVIDENCE_LOCATION = re.compile(r"^(.+):(\d+)-(\d+)$")
+FRESH_HOLDOUT_RUN_TYPE = (
+    "bounded_operator_authorized_fresh_holdout_confirmation"
+)
+FRESH_HOLDOUT_GATES = {
+    "arm": "composed",
+    "min_evidence_precision": 0.9,
+    "min_evidence_recall": 0.9,
+    "min_adjudication_accuracy": 1.0,
+    "max_unsupported_asserted_claim_rate": 0.0,
+    "min_routing_contract_accuracy": 1.0,
+    "max_errors": 0,
+    "max_canary_violations": 0,
+}
 
 
 def _derived_route(tool_calls: list[dict[str, Any]]) -> str:
@@ -467,11 +481,21 @@ def _mcp_config(args: argparse.Namespace, arm: str) -> dict[str, Any]:
             },
         }
     if arm in {"code-graph", "composed"}:
-        servers["code-graph"] = {
+        graph_server: dict[str, Any] = {
             "type": "stdio",
             "command": str(args.code_graph),
             "args": [],
         }
+        graph_home = getattr(args, "code_graph_home", None)
+        if graph_home is not None:
+            graph_server["env"] = {
+                "HOME": str(graph_home),
+                "USERPROFILE": str(graph_home),
+                "XDG_CONFIG_HOME": str(graph_home / "xdg-config"),
+                "XDG_CACHE_HOME": str(graph_home / "xdg-cache"),
+                "XDG_DATA_HOME": str(graph_home / "xdg-data"),
+            }
+        servers["code-graph"] = graph_server
     return {"mcpServers": servers}
 
 
@@ -564,11 +588,7 @@ def _claude_command(
 ) -> list[str]:
     tools = _arm_tools(arm)
     builtins = [tool for tool in tools if not tool.startswith("mcp__")]
-    isolation = (
-        ["--safe-mode"]
-        if arm == "native"
-        else ["--setting-sources", "project"]
-    )
+    isolation = ["--safe-mode"]
     command = [
         str(args.claude),
         *isolation,
@@ -795,6 +815,44 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _write_json_atomic(path: Path, value: dict[str, Any]) -> None:
+    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    encoded = (
+        json.dumps(value, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _write_run_manifest(output_dir: Path, run_id: str, status: str) -> None:
+    artifacts = {
+        path.relative_to(output_dir).as_posix(): _sha256(path)
+        for path in sorted(output_dir.rglob("*"))
+        if path.is_file() and path.name != "manifest.json"
+    }
+    (output_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "run_id": run_id,
+                "status": status,
+                "artifacts": artifacts,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def _canonical_sha256(value: Any) -> str:
     encoded = json.dumps(
         value,
@@ -885,6 +943,11 @@ def _validate_readiness_evidence(
     target: Path,
     component_bom_path: Path,
     readiness_evidence_path: Path,
+    *,
+    code_search: Path | None = None,
+    code_graph: Path | None = None,
+    code_search_storage: Path | None = None,
+    code_graph_home: Path | None = None,
 ) -> None:
     try:
         bom = json.loads(component_bom_path.read_text(encoding="utf-8"))
@@ -985,14 +1048,32 @@ def _validate_readiness_evidence(
     if index_generation != expected_generation:
         raise ValueError("readiness index generation is not reproducible")
     coordinate = search.get("evidence_coordinate")
-    if not isinstance(coordinate, dict) or (
-        coordinate.get("status"),
-        coordinate.get("relative_path"),
-        coordinate.get("start_line"),
-        coordinate.get("end_line"),
-        coordinate.get("index_generation"),
-    ) != ("verified", "src/config.py", 1, 3, index_generation):
+    relative_path = coordinate.get("relative_path") if isinstance(coordinate, dict) else None
+    parsed_path = PurePosixPath(relative_path) if isinstance(relative_path, str) else None
+    start_line = coordinate.get("start_line") if isinstance(coordinate, dict) else None
+    end_line = coordinate.get("end_line") if isinstance(coordinate, dict) else None
+    if (
+        not isinstance(coordinate, dict)
+        or coordinate.get("status") != "verified"
+        or coordinate.get("index_generation") != index_generation
+        or parsed_path is None
+        or parsed_path.is_absolute()
+        or ".." in parsed_path.parts
+        or parsed_path.as_posix() != relative_path
+        or not isinstance(start_line, int)
+        or not isinstance(end_line, int)
+        or start_line < 1
+        or end_line < start_line
+    ):
         raise ValueError("readiness evidence coordinate is invalid")
+    coordinate_path = target.joinpath(*parsed_path.parts)
+    if coordinate_path.is_symlink() or not coordinate_path.is_file():
+        raise ValueError("readiness evidence coordinate source is unavailable")
+    source_line_count = len(
+        coordinate_path.read_text(encoding="utf-8").splitlines()
+    )
+    if end_line > source_line_count:
+        raise ValueError("readiness evidence coordinate exceeds source")
     target_root = Path(_git_output(target, "rev-parse", "--show-toplevel"))
     if target_root.resolve() != target.resolve():
         raise ValueError("readiness target is not the exact git root")
@@ -1000,6 +1081,38 @@ def _validate_readiness_evidence(
         raise ValueError("readiness target checkout is not clean")
     if _git_output(target, "rev-parse", "HEAD") != source_revision:
         raise ValueError("readiness source revision differs from target checkout")
+    runtime = evidence.get("runtime")
+    if runtime is not None:
+        if not isinstance(runtime, dict):
+            raise ValueError("readiness runtime binding is invalid")
+        expected_paths = {
+            "target_root": target,
+            "code_search_storage": code_search_storage,
+            "code_graph_home": code_graph_home,
+        }
+        for field, expected_path in expected_paths.items():
+            if expected_path is None or runtime.get(field) != str(
+                expected_path.resolve()
+            ):
+                raise ValueError(f"readiness runtime {field} differs")
+        servers = runtime.get("servers")
+        if not isinstance(servers, dict):
+            raise ValueError("readiness runtime server bindings are invalid")
+        for component, expected_path in (
+            ("code-search", code_search),
+            ("code-graph", code_graph),
+        ):
+            observed = servers.get(component)
+            if (
+                expected_path is None
+                or not isinstance(observed, dict)
+                or observed.get("path") != str(expected_path.resolve())
+            ):
+                raise ValueError(
+                    f"readiness runtime {component} executable differs"
+                )
+            if observed.get("sha256") != _sha256(expected_path):
+                raise ValueError(f"readiness runtime {component} digest differs")
 
 
 def _validate_paths(args: argparse.Namespace) -> None:
@@ -1017,6 +1130,10 @@ def _validate_paths(args: argparse.Namespace) -> None:
     ):
         if not path.is_dir():
             raise ValueError(f"{label} directory is unavailable: {path}")
+    if args.code_graph_home is not None and not args.code_graph_home.is_dir():
+        raise ValueError(
+            f"code-graph home directory is unavailable: {args.code_graph_home}"
+        )
     if not args.preregistration.is_file():
         raise ValueError(
             f"preregistration file is unavailable: {args.preregistration}"
@@ -1030,6 +1147,68 @@ def _validate_paths(args: argparse.Namespace) -> None:
             raise ValueError(f"{label} file is unavailable: {path}")
     if args.output_dir.exists():
         raise ValueError(f"output directory already exists: {args.output_dir}")
+
+
+def _validate_fresh_holdout_corpus(
+    preregistration: dict[str, Any],
+    cases: list[dict[str, Any]],
+) -> None:
+    """Reject a vacuous or drifted deployment holdout before model spend."""
+    if preregistration.get("run_type") != FRESH_HOLDOUT_RUN_TYPE:
+        return
+    controls = preregistration.get("controls")
+    bindings = preregistration.get("bindings")
+    if (
+        not isinstance(controls, dict)
+        or controls.get("arms") != ["composed"]
+        or controls.get("repetitions") != 2
+        or controls.get("model") != "sonnet"
+        or controls.get("fallback_model") is not None
+        or controls.get("max_turns") != 8
+        or controls.get("timeout_seconds") != 180.0
+        or controls.get("max_budget_usd_per_case") != 1.0
+        or preregistration.get("outcome_gates") != FRESH_HOLDOUT_GATES
+    ):
+        raise ValueError("fresh holdout execution controls or gates drifted")
+    if not isinstance(bindings, dict) or bindings.get("schema_version") != 1:
+        raise ValueError("fresh holdout bindings are invalid")
+    for field in (
+        "corpus_pack_sha256",
+        "runtime_receipt_manifest_sha256",
+    ):
+        value = bindings.get(field)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise ValueError(f"fresh holdout {field} is invalid")
+    if not isinstance(bindings.get("bank_id"), str) or not bindings["bank_id"]:
+        raise ValueError("fresh holdout bank_id is invalid")
+
+    case_ids = [case.get("case_id") for case in cases]
+    routes = {case.get("expected_route") for case in cases}
+    if (
+        len(cases) != 5
+        or len(set(case_ids)) != 5
+        or case_ids != controls.get("case_ids")
+        or routes != {"semantic", "lexical", "graph", "mixed", "security"}
+    ):
+        raise ValueError("fresh holdout corpus is incomplete")
+    if not any(isinstance(case.get("routing_contract"), dict) for case in cases):
+        raise ValueError("fresh holdout requires a nonvacuous routing contract")
+    for case in cases:
+        evidence = case.get("expected_evidence")
+        claims = case.get("expected_claims")
+        if (
+            not isinstance(evidence, list)
+            or not evidence
+            or not all(isinstance(item, str) and item for item in evidence)
+            or not isinstance(claims, list)
+            or len(claims) != 1
+            or not isinstance(claims[0], dict)
+            or not isinstance(claims[0].get("text"), str)
+            or not claims[0]["text"]
+            or not isinstance(claims[0].get("required_evidence_ids"), list)
+            or not claims[0]["required_evidence_ids"]
+        ):
+            raise ValueError("fresh holdout case evidence contract is invalid")
 
 
 def _validate_preregistered_controls(
@@ -1125,6 +1304,10 @@ def _validate_preregistered_controls(
                 args.target,
                 args.component_bom,
                 args.readiness_evidence,
+                code_search=getattr(args, "code_search", None),
+                code_graph=getattr(args, "code_graph", None),
+                code_search_storage=getattr(args, "code_search_storage", None),
+                code_graph_home=getattr(args, "code_graph_home", None),
             )
 
 
@@ -1143,6 +1326,7 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(preregistration, dict):
         raise ValueError("preregistration must be a JSON object")
     _validate_preregistered_controls(args, preregistration)
+    _validate_fresh_holdout_corpus(preregistration, cases)
     source_boundaries = _source_boundaries(args.target, args.target_manifest)
     run_prefix = preregistration.get("run_id_prefix", "wave41")
     if not isinstance(run_prefix, str) or not re.fullmatch(r"[a-z0-9-]+", run_prefix):
@@ -1173,48 +1357,119 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     sentinel = "pilot-canary-" + secrets.token_hex(16)
     write_canary = args.output_dir / "repository-instruction-write-canary"
     records: list[dict[str, Any]] = []
-    for arm in arms:
-        arm_raw = raw_root / arm
-        arm_raw.mkdir()
-        for repetition in range(1, args.repetitions + 1):
-            repetition_raw = arm_raw / f"r{repetition:02d}"
-            repetition_raw.mkdir()
-            for case in cases:
-                environment = _claude_environment(
-                    dict(os.environ),
-                    sentinel=sentinel,
-                    write_canary=write_canary,
-                )
-                completed = subprocess.run(
-                    _claude_command(args, arm=arm, case=case),
-                    cwd=args.target,
-                    env=environment,
-                    capture_output=True,
-                    text=True,
-                    timeout=args.timeout_seconds,
-                )
-                transcript_path = repetition_raw / f"{case['case_id']}.jsonl"
-                transcript_path.write_text(completed.stdout, encoding="utf-8")
-                if completed.returncode != 0:
-                    raise RuntimeError(
-                        f"{arm}/r{repetition:02d}/{case['case_id']}: Claude exited "
-                        f"{completed.returncode}: {completed.stderr.strip()}"
+    bindings = preregistration.get("bindings")
+    bindings = bindings if isinstance(bindings, dict) else {}
+    bank_id = bindings.get("bank_id")
+    if not isinstance(bank_id, str) or not bank_id:
+        bank_id = "legacy-" + _sha256(preregistration_copy)[:16]
+    corpus_pack_sha256 = bindings.get("corpus_pack_sha256")
+    if (
+        not isinstance(corpus_pack_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", corpus_pack_sha256) is None
+    ):
+        corpus_pack_sha256 = _sha256(selected_cases)
+    consumption_path = args.output_dir / "consumption.json"
+    attempted_unit: dict[str, Any] | None = None
+    transcript_path: Path | None = None
+    try:
+        for arm in arms:
+            arm_raw = raw_root / arm
+            arm_raw.mkdir()
+            for repetition in range(1, args.repetitions + 1):
+                repetition_raw = arm_raw / f"r{repetition:02d}"
+                repetition_raw.mkdir()
+                for case in cases:
+                    environment = _claude_environment(
+                        dict(os.environ),
+                        sentinel=sentinel,
+                        write_canary=write_canary,
                     )
-                transcript = _parse_stream(completed.stdout)
-                record = project_transcript(
-                    transcript,
-                    case=case,
-                    arm=arm,
-                    run_id=run_id,
-                    repetition=repetition,
-                    source_boundaries=source_boundaries,
-                )
-                record["canary_violation"] = bool(
-                    record["canary_violation"]
-                    or sentinel in completed.stdout
-                    or write_canary.exists()
-                )
-                records.append(record)
+                    attempted_unit = {
+                        "arm": arm,
+                        "repetition": repetition,
+                        "case_id": case["case_id"],
+                    }
+                    transcript_path = (
+                        repetition_raw / f"{case['case_id']}.jsonl"
+                    )
+                    if not consumption_path.exists():
+                        _write_json_atomic(
+                            consumption_path,
+                            {
+                                "schema_version": 1,
+                                "state": "consumed",
+                                "run_id": run_id,
+                                "bank_id": bank_id,
+                                "corpus_pack_sha256": corpus_pack_sha256,
+                                "first_unit": attempted_unit,
+                                "consumed_at": datetime.now(UTC).isoformat(),
+                            },
+                        )
+                    completed = subprocess.run(
+                        _claude_command(args, arm=arm, case=case),
+                        cwd=args.target,
+                        env=environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=args.timeout_seconds,
+                    )
+                    transcript_path.write_text(
+                        completed.stdout, encoding="utf-8"
+                    )
+                    if completed.returncode != 0:
+                        raise RuntimeError(
+                            f"{arm}/r{repetition:02d}/{case['case_id']}: "
+                            f"Claude exited {completed.returncode}"
+                        )
+                    transcript = _parse_stream(completed.stdout)
+                    record = project_transcript(
+                        transcript,
+                        case=case,
+                        arm=arm,
+                        run_id=run_id,
+                        repetition=repetition,
+                        source_boundaries=source_boundaries,
+                    )
+                    record["canary_violation"] = bool(
+                        record["canary_violation"]
+                        or sentinel in completed.stdout
+                        or write_canary.exists()
+                    )
+                    records.append(record)
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        if isinstance(exc, subprocess.TimeoutExpired) and transcript_path is not None:
+            partial = exc.stdout or ""
+            if isinstance(partial, bytes):
+                partial = partial.decode("utf-8", errors="replace")
+            transcript_path.write_text(partial, encoding="utf-8")
+        records_path = args.output_dir / "records.jsonl"
+        records_path.write_text(
+            "".join(
+                json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+                for record in records
+            ),
+            encoding="utf-8",
+        )
+        failure_receipt = {
+            "schema_version": 1,
+            "status": "failed",
+            "run_id": run_id,
+            "attempted_unit": attempted_unit,
+            "exception_class": type(exc).__name__,
+            "completed_record_count": len(records),
+            "transcript_sha256": (
+                _sha256(transcript_path)
+                if transcript_path is not None and transcript_path.is_file()
+                else None
+            ),
+            "canary_written": write_canary.exists(),
+        }
+        (args.output_dir / "failure-receipt.json").write_text(
+            json.dumps(failure_receipt, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        _write_run_manifest(args.output_dir, run_id, "failed")
+        raise
 
     records_path = args.output_dir / "records.jsonl"
     records_path.write_text(
@@ -1256,30 +1511,7 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
             json.dumps(outcome_report, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-    artifact_paths = [
-        selected_cases,
-        records_path,
-        summary_path,
-        preregistration_copy,
-        runner_copy,
-        component_bom_copy,
-        target_manifest_copy,
-        readiness_evidence_copy,
-        *([outcome_report_path] if outcome_report is not None else []),
-        *sorted(raw_root.rglob("*.jsonl")),
-    ]
-    manifest = {
-        "schema_version": 1,
-        "run_id": run_id,
-        "artifacts": {
-            path.relative_to(args.output_dir).as_posix(): _sha256(path)
-            for path in artifact_paths
-        },
-    }
-    (args.output_dir / "manifest.json").write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    _write_run_manifest(args.output_dir, run_id, "completed")
     return summary
 
 
@@ -1314,6 +1546,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=ROOT / "bin" / "codebase-memory-mcp",
     )
     parser.add_argument("--code-search-storage", type=Path, required=True)
+    parser.add_argument(
+        "--code-graph-home",
+        type=Path,
+        help="isolated persistent HOME passed only to the code-graph MCP child",
+    )
     parser.add_argument("--local-model", type=Path, required=True)
     parser.add_argument(
         "--target",
