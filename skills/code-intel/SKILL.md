@@ -60,7 +60,15 @@ conceptual implementations, similar code, or files relevant to an issue.
 Return the smallest sufficient set of file/line evidence. Shrink every
 `path:start-end` range to only the lines needed to prove the answer; omit
 imports, blank lines, or surrounding context unless they are necessary for an
-atomic claim or named relationship endpoint.
+atomic claim or named relationship endpoint. Apply a deletion test to every
+location: remove it unless its deletion would leave an atomic clause or named
+endpoint unsupported. Do not return discovery, contextual, or duplicate
+corroborating locations. Evidence is claim-scoped, not flow-scoped. For a
+direct relationship, imports or aliases are discovery context, not evidence;
+cite the direct call site and named endpoint definitions only. Do not cite
+extra upstream or downstream endpoints, call sites, or relationships not named
+by the candidate unless an unnamed helper is the only direct implementation of
+an atomic clause.
 
 ## UNDERSTAND
 
@@ -191,6 +199,12 @@ Give the verdict or direct answer first, then the minimum supporting evidence.
 When evaluating a supplied candidate assertion, reproduce it byte-for-byte,
 including terminal punctuation, or mark it unsupported; do not silently rewrite
 the claim identity.
+Use `not_supported` only when cited code directly contradicts at least one
+atomic clause. If direct evidence supports every atomic clause, every named
+endpoint is resolved, and no cited code contradicts the candidate, the
+disposition must be supported. Implementation-quality, naming, persistence, or
+style caveats do not refute a literal claim unless the claim requires that
+property.
 For PROVE, include:
 
 - proof ID and verdict;

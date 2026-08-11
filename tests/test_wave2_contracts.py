@@ -117,3 +117,9 @@ def test_code_intel_skill_requires_minimal_exact_evidence_ranges():
     assert "smallest sufficient set" in normalized
     assert "Shrink every `path:start-end` range" in normalized
     assert "imports, blank lines, or surrounding context" in normalized
+    assert "deletion test" in normalized
+    assert "claim-scoped, not flow-scoped" in normalized
+    assert "imports or aliases are discovery context" in normalized
+    assert "upstream or downstream" in normalized
+    assert "directly contradicts at least one atomic clause" in normalized
+    assert "disposition must be supported" in normalized

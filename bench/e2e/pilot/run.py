@@ -12,6 +12,7 @@ from pathlib import Path
 from pathlib import PurePosixPath
 import re
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -138,6 +139,26 @@ FRESH_HOLDOUT_GATES = {
     "max_errors": 0,
     "max_canary_violations": 0,
 }
+
+
+def _response_schema(case: dict[str, Any]) -> dict[str, Any]:
+    """Bind claim identity without encoding or leaking the expected verdict."""
+    claim = case["expected_claims"][0]["text"]
+    schema = json.loads(json.dumps(RESPONSE_SCHEMA))
+    schema["properties"]["candidate_assertion"] = {"const": claim}
+    schema["properties"]["disposition"]["description"] = (
+        "Use not_supported only when cited code directly contradicts an atomic "
+        "clause; use supported when every clause is directly supported."
+    )
+    schema["properties"]["asserted_claim"]["description"] = (
+        "Repeat the exact candidate only for supported; otherwise return null."
+    )
+    schema["properties"]["evidence_ids"]["description"] = (
+        "Return a deletion-tested, claim-scoped minimum. Exclude imports, aliases, "
+        "and unnamed upstream or downstream endpoints and relationships unless "
+        "they are the only direct implementation of an atomic clause."
+    )
+    return schema
 
 
 def _derived_route(tool_calls: list[dict[str, Any]]) -> str:
@@ -585,17 +606,79 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         "the smallest sufficient evidence set. Shrink each path:start-end range "
         "to only the lines needed to prove the disposition; omit imports, blank "
         "lines, or surrounding context unless they are necessary for an atomic "
-        "claim or named relationship endpoint. For a "
-        "relationship claim, include source evidence for every named relationship "
-        "endpoint, both caller and callee or source and target."
+        "claim or named relationship endpoint. Before returning JSON, apply a "
+        "deletion test to every evidence ID: remove it unless its deletion would "
+        "leave an atomic clause or named endpoint unsupported. Do not return "
+        "discovery, contextual, or duplicate corroborating locations. Evidence is "
+        "claim-scoped, not flow-scoped. For a direct relationship, imports or "
+        "aliases are discovery context, not evidence; cite the direct call site and "
+        "named endpoint definitions only. Do not cite extra upstream or downstream "
+        "endpoints, call sites, or relationships not named by the candidate unless "
+        "an unnamed helper is the only direct implementation of an atomic clause. "
+        "For a relationship claim, include source evidence for every named "
+        "relationship endpoint, both caller and callee or source and target."
         " Before setting disposition to supported, decompose the candidate into "
         "atomic relationships and read or retrieve the definition of every named "
         "endpoint. An import or call site does not substitute for the other "
         "endpoint's definition. If any endpoint is missing and cannot be resolved, "
         "set disposition to unresolved and asserted_claim to null. Read can display "
         "one extra numbered empty line after a file-ending newline; never include "
-        "that synthetic terminal line in an evidence range."
+        "that synthetic terminal line in an evidence range. Use not_supported only "
+        "when cited code directly contradicts at least one atomic clause. If direct "
+        "evidence supports every atomic clause, every named endpoint is resolved, "
+        "and no cited code contradicts the candidate, disposition must be supported. "
+        "Implementation-quality, naming, persistence, or style caveats do not refute "
+        "a literal claim unless the claim requires that property."
     )
+
+
+def _trace_guard_settings(
+    case: dict[str, Any],
+    arm: str,
+) -> dict[str, Any] | None:
+    contract = case.get("routing_contract")
+    trace = contract.get("trace_call_path") if isinstance(contract, dict) else None
+    if (
+        arm not in {"code-graph", "composed"}
+        or not isinstance(trace, dict)
+        or trace.get("count") != 1
+    ):
+        return None
+    guard = ROOT / "scripts" / "code_intel_trace_guard.py"
+    command = shlex.join([sys.executable, str(guard)])
+
+    def command_hook(mode: str) -> list[dict[str, Any]]:
+        return [
+            {
+                "matcher": "mcp__code-graph__trace_call_path",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": f"{command} {mode}",
+                        "timeout": 5,
+                    }
+                ],
+            }
+        ]
+
+    return {
+        "hooks": {
+            "PreToolUse": command_hook("pre-tool-use"),
+            "PostToolUse": command_hook("post-tool-use"),
+            "PostToolUseFailure": command_hook("post-tool-failure"),
+            "Stop": [
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": f"{command} stop",
+                            "timeout": 5,
+                        }
+                    ]
+                }
+            ],
+        }
+    }
 
 
 def _claude_command(
@@ -616,7 +699,7 @@ def _claude_command(
         "stream-json",
         "--verbose",
         "--json-schema",
-        json.dumps(RESPONSE_SCHEMA, sort_keys=True, separators=(",", ":")),
+        json.dumps(_response_schema(case), sort_keys=True, separators=(",", ":")),
         "--model",
         args.model,
         "--no-session-persistence",
@@ -636,6 +719,14 @@ def _claude_command(
         "--mcp-config",
         json.dumps(_mcp_config(args, arm), sort_keys=True, separators=(",", ":")),
     ]
+    trace_settings = _trace_guard_settings(case, arm)
+    if trace_settings is not None:
+        command.extend(
+            [
+                "--settings",
+                json.dumps(trace_settings, sort_keys=True, separators=(",", ":")),
+            ]
+        )
     return command
 
 

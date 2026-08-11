@@ -15,6 +15,7 @@ from bench.e2e.pilot.run import (
     _claude_environment,
     _mcp_config,
     _prompt,
+    _response_schema,
     _route_satisfies,
     _routing_contract_satisfies,
     _validate_fresh_holdout_corpus,
@@ -924,6 +925,76 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertNotIn("ToolSearch", native_tools)
         self.assertIn("ToolSearch", composed_allowed)
 
+    def test_trace_contract_installs_exactly_once_runtime_hooks(self):
+        arguments = SimpleNamespace(
+            claude=Path("/usr/bin/claude"),
+            code_search=Path("/usr/bin/code-search"),
+            code_graph=Path("/usr/bin/code-graph"),
+            code_search_storage=Path("/tmp/search"),
+            local_model=Path("/tmp/model"),
+            model="sonnet",
+            max_turns=8,
+            max_budget_usd=0.5,
+        )
+        case = {
+            "query": "What calls login?",
+            "expected_claims": [{"text": "Session creation calls login."}],
+            "routing_contract": {
+                "trace_call_path": {"count": 1, "direction": "inbound"}
+            },
+        }
+
+        command = _claude_command(arguments, arm="composed", case=case)
+        settings = json.loads(command[command.index("--settings") + 1])
+
+        pre = settings["hooks"]["PreToolUse"][0]
+        post = settings["hooks"]["PostToolUse"][0]
+        failure = settings["hooks"]["PostToolUseFailure"][0]
+        stop = settings["hooks"]["Stop"][0]
+        self.assertEqual(pre["matcher"], "mcp__code-graph__trace_call_path")
+        self.assertIn(
+            "code_intel_trace_guard.py pre-tool-use",
+            pre["hooks"][0]["command"],
+        )
+        self.assertIn(
+            "code_intel_trace_guard.py post-tool-use",
+            post["hooks"][0]["command"],
+        )
+        self.assertIn(
+            "code_intel_trace_guard.py post-tool-failure",
+            failure["hooks"][0]["command"],
+        )
+        self.assertIn("code_intel_trace_guard.py stop", stop["hooks"][0]["command"])
+
+    def test_response_schema_binds_claim_identity_without_unsupported_combinators(
+        self,
+    ):
+        claim = "Session creation calls login."
+        schema = _response_schema({"expected_claims": [{"text": claim}]})
+
+        self.assertEqual(schema["properties"]["candidate_assertion"], {"const": claim})
+        self.assertEqual(
+            schema["properties"]["disposition"]["enum"],
+            ["supported", "not_supported", "unresolved"],
+        )
+        self.assertNotIn("anyOf", schema)
+        self.assertIn(
+            "directly contradicts",
+            schema["properties"]["disposition"]["description"],
+        )
+        self.assertIn(
+            "exact candidate",
+            schema["properties"]["asserted_claim"]["description"],
+        )
+        self.assertIn(
+            "claim-scoped",
+            schema["properties"]["evidence_ids"]["description"],
+        )
+        self.assertIn(
+            "unnamed upstream",
+            schema["properties"]["evidence_ids"]["description"],
+        )
+
     def test_operator_environment_disables_incompatible_scrub_for_child_only(self):
         ambient = {
             "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1",
@@ -986,6 +1057,13 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("smallest sufficient evidence set", prompt)
         self.assertIn("Shrink each path:start-end range", prompt)
         self.assertIn("imports, blank lines, or surrounding context", prompt)
+        self.assertIn("deletion test", prompt)
+        self.assertIn("claim-scoped, not flow-scoped", prompt)
+        self.assertIn("imports or aliases are discovery context", prompt)
+        self.assertIn("upstream or downstream", prompt)
+        self.assertIn("Use not_supported only when", prompt)
+        self.assertIn("directly contradicts at least one atomic clause", prompt)
+        self.assertIn("disposition must be supported", prompt)
         self.assertIn("byte-for-byte, including terminal punctuation", prompt)
         self.assertIn("as candidate_assertion", prompt)
         self.assertIn("as asserted_claim", prompt)
