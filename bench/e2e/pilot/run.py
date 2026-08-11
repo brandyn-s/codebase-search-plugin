@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
 from datetime import UTC, datetime
 import hashlib
 import json
@@ -109,7 +110,10 @@ RESPONSE_SCHEMA = {
         "asserted_claim": {"type": ["string", "null"]},
         "evidence_ids": {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {
+                "type": "string",
+                "pattern": "^ev:v1:[0-9a-f]{64}$",
+            },
             "uniqueItems": True,
         },
         "answer": {"type": "string"},
@@ -126,6 +130,7 @@ RESPONSE_SCHEMA = {
     "additionalProperties": False,
 }
 EVIDENCE_LOCATION = re.compile(r"^(.+):(\d+)-(\d+)$")
+BACKEND_EVIDENCE_ID = re.compile(r"^ev:v1:[0-9a-f]{64}$")
 FRESH_HOLDOUT_RUN_TYPE = (
     "bounded_operator_authorized_fresh_holdout_confirmation"
 )
@@ -154,13 +159,10 @@ def _response_schema(case: dict[str, Any]) -> dict[str, Any]:
         "Repeat the exact candidate only for supported; otherwise return null."
     )
     schema["properties"]["evidence_ids"]["description"] = (
-        "Return a deletion-tested, claim-scoped minimum. Inspected locations are "
-        "not automatically evidence. Include minimal source evidence for every "
-        "candidate-named endpoint. Exclude imports, aliases, and unnamed upstream "
-        "or downstream helpers, endpoints, and relationships unless one is the "
-        "sole direct implementation of an otherwise unsupported atomic clause. "
-        "Create an exact successful Read pin for every final range and cite every "
-        "evidence ID verbatim in the answer."
+        "Select a deletion-tested, claim-scoped minimum of backend-issued "
+        "evidence_ref.id values observed in successful tool results. Never invent, "
+        "edit, or translate an ID. Exclude discovery context and duplicate or "
+        "surplus evidence. Cite every selected evidence ID verbatim in the answer."
     )
     return schema
 
@@ -170,16 +172,23 @@ def _derived_route(tool_calls: list[dict[str, Any]]) -> str:
     if names & SECURITY_TOOLS:
         return "security"
     lexical = "mcp__code-graph__search_code" in names or any(
-        call["tool"] == "mcp__code-search__search_code"
+        call["tool"]
+        in {
+            "mcp__code-search__search_code",
+            "mcp__code-search__search_code_evidence",
+        }
         and call.get("arguments", {}).get("search_mode") == "keyword"
         for call in tool_calls
     )
     semantic = any(
         call["tool"]
         in {
-            "mcp__code-search__search_code_evidence",
             "mcp__code-search__code_localize",
         }
+        or (
+            call["tool"] == "mcp__code-search__search_code_evidence"
+            and call.get("arguments", {}).get("search_mode") != "keyword"
+        )
         or (
             call["tool"] == "mcp__code-search__search_code"
             and call.get("arguments", {}).get("search_mode") != "keyword"
@@ -204,16 +213,23 @@ def _route_satisfies(
 ) -> bool:
     names = {call["tool"] for call in tool_calls}
     lexical = "mcp__code-graph__search_code" in names or any(
-        call["tool"] == "mcp__code-search__search_code"
+        call["tool"]
+        in {
+            "mcp__code-search__search_code",
+            "mcp__code-search__search_code_evidence",
+        }
         and call.get("arguments", {}).get("search_mode") == "keyword"
         for call in tool_calls
     )
     semantic = any(
         call["tool"]
         in {
-            "mcp__code-search__search_code_evidence",
             "mcp__code-search__code_localize",
         }
+        or (
+            call["tool"] == "mcp__code-search__search_code_evidence"
+            and call.get("arguments", {}).get("search_mode") != "keyword"
+        )
         or (
             call["tool"] == "mcp__code-search__search_code"
             and call.get("arguments", {}).get("search_mode") != "keyword"
@@ -333,6 +349,78 @@ def _normalize_evidence_ids(
     return normalized, sorted(normalizations, key=lambda item: item["raw"])
 
 
+def _walk_json(value: object) -> Iterator[dict[str, Any]]:
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return
+        yield from _walk_json(decoded)
+    elif isinstance(value, dict):
+        yield value
+        for item in value.values():
+            yield from _walk_json(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _walk_json(item)
+
+
+def _source_location(value: object) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    relative_path = value.get("relative_path")
+    start_line = value.get("start_line")
+    end_line = value.get("end_line")
+    parsed = PurePosixPath(relative_path) if isinstance(relative_path, str) else None
+    if (
+        parsed is None
+        or parsed.is_absolute()
+        or ".." in parsed.parts
+        or parsed.as_posix() != relative_path
+        or isinstance(start_line, bool)
+        or not isinstance(start_line, int)
+        or start_line < 1
+        or isinstance(end_line, bool)
+        or not isinstance(end_line, int)
+        or end_line < start_line
+    ):
+        return None
+    return f"{relative_path}:{start_line}-{end_line}"
+
+
+def _backend_evidence_registry(
+    transcript: list[dict[str, Any]],
+) -> dict[str, set[str]]:
+    registry: dict[str, set[str]] = {}
+    for event in transcript:
+        message = event.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        for block in content if isinstance(content, list) else []:
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            for value in _walk_json(block.get("content")):
+                evidence = value.get("evidence_ref")
+                if not isinstance(evidence, dict):
+                    continue
+                evidence_id = evidence.get("id")
+                location = _source_location(evidence)
+                if (
+                    not isinstance(evidence_id, str)
+                    or BACKEND_EVIDENCE_ID.fullmatch(evidence_id) is None
+                    or location is None
+                ):
+                    continue
+                locations = {location}
+                relationship = evidence.get("relationship_ref")
+                if isinstance(relationship, dict):
+                    for role in ("source_symbol_ref", "target_symbol_ref"):
+                        endpoint = _source_location(relationship.get(role))
+                        if endpoint is not None:
+                            locations.add(endpoint)
+                registry.setdefault(evidence_id, set()).update(locations)
+    return registry
+
+
 def project_transcript(
     transcript: list[dict[str, Any]],
     *,
@@ -371,10 +459,27 @@ def project_transcript(
 
     expected_evidence = set(case["expected_evidence"])
     raw_evidence = list(output.get("evidence_ids", []))
-    observed_evidence, evidence_normalizations = _normalize_evidence_ids(
-        raw_evidence,
-        source_boundaries,
-    )
+    backend_ids = [
+        item
+        for item in raw_evidence
+        if isinstance(item, str) and BACKEND_EVIDENCE_ID.fullmatch(item)
+    ]
+    if backend_ids:
+        if len(backend_ids) != len(raw_evidence):
+            raise ValueError("terminal evidence mixes backend IDs and source locations")
+        registry = _backend_evidence_registry(transcript)
+        missing = [item for item in backend_ids if item not in registry]
+        if missing:
+            raise ValueError("terminal selected an unseen backend evidence ID")
+        observed_evidence = {
+            location for evidence_id in backend_ids for location in registry[evidence_id]
+        }
+        evidence_normalizations: list[dict[str, str]] = []
+    else:
+        observed_evidence, evidence_normalizations = _normalize_evidence_ids(
+            raw_evidence,
+            source_boundaries,
+        )
     covered_expected = {
         expected
         for expected in expected_evidence
@@ -568,7 +673,7 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
             "mixed route when explanation and relationship are both requested. A "
             "callers-only or relationship-only question with an explicit symbol "
             "uses a graph tool. Pure literal or location lookup for an exact "
-            "identifier or config key uses code-search search_code with "
+            "identifier or config key uses code-search search_code_evidence with "
             'search_mode="keyword". Conceptual how, why, or whether behavior uses '
             "code-search semantic/default retrieval, even when it names an exact "
             "symbol or discusses security. Do not call graph security tools for "
@@ -593,8 +698,8 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         " For an exact callers question, call trace_call_path once with "
         'direction="inbound"; for an exact callees question, call it once with '
         'direction="outbound". Do not add search_graph when that trace resolves '
-        "the symbol; use Read to corroborate the returned relationship and pin "
-        "source lines."
+        "the symbol; use get_relationship_evidence for the resolved relationship "
+        "and select its backend-issued evidence ID."
         if arm in {"code-graph", "composed"}
         else ""
     )
@@ -630,38 +735,28 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         + " Return only the requested JSON. Always repeat the candidate assertion "
         "byte-for-byte, including terminal punctuation, as candidate_assertion. "
         "If supported, repeat it again as asserted_claim; otherwise set "
-        "asserted_claim to null. Evidence IDs must be repo-relative "
-        "path:start-end locations that directly support the disposition. Return "
-        "the smallest sufficient evidence set. Shrink each path:start-end range "
-        "to only the lines needed to prove the disposition; omit imports, blank "
-        "lines, or surrounding context unless they are necessary for an atomic "
-        "claim or named relationship endpoint. Before returning JSON, apply a "
-        "deletion test to every evidence ID: remove it unless its deletion would "
-        "leave an atomic clause or candidate-named endpoint unsupported. Do not return "
-        "discovery, contextual, or duplicate corroborating locations. Evidence is "
-        "claim-scoped, not flow-scoped. Inspecting a location does not make it "
-        "answer evidence. After the deletion test, create one exact successful Read pin "
-        "for every final range with offset=start and limit=end-start+1. Whole-file or "
-        "unbounded Reads are inspection-only. Cite every final evidence ID verbatim in "
-        "the answer. "
-        "For a direct relationship, imports and aliases are "
-        "discovery context; the direct call site is edge evidence. Include the "
-        "minimal definition or implementation evidence for every candidate-named "
-        "endpoint; one location may satisfy both the edge and endpoint roles. In "
-        "particular, do not cite an "
-        "unnamed helper merely because retrieval found it or you read it; cite it "
-        "only when it is the sole direct implementation of an atomic clause and no "
-        "candidate-named or direct-call location supports that clause. Do not cite "
-        "extra upstream or downstream endpoints, call sites, or relationships."
+        "asserted_claim to null. Evidence IDs must be backend-issued canonical "
+        "ev:v1: identifiers from evidence_ref.id fields in successful MCP results. "
+        "Select only IDs observed in this session; never invent, edit, or translate "
+        "an ID into a path or range. Return the smallest sufficient evidence set. "
+        "Before returning JSON, apply a deletion test to every selected ID: remove "
+        "it unless its deletion would leave an atomic clause or candidate-named "
+        "endpoint unsupported. Do not return discovery, contextual, duplicate, or "
+        "surplus evidence. Evidence is claim-scoped, not flow-scoped. A Read is "
+        "inspection-only and never creates evidence. Cite every final evidence ID "
+        "verbatim in the answer. For a direct relationship, prefer the "
+        "evidence_ref.id returned by get_relationship_evidence because its immutable "
+        "relationship_ref binds both named endpoints. Imports and aliases remain "
+        "discovery context. Do not select evidence for unnamed helpers or extra "
+        "upstream/downstream relationships unless it is the sole support for an "
+        "atomic clause."
         " Before setting disposition to supported, decompose the candidate into "
-        "atomic relationships and read or retrieve the definition of every named "
+        "atomic relationships and retrieve the definition of every named "
         "endpoint. Endpoint resolution is an adjudication check; cite minimal source "
         "evidence for every candidate-named endpoint, but do not promote other "
         "inspected definitions into evidence. If any endpoint is missing and cannot "
-        "be resolved, set disposition to unresolved and asserted_claim to null. Read "
-        "can display "
-        "one extra numbered empty line after a file-ending newline; never include "
-        "that synthetic terminal line in an evidence range. Use not_supported only "
+        "be resolved, set disposition to unresolved and asserted_claim to null. Use "
+        "not_supported only "
         "when cited code directly contradicts at least one atomic clause. If direct "
         "evidence supports every atomic clause, every named endpoint is resolved, "
         "and no cited code contradicts the candidate, disposition must be supported. "
@@ -675,9 +770,22 @@ def _runtime_guard_settings(
     arm: str,
     target: Path,
 ) -> dict[str, Any] | None:
+    if arm != "composed":
+        return None
+    expected_route = case.get("expected_route")
+    if expected_route not in {"semantic", "lexical", "graph", "mixed", "security"}:
+        raise ValueError("composed case expected_route is invalid")
     contract = case.get("routing_contract")
     trace = contract.get("trace_call_path") if isinstance(contract, dict) else None
-    hooks: dict[str, list[dict[str, Any]]] = {}
+    trace_direction = "none"
+    if isinstance(trace, dict):
+        if trace.get("count") != 1 or trace.get("direction") not in {
+            "inbound",
+            "outbound",
+            "both",
+        }:
+            raise ValueError("composed trace contract is invalid")
+        trace_direction = trace["direction"]
 
     def command_hook(command: str, matcher: str) -> dict[str, Any]:
         return {
@@ -691,94 +799,37 @@ def _runtime_guard_settings(
             ],
         }
 
-    if (
-        arm in {"code-graph", "composed"}
-        and isinstance(trace, dict)
-        and trace.get("count") == 1
-    ):
-        guard = ROOT / "scripts" / "code_intel_trace_guard.py"
-        base = [sys.executable, str(guard)]
-        hooks["PreToolUse"] = [
-            command_hook(
-                shlex.join([*base, "pre-tool-use"]),
-                "mcp__code-graph__trace_call_path",
-            ),
-            command_hook(
-                shlex.join([*base, "pre-terminal-output"]),
-                "StructuredOutput",
-            ),
-        ]
-        hooks["PostToolUse"] = [
-            command_hook(
-                shlex.join([*base, "post-tool-use"]),
-                "mcp__code-graph__trace_call_path",
-            )
-        ]
-        hooks["PostToolUseFailure"] = [
-            command_hook(
-                shlex.join([*base, "post-tool-failure"]),
-                "mcp__code-graph__trace_call_path",
-            )
-        ]
-        hooks["Stop"] = [
-            {
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": shlex.join([*base, "stop"]),
-                        "timeout": 5,
-                    }
-                ]
-            }
-        ]
+    guard = ROOT / "scripts" / "code_intel_state_guard.py"
 
-    if arm == "composed":
-        expected_route = case.get("expected_route")
-        if expected_route not in {"semantic", "lexical", "graph", "mixed", "security"}:
-            raise ValueError("composed case expected_route is invalid")
-        guard = ROOT / "scripts" / "code_intel_contract_guard.py"
-        base = [
-            sys.executable,
-            str(guard),
-        ]
-
-        def contract_command(mode: str) -> str:
-            return shlex.join(
-                [
-                    *base,
-                    mode,
-                    "--expected-route",
-                    expected_route,
-                    "--target",
-                    str(target.resolve()),
-                ]
-            )
-
-        hooks.setdefault("PreToolUse", []).extend(
+    def state_command(mode: str) -> str:
+        return shlex.join(
             [
-                command_hook(
-                    contract_command("pre-route-tool"),
-                    "mcp__code-search__.*|mcp__code-graph__.*",
-                ),
-                command_hook(contract_command("pre-read"), "Read"),
-                command_hook(
-                    contract_command("pre-terminal-output"),
-                    "StructuredOutput",
-                ),
-            ]
-        )
-        hooks.setdefault("PostToolUse", []).extend(
-            [
-                command_hook(
-                    contract_command("record-route"),
-                    "mcp__code-search__.*|mcp__code-graph__.*",
-                ),
-                command_hook(contract_command("record-read"), "Read"),
-                command_hook(contract_command("cleanup"), "StructuredOutput"),
+                sys.executable,
+                str(guard),
+                mode,
+                "--expected-route",
+                expected_route,
+                "--trace-direction",
+                trace_direction,
             ]
         )
 
-    return {"hooks": hooks} if hooks else None
+    mcp_matcher = "mcp__code-search__.*|mcp__code-graph__.*"
+    hooks = {
+        "PreToolUse": [
+            command_hook(state_command("pre-tool-use"), mcp_matcher),
+            command_hook(state_command("pre-tool-use"), "Read"),
+            command_hook(state_command("pre-terminal-output"), "StructuredOutput"),
+        ],
+        "PostToolUse": [
+            command_hook(state_command("post-tool-use"), mcp_matcher),
+            command_hook(state_command("cleanup"), "StructuredOutput"),
+        ],
+        "PostToolUseFailure": [
+            command_hook(state_command("post-tool-failure"), mcp_matcher),
+        ],
+    }
+    return {"hooks": hooks}
 
 
 def _claude_command(
@@ -1054,19 +1105,45 @@ def _write_json_atomic(path: Path, value: dict[str, Any]) -> None:
             temporary.unlink()
 
 
-def _write_run_manifest(output_dir: Path, run_id: str, status: str) -> None:
+def _write_run_manifest(
+    output_dir: Path,
+    run_id: str,
+    status: str,
+    *,
+    preregistration_name: str,
+) -> None:
     artifacts = {
         path.relative_to(output_dir).as_posix(): _sha256(path)
         for path in sorted(output_dir.rglob("*"))
         if path.is_file() and path.name != "manifest.json"
     }
+    role_candidates = {
+        "cases": "cases.jsonl",
+        "component_bom": "component-bom.json",
+        "consumption": "consumption.json",
+        "failure_receipt": "failure-receipt.json",
+        "outcome_gates": "outcome-gates.json",
+        "pilot_runner": "pilot-runner.py",
+        "preregistration": preregistration_name,
+        "readiness_evidence": "readiness-evidence.json",
+        "records": "records.jsonl",
+        "state_guard": "code-intel-state-guard.py",
+        "summary": "summary.json",
+        "target_manifest": "target-manifest.json",
+    }
+    artifact_roles = {
+        role: relative
+        for role, relative in role_candidates.items()
+        if relative in artifacts
+    }
     (output_dir / "manifest.json").write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "run_id": run_id,
                 "status": status,
                 "artifacts": artifacts,
+                "artifact_roles": artifact_roles,
             },
             indent=2,
             sort_keys=True,
@@ -1393,8 +1470,27 @@ def _validate_fresh_holdout_corpus(
         or preregistration.get("outcome_gates") != FRESH_HOLDOUT_GATES
     ):
         raise ValueError("fresh holdout execution controls or gates drifted")
-    if not isinstance(bindings, dict) or bindings.get("schema_version") != 1:
+    if (
+        not isinstance(bindings, dict)
+        or bindings.get("schema_version") not in {1, 2}
+    ):
         raise ValueError("fresh holdout bindings are invalid")
+    binding_schema_version = bindings["schema_version"]
+    if binding_schema_version == 2:
+        state_guard_sha256 = bindings.get("state_guard_sha256")
+        if (
+            not isinstance(state_guard_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", state_guard_sha256) is None
+        ):
+            raise ValueError("fresh holdout state guard binding is invalid")
+        if any(
+            legacy_field in bindings
+            for legacy_field in (
+                "contract_guard_sha256",
+                "trace_guard_sha256",
+            )
+        ):
+            raise ValueError("fresh holdout legacy guard bindings are invalid")
     for field in (
         "corpus_pack_sha256",
         "runtime_receipt_manifest_sha256",
@@ -1417,12 +1513,13 @@ def _validate_fresh_holdout_corpus(
     if not any(isinstance(case.get("routing_contract"), dict) for case in cases):
         raise ValueError("fresh holdout requires a nonvacuous routing contract")
     if controls.get("routing_contract_schema_version") is not None:
-        contract_guard_sha256 = bindings.get("contract_guard_sha256")
-        if (
-            not isinstance(contract_guard_sha256, str)
-            or re.fullmatch(r"[0-9a-f]{64}", contract_guard_sha256) is None
-        ):
-            raise ValueError("fresh holdout contract guard binding is invalid")
+        if binding_schema_version == 1:
+            contract_guard_sha256 = bindings.get("contract_guard_sha256")
+            if (
+                not isinstance(contract_guard_sha256, str)
+                or re.fullmatch(r"[0-9a-f]{64}", contract_guard_sha256) is None
+            ):
+                raise ValueError("fresh holdout contract guard binding is invalid")
         if controls["routing_contract_schema_version"] != 1 or any(
             not isinstance(case.get("routing_contract"), dict)
             or case["routing_contract"].get("required_route")
@@ -1500,7 +1597,7 @@ def _validate_preregistered_controls(
         _validate_target_fixture(args.target, args.target_manifest)
         binding_schema_version = bindings.get("schema_version")
         if binding_schema_version is not None:
-            if binding_schema_version != 1:
+            if binding_schema_version not in {1, 2}:
                 raise ValueError("preregistration binding schema is unsupported")
             if args.max_turns != controls.get("max_turns"):
                 raise ValueError("execution max turns differs from preregistration")
@@ -1537,20 +1634,40 @@ def _validate_preregistered_controls(
                     raise ValueError(
                         f"{label} SHA-256 differs from preregistration"
                     )
-            for field, path, label in (
-                (
-                    "contract_guard_sha256",
-                    ROOT / "scripts" / "code_intel_contract_guard.py",
-                    "contract guard",
-                ),
-                (
-                    "trace_guard_sha256",
-                    ROOT / "scripts" / "code_intel_trace_guard.py",
-                    "trace guard",
-                ),
-            ):
+            if binding_schema_version == 1:
+                guard_bindings = (
+                    (
+                        "contract_guard_sha256",
+                        ROOT / "scripts" / "code_intel_contract_guard.py",
+                        "contract guard",
+                    ),
+                    (
+                        "trace_guard_sha256",
+                        ROOT / "scripts" / "code_intel_trace_guard.py",
+                        "trace guard",
+                    ),
+                )
+            else:
+                if any(
+                    legacy_field in bindings
+                    for legacy_field in (
+                        "contract_guard_sha256",
+                        "trace_guard_sha256",
+                    )
+                ):
+                    raise ValueError(
+                        "legacy guard bindings are not allowed for schema 2"
+                    )
+                guard_bindings = (
+                    (
+                        "state_guard_sha256",
+                        ROOT / "scripts" / "code_intel_state_guard.py",
+                        "state guard",
+                    ),
+                )
+            for field, path, label in guard_bindings:
                 expected_sha256 = bindings.get(field)
-                if expected_sha256 is None:
+                if binding_schema_version == 1 and expected_sha256 is None:
                     continue
                 if (
                     not isinstance(expected_sha256, str)
@@ -1610,6 +1727,8 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     shutil.copy2(args.preregistration, preregistration_copy)
     runner_copy = args.output_dir / "pilot-runner.py"
     shutil.copy2(Path(__file__), runner_copy)
+    state_guard_copy = args.output_dir / "code-intel-state-guard.py"
+    shutil.copy2(ROOT / "scripts" / "code_intel_state_guard.py", state_guard_copy)
     component_bom_copy = args.output_dir / "component-bom.json"
     shutil.copy2(args.component_bom, component_bom_copy)
     target_manifest_copy = args.output_dir / "target-manifest.json"
@@ -1762,7 +1881,12 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
             json.dumps(failure_receipt, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        _write_run_manifest(args.output_dir, run_id, "failed")
+        _write_run_manifest(
+            args.output_dir,
+            run_id,
+            "failed",
+            preregistration_name=preregistration_copy.name,
+        )
         raise
 
     records_path = args.output_dir / "records.jsonl"
@@ -1805,7 +1929,12 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
             json.dumps(outcome_report, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-    _write_run_manifest(args.output_dir, run_id, "completed")
+    _write_run_manifest(
+        args.output_dir,
+        run_id,
+        "completed",
+        preregistration_name=preregistration_copy.name,
+    )
     return summary
 
 

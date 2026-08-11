@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 from pathlib import PurePosixPath
+import re
 import subprocess
 import sys
 
@@ -101,15 +102,91 @@ def _load_json_object(path: Path, label: str) -> dict:
     return value
 
 
-def _verify_artifact_manifest(root: Path) -> dict[str, str]:
-    manifest = _load_json_object(root / "manifest.json", "runtime manifest")
+def _bound_manifest(
+    evidence_root: Path,
+    binding: object,
+    *,
+    label: str,
+) -> Path:
+    if not isinstance(binding, dict):
+        raise VerificationError(f"deployment receipt {label} binding is invalid")
+    relative = binding.get("path")
+    expected_sha256 = binding.get("sha256")
+    parsed = PurePosixPath(relative) if isinstance(relative, str) else None
+    if (
+        parsed is None
+        or parsed.is_absolute()
+        or ".." in parsed.parts
+        or parsed.as_posix() != relative
+        or not isinstance(expected_sha256, str)
+        or len(expected_sha256) != 64
+    ):
+        raise VerificationError(f"deployment receipt {label} binding is unsafe")
+    current = evidence_root
+    for part in parsed.parts:
+        current = current / part
+        if current.is_symlink():
+            raise VerificationError(f"deployment receipt {label} traverses a symlink")
+    if not current.is_file():
+        raise VerificationError(f"deployment receipt {label} is unavailable")
+    actual_sha256 = hashlib.sha256(current.read_bytes()).hexdigest()
+    if actual_sha256 != expected_sha256:
+        raise VerificationError(f"deployment receipt {label} hash differs")
+    return current
+
+
+def _deployment_bindings(
+    evidence_root: Path,
+    *,
+    expected_version: str,
+) -> tuple[Path, Path | None] | None:
+    receipt_path = evidence_root / "deployment-receipt.json"
+    if not receipt_path.exists():
+        return None
+    if receipt_path.is_symlink() or not receipt_path.is_file():
+        raise VerificationError("canonical deployment receipt is unsafe")
+    receipt = _load_json_object(receipt_path, "deployment receipt")
+    if (
+        receipt.get("schema_version") != 1
+        or receipt.get("receipt_type") != "code-intelligence-deployment"
+        or receipt.get("plugin_version") != expected_version
+    ):
+        raise VerificationError("canonical deployment receipt has an unsupported shape")
+    runtime_manifest = _bound_manifest(
+        evidence_root,
+        receipt.get("runtime_manifest"),
+        label="runtime manifest",
+    )
+    holdout_binding = receipt.get("holdout_manifest")
+    holdout_manifest = (
+        _bound_manifest(
+            evidence_root,
+            holdout_binding,
+            label="holdout manifest",
+        )
+        if holdout_binding is not None
+        else None
+    )
+    return runtime_manifest, holdout_manifest
+
+
+def _verify_artifact_manifest(
+    manifest_path: Path,
+    *,
+    expected_schema_version: int = 1,
+) -> dict[str, str]:
+    root = manifest_path.parent
+    manifest = _load_json_object(manifest_path, "artifact manifest")
     artifacts = manifest.get("artifacts")
-    if manifest.get("schema_version") != 1 or not isinstance(artifacts, dict):
+    if (
+        manifest.get("schema_version") != expected_schema_version
+        or not isinstance(artifacts, dict)
+    ):
         raise VerificationError("runtime manifest has an unsupported shape")
     expected_files = {
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
-        if path.is_file() and path.name != "manifest.json"
+        if path.is_file() and path != manifest_path
     }
     if expected_files != set(artifacts):
         raise VerificationError("runtime manifest does not cover every artifact")
@@ -209,34 +286,32 @@ def _runtime_trace_uses_both_families(raw_path: Path) -> bool:
 
 
 def _valid_runtime_receipt_manifest(
-    evidence_root: Path, *, expected_version: str, marketplace_root: str
-) -> str | None:
-    candidates = sorted(evidence_root.glob("installed-runtime-smoke-*"))
-    for root in candidates:
-        if root.is_symlink() or not root.is_dir():
-            raise VerificationError("runtime receipt root is not a real directory")
-        artifacts = _verify_artifact_manifest(root)
-        if "receipt.json" not in artifacts:
-            raise VerificationError("runtime manifest omits receipt.json")
-        receipt = _load_json_object(root / "receipt.json", "runtime receipt")
-        raw_relative = receipt.get("raw_stream")
-        if (
-            receipt.get("schema_version") != 1
-            or receipt.get("receipt_type") != "installed-plugin-runtime"
-            or receipt.get("plugin_id") != PLUGIN_ID
-            or receipt.get("plugin_version") != expected_version
-            or receipt.get("marketplace_root") != marketplace_root
-            or receipt.get("checkout_unchanged") is not True
-            or receipt.get("canary_violations") != 0
-            or receipt.get("denied_tool_calls") != 0
-            or not isinstance(raw_relative, str)
-            or raw_relative not in artifacts
-        ):
-            raise VerificationError("runtime receipt does not match the live deployment")
-        if not _runtime_trace_uses_both_families(root / raw_relative):
-            raise VerificationError("runtime trace does not prove both MCP families")
-        return hashlib.sha256((root / "manifest.json").read_bytes()).hexdigest()
-    return None
+    manifest: Path, *, expected_version: str, marketplace_root: str
+) -> str:
+    root = manifest.parent
+    if root.is_symlink() or not root.is_dir():
+        raise VerificationError("runtime receipt root is not a real directory")
+    artifacts = _verify_artifact_manifest(manifest)
+    if "receipt.json" not in artifacts:
+        raise VerificationError("runtime manifest omits receipt.json")
+    receipt = _load_json_object(root / "receipt.json", "runtime receipt")
+    raw_relative = receipt.get("raw_stream")
+    if (
+        receipt.get("schema_version") != 1
+        or receipt.get("receipt_type") != "installed-plugin-runtime"
+        or receipt.get("plugin_id") != PLUGIN_ID
+        or receipt.get("plugin_version") != expected_version
+        or receipt.get("marketplace_root") != marketplace_root
+        or receipt.get("checkout_unchanged") is not True
+        or receipt.get("canary_violations") != 0
+        or receipt.get("denied_tool_calls") != 0
+        or not isinstance(raw_relative, str)
+        or raw_relative not in artifacts
+    ):
+        raise VerificationError("runtime receipt does not match the live deployment")
+    if not _runtime_trace_uses_both_families(root / raw_relative):
+        raise VerificationError("runtime trace does not prove both MCP families")
+    return hashlib.sha256(manifest.read_bytes()).hexdigest()
 
 
 def _jsonl_objects(path: Path, label: str) -> list[dict]:
@@ -271,30 +346,32 @@ def _passing_holdout(
     root: Path,
     *,
     artifacts: dict[str, str],
+    artifact_roles: dict[str, str],
     runtime_manifest_sha256: str,
+    state_guard_sha256: str,
 ) -> bool:
-    required = {
-        "cases.jsonl",
-        "records.jsonl",
-        "summary.json",
-        "outcome-gates.json",
-        "component-bom.json",
-        "pilot-runner.py",
-        "readiness-evidence.json",
-        "target-manifest.json",
-        "consumption.json",
+    required_roles = {
+        "cases",
+        "component_bom",
+        "consumption",
+        "outcome_gates",
+        "pilot_runner",
+        "preregistration",
+        "readiness_evidence",
+        "records",
+        "state_guard",
+        "summary",
+        "target_manifest",
     }
-    if not required.issubset(artifacts):
-        return False
-    preregistrations = [
-        relative
-        for relative in artifacts
-        if PurePosixPath(relative).name.startswith("preregistration")
-        and relative.endswith(".json")
-    ]
-    if len(preregistrations) != 1:
-        raise VerificationError("holdout manifest must cover one preregistration")
-    outcome = _load_json_object(root / "outcome-gates.json", "holdout outcome")
+    if (
+        set(artifact_roles) != required_roles
+        or len(set(artifact_roles.values())) != len(required_roles)
+        or any(relative not in artifacts for relative in artifact_roles.values())
+    ):
+        raise VerificationError("holdout manifest artifact roles are invalid")
+    outcome = _load_json_object(
+        root / artifact_roles["outcome_gates"], "holdout outcome"
+    )
     if outcome.get("status") != "pass":
         return False
     gates = outcome.get("gates")
@@ -321,7 +398,7 @@ def _passing_holdout(
             raise VerificationError(f"passing holdout weakened or failed {name}")
 
     preregistration = _load_json_object(
-        root / preregistrations[0], "holdout preregistration"
+        root / artifact_roles["preregistration"], "holdout preregistration"
     )
     controls = preregistration.get("controls")
     bindings = preregistration.get("bindings")
@@ -349,22 +426,30 @@ def _passing_holdout(
         or controls.get("max_turns") != 8
         or controls.get("timeout_seconds") != 180.0
         or controls.get("max_budget_usd_per_case") != 1.0
+        or controls.get("routing_contract_schema_version") != 1
+        or bindings.get("schema_version") != 2
+        or bindings.get("state_guard_sha256") != state_guard_sha256
+        or artifacts.get(artifact_roles["state_guard"]) != state_guard_sha256
+        or "contract_guard_sha256" in bindings
+        or "trace_guard_sha256" in bindings
     ):
         raise VerificationError("passing holdout execution controls drifted")
     bound_artifacts = {
-        "cases_sha256": "cases.jsonl",
-        "target_manifest_sha256": "target-manifest.json",
-        "pilot_runner_sha256": "pilot-runner.py",
-        "component_bom_sha256": "component-bom.json",
-        "readiness_evidence_sha256": "readiness-evidence.json",
+        "cases_sha256": "cases",
+        "target_manifest_sha256": "target_manifest",
+        "pilot_runner_sha256": "pilot_runner",
+        "component_bom_sha256": "component_bom",
+        "readiness_evidence_sha256": "readiness_evidence",
     }
-    for field, relative in bound_artifacts.items():
-        if bindings.get(field) != artifacts.get(relative):
+    for field, role in bound_artifacts.items():
+        if bindings.get(field) != artifacts.get(artifact_roles[role]):
             raise VerificationError(f"passing holdout binding differs: {field}")
     if bindings.get("runtime_receipt_manifest_sha256") != runtime_manifest_sha256:
         raise VerificationError("passing holdout used another installed runtime")
 
-    consumption = _load_json_object(root / "consumption.json", "consumption receipt")
+    consumption = _load_json_object(
+        root / artifact_roles["consumption"], "consumption receipt"
+    )
     if (
         consumption.get("schema_version") != 1
         or consumption.get("state") != "consumed"
@@ -373,7 +458,7 @@ def _passing_holdout(
         != bindings.get("corpus_pack_sha256")
     ):
         raise VerificationError("passing holdout consumption binding is invalid")
-    cases = _jsonl_objects(root / "cases.jsonl", "holdout cases")
+    cases = _jsonl_objects(root / artifact_roles["cases"], "holdout cases")
     case_ids = [case.get("case_id") for case in cases]
     routes = {case.get("expected_route") for case in cases}
     if (
@@ -381,10 +466,15 @@ def _passing_holdout(
         or len(set(case_ids)) != 5
         or case_ids != controls.get("case_ids")
         or routes != {"semantic", "lexical", "graph", "mixed", "security"}
-        or not any(isinstance(case.get("routing_contract"), dict) for case in cases)
+        or any(
+            not isinstance(case.get("routing_contract"), dict)
+            or case["routing_contract"].get("required_route")
+            != case.get("expected_route")
+            for case in cases
+        )
     ):
         raise VerificationError("passing holdout corpus is vacuous or incomplete")
-    records = _jsonl_objects(root / "records.jsonl", "holdout records")
+    records = _jsonl_objects(root / artifact_roles["records"], "holdout records")
     expected_units = {
         (case_id, repetition) for case_id in case_ids for repetition in (1, 2)
     }
@@ -395,7 +485,16 @@ def _passing_holdout(
         len(records) != 10
         or observed_units != expected_units
         or any(
-            record.get("arm") != "composed" or record.get("status") != "success"
+            record.get("arm") != "composed"
+            or record.get("status") != "success"
+            or record.get("response_contract_version") != 2
+            or not isinstance(record.get("raw_evidence"), list)
+            or not record["raw_evidence"]
+            or any(
+                not isinstance(evidence_id, str)
+                or re.fullmatch(r"ev:v1:[0-9a-f]{64}", evidence_id) is None
+                for evidence_id in record["raw_evidence"]
+            )
             for record in records
         )
     ):
@@ -407,7 +506,9 @@ def _passing_holdout(
     ]
     if len(raw) != 10:
         raise VerificationError("passing holdout lacks ten raw fresh-session traces")
-    summary = _load_json_object(root / "summary.json", "holdout summary")
+    summary = _load_json_object(
+        root / artifact_roles["summary"], "holdout summary"
+    )
     composed = summary.get("arms", {}).get("composed")
     if (
         summary.get("outcome_gate_status") != "pass"
@@ -423,33 +524,43 @@ def _passing_holdout(
 
 
 def _has_fresh_passing_holdout(
-    evidence_root: Path, *, runtime_manifest_sha256: str
+    manifest: Path | None,
+    *,
+    runtime_manifest_sha256: str,
+    state_guard_sha256: str,
 ) -> bool:
-    seen_banks: set[tuple[str, str]] = set()
-    passed = False
-    for root in sorted(evidence_root.glob("pilot-*")):
-        if root.is_symlink() or not root.is_dir():
-            raise VerificationError("holdout root is not a real directory")
-        if not (root / "consumption.json").is_file():
-            continue
-        artifacts = _verify_artifact_manifest(root)
-        consumption = _load_json_object(root / "consumption.json", "consumption receipt")
-        identity = (
-            consumption.get("bank_id"),
-            consumption.get("corpus_pack_sha256"),
-        )
-        if not all(isinstance(value, str) and value for value in identity):
-            raise VerificationError("consumed holdout has no opaque corpus identity")
-        if identity in seen_banks:
-            raise VerificationError("a holdout bank was consumed more than once")
-        seen_banks.add(identity)
-        if _passing_holdout(
-            root,
-            artifacts=artifacts,
-            runtime_manifest_sha256=runtime_manifest_sha256,
-        ):
-            passed = True
-    return passed
+    if manifest is None:
+        return False
+    root = manifest.parent
+    if root.is_symlink() or not root.is_dir():
+        raise VerificationError("holdout root is not a real directory")
+    artifacts = _verify_artifact_manifest(manifest, expected_schema_version=2)
+    manifest_document = _load_json_object(manifest, "holdout manifest")
+    artifact_roles = manifest_document.get("artifact_roles")
+    if not isinstance(artifact_roles, dict) or not all(
+        isinstance(role, str) and isinstance(relative, str)
+        for role, relative in artifact_roles.items()
+    ):
+        raise VerificationError("holdout manifest artifact roles are invalid")
+    consumption_relative = artifact_roles.get("consumption")
+    if not isinstance(consumption_relative, str):
+        raise VerificationError("holdout manifest omits the consumption role")
+    consumption = _load_json_object(
+        root / consumption_relative, "consumption receipt"
+    )
+    identity = (
+        consumption.get("bank_id"),
+        consumption.get("corpus_pack_sha256"),
+    )
+    if not all(isinstance(value, str) and value for value in identity):
+        raise VerificationError("consumed holdout has no opaque corpus identity")
+    return _passing_holdout(
+        root,
+        artifacts=artifacts,
+        artifact_roles=artifact_roles,
+        runtime_manifest_sha256=runtime_manifest_sha256,
+        state_guard_sha256=state_guard_sha256,
+    )
 
 
 def deployment_stage(repo: Path, evidence_root: Path, claude: Path) -> int:
@@ -482,19 +593,28 @@ def deployment_stage(repo: Path, evidence_root: Path, claude: Path) -> int:
     if _durable_runtime_connected(
         installed[0], sources[0], mcp_output, str(plugin["version"])
     ):
-        runtime_manifest_sha256 = _valid_runtime_receipt_manifest(
+        deployment_bindings = _deployment_bindings(
             evidence_root,
+            expected_version=str(plugin["version"]),
+        )
+        if deployment_bindings is None:
+            return 2
+        runtime_manifest, holdout_manifest = deployment_bindings
+        runtime_manifest_sha256 = _valid_runtime_receipt_manifest(
+            runtime_manifest,
             expected_version=str(plugin["version"]),
             marketplace_root=str(sources[0]["installLocation"]),
         )
-        if runtime_manifest_sha256 is not None:
-            if _has_fresh_passing_holdout(
-                evidence_root,
-                runtime_manifest_sha256=runtime_manifest_sha256,
-            ):
-                return 4
-            return 3
-        return 2
+        state_guard = repo / "scripts" / "code_intel_state_guard.py"
+        if not state_guard.is_file():
+            raise VerificationError("unified state guard is unavailable")
+        if _has_fresh_passing_holdout(
+            holdout_manifest,
+            runtime_manifest_sha256=runtime_manifest_sha256,
+            state_guard_sha256=hashlib.sha256(state_guard.read_bytes()).hexdigest(),
+        ):
+            return 4
+        return 3
     return 1
 
 

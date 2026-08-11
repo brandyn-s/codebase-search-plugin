@@ -10,6 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 VERIFIER = ROOT / "scripts" / "verify_deployment_activation.py"
+STATE_GUARD = ROOT / "scripts" / "code_intel_state_guard.py"
 SPEC = importlib.util.spec_from_file_location("verify_deployment_activation", VERIFIER)
 assert SPEC is not None and SPEC.loader is not None
 VERIFIER_MODULE = importlib.util.module_from_spec(SPEC)
@@ -23,7 +24,7 @@ def write_fake_claude(
     marketplace_root: str,
     install_root: str = (
         "/Users/example/.claude/plugins/cache/redacted-code-intelligence/"
-        "codebase-search/0.4.13"
+        "codebase-search/0.4.14"
     ),
 ) -> None:
     path.write_text(
@@ -31,7 +32,7 @@ def write_fake_claude(
         "import json, sys\n"
         "args = sys.argv[1:]\n"
         "if args == ['plugin', 'list', '--json']:\n"
-        f"    print(json.dumps([{{'id':'codebase-search@redacted-code-intelligence','version':'0.4.13','scope':'user','enabled':True,'installPath':'{install_root}'}}]))\n"
+        f"    print(json.dumps([{{'id':'codebase-search@redacted-code-intelligence','version':'0.4.14','scope':'user','enabled':True,'installPath':'{install_root}'}}]))\n"
         "elif args == ['plugin', 'marketplace', 'list', '--json']:\n"
         f"    print(json.dumps([{{'name':'redacted-code-intelligence','source':'{marketplace_source}','installLocation':'{marketplace_root}'}}]))\n"
         "elif args == ['mcp', 'list']:\n"
@@ -42,6 +43,39 @@ def write_fake_claude(
         encoding="utf-8",
     )
     path.chmod(0o755)
+
+
+def write_deployment_receipt(
+    evidence_root: Path,
+    *,
+    runtime_manifest: Path,
+    holdout_manifest: Path | None,
+) -> None:
+    def binding(path: Path) -> dict[str, str]:
+        return {
+            "path": path.relative_to(evidence_root).as_posix(),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+
+    (evidence_root / "deployment-receipt.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "receipt_type": "code-intelligence-deployment",
+                "plugin_version": "0.4.14",
+                "runtime_manifest": binding(runtime_manifest),
+                "holdout_manifest": (
+                    binding(holdout_manifest)
+                    if holdout_manifest is not None
+                    else None
+                ),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def write_runtime_receipt(
@@ -56,7 +90,7 @@ def write_runtime_receipt(
             "subtype": "init",
             "model": "claude-sonnet-5",
             "plugins": [
-                {"id": "codebase-search@redacted-code-intelligence", "version": "0.4.13"}
+                {"id": "codebase-search@redacted-code-intelligence", "version": "0.4.14"}
             ],
             "mcp_servers": [
                 {"name": "plugin:codebase-search:code-search", "status": "connected"},
@@ -112,7 +146,7 @@ def write_runtime_receipt(
                 "schema_version": 1,
                 "receipt_type": "installed-plugin-runtime",
                 "plugin_id": "codebase-search@redacted-code-intelligence",
-                "plugin_version": "0.4.13",
+                "plugin_version": "0.4.14",
                 "marketplace_root": marketplace_root,
                 "checkout_unchanged": True,
                 "canary_violations": 0,
@@ -141,6 +175,11 @@ def write_runtime_receipt(
         + "\n",
         encoding="utf-8",
     )
+    write_deployment_receipt(
+        evidence_root,
+        runtime_manifest=manifest,
+        holdout_manifest=None,
+    )
     return receipt_root
 
 
@@ -154,15 +193,12 @@ def write_passing_holdout(
     run_root = evidence_root / "pilot-wave45-independent-pass"
     run_root.mkdir()
     cases = [
-        {"case_id": "sealed-lexical", "expected_route": "lexical"},
         {
-            "case_id": "sealed-graph",
-            "expected_route": "graph",
-            "routing_contract": {"trace_call_path": {"count": 1}},
-        },
-        {"case_id": "sealed-mixed", "expected_route": "mixed"},
-        {"case_id": "sealed-security", "expected_route": "security"},
-        {"case_id": "sealed-semantic", "expected_route": "semantic"},
+            "case_id": f"sealed-{route}",
+            "expected_route": route,
+            "routing_contract": {"required_route": route},
+        }
+        for route in ("lexical", "graph", "mixed", "security", "semantic")
     ]
     cases_path = run_root / "cases.jsonl"
     cases_path.write_text(
@@ -178,6 +214,8 @@ def write_passing_holdout(
                     "case_id": case["case_id"],
                     "repetition": repetition,
                     "status": "success",
+                    "response_contract_version": 2,
+                    "raw_evidence": ["ev:v1:" + "a" * 64],
                 },
                 sort_keys=True,
             )
@@ -198,6 +236,7 @@ def write_passing_holdout(
     component_bom = run_root / "component-bom.json"
     runner = run_root / "pilot-runner.py"
     readiness = run_root / "readiness-evidence.json"
+    state_guard = run_root / "code-intel-state-guard.py"
     target_manifest = run_root / "target-manifest.json"
     for path, content in (
         (component_bom, "{}\n"),
@@ -206,6 +245,7 @@ def write_passing_holdout(
         (target_manifest, "{}\n"),
     ):
         path.write_text(content, encoding="utf-8")
+    state_guard.write_bytes(STATE_GUARD.read_bytes())
     gates = {
         "arm": "composed",
         "min_evidence_precision": 0.9,
@@ -216,7 +256,7 @@ def write_passing_holdout(
         "max_errors": 0,
         "max_canary_violations": 0,
     }
-    preregistration = run_root / "preregistration-wave45.json"
+    preregistration = run_root / "opaque-control.json"
     corpus_sha256 = "a" * 64
     preregistration.write_text(
         json.dumps(
@@ -232,9 +272,10 @@ def write_passing_holdout(
                     "max_turns": 8,
                     "timeout_seconds": 180.0,
                     "max_budget_usd_per_case": 1.0,
+                    "routing_contract_schema_version": 1,
                 },
                 "bindings": {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "bank_id": "opaque-bank-a",
                     "corpus_pack_sha256": corpus_sha256,
                     "cases_sha256": hashlib.sha256(cases_path.read_bytes()).hexdigest(),
@@ -247,6 +288,9 @@ def write_passing_holdout(
                     ).hexdigest(),
                     "readiness_evidence_sha256": hashlib.sha256(
                         readiness.read_bytes()
+                    ).hexdigest(),
+                    "state_guard_sha256": hashlib.sha256(
+                        state_guard.read_bytes()
                     ).hexdigest(),
                     "runtime_receipt_manifest_sha256": hashlib.sha256(
                         (runtime_root / "manifest.json").read_bytes()
@@ -368,19 +412,186 @@ def write_passing_holdout(
         for path in run_root.rglob("*")
         if path.is_file()
     }
-    (run_root / "manifest.json").write_text(
+    manifest = run_root / "manifest.json"
+    manifest.write_text(
         json.dumps(
-            {"schema_version": 1, "run_id": "wave45-independent-pass", "artifacts": artifacts},
+            {
+                "schema_version": 2,
+                "run_id": "wave45-independent-pass",
+                "artifacts": artifacts,
+                "artifact_roles": {
+                    "cases": "cases.jsonl",
+                    "component_bom": "component-bom.json",
+                    "consumption": "consumption.json",
+                    "outcome_gates": "outcome-gates.json",
+                    "pilot_runner": "pilot-runner.py",
+                    "preregistration": "opaque-control.json",
+                    "readiness_evidence": "readiness-evidence.json",
+                    "records": "records.jsonl",
+                    "state_guard": "code-intel-state-guard.py",
+                    "summary": "summary.json",
+                    "target_manifest": "target-manifest.json",
+                },
+            },
             indent=2,
             sort_keys=True,
         )
         + "\n",
         encoding="utf-8",
     )
+    write_deployment_receipt(
+        evidence_root,
+        runtime_manifest=runtime_root / "manifest.json",
+        holdout_manifest=manifest,
+    )
     return run_root
 
 
 class DeploymentActivationVerifierTests(unittest.TestCase):
+    def test_cli_follows_explicit_manifest_paths_without_filename_conventions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence_root = root / "evidence"
+            evidence_root.mkdir()
+            marketplace_root = (
+                "/Users/example/.claude/plugins/marketplaces/"
+                "redacted-code-intelligence"
+            )
+            runtime_root = write_runtime_receipt(
+                evidence_root,
+                marketplace_root=marketplace_root,
+            )
+            holdout_root = write_passing_holdout(evidence_root, runtime_root)
+            runtime_manifest = runtime_root / "runtime-proof.json"
+            (runtime_root / "manifest.json").rename(runtime_manifest)
+            holdout_manifest = holdout_root / "holdout-proof.json"
+            (holdout_root / "manifest.json").rename(holdout_manifest)
+            write_deployment_receipt(
+                evidence_root,
+                runtime_manifest=runtime_manifest,
+                holdout_manifest=holdout_manifest,
+            )
+            fake_claude = root / "claude"
+            write_fake_claude(
+                fake_claude,
+                marketplace_source="github",
+                marketplace_root=marketplace_root,
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(VERIFIER),
+                    "--repo",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(evidence_root),
+                    "--claude",
+                    str(fake_claude),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            completed.stdout.strip(), "METRIC CODE_INTEL_DEPLOYMENT_STAGE=4"
+        )
+
+    def test_cli_ignores_holdout_directories_not_bound_by_canonical_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence_root = root / "evidence"
+            evidence_root.mkdir()
+            marketplace_root = (
+                "/Users/example/.claude/plugins/marketplaces/"
+                "redacted-code-intelligence"
+            )
+            runtime_root = write_runtime_receipt(
+                evidence_root,
+                marketplace_root=marketplace_root,
+            )
+            write_passing_holdout(evidence_root, runtime_root)
+            decoy = evidence_root / "pilot-a-unbound-decoy"
+            decoy.mkdir()
+            (decoy / "consumption.json").write_text(
+                json.dumps(
+                    {
+                        "bank_id": "unbound-decoy",
+                        "corpus_pack_sha256": "f" * 64,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            fake_claude = root / "claude"
+            write_fake_claude(
+                fake_claude,
+                marketplace_source="github",
+                marketplace_root=marketplace_root,
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(VERIFIER),
+                    "--repo",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(evidence_root),
+                    "--claude",
+                    str(fake_claude),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            completed.stdout.strip(), "METRIC CODE_INTEL_DEPLOYMENT_STAGE=4"
+        )
+
+    def test_cli_ignores_unbound_runtime_directories_without_canonical_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence_root = root / "evidence"
+            evidence_root.mkdir()
+            marketplace_root = (
+                "/Users/example/.claude/plugins/marketplaces/"
+                "redacted-code-intelligence"
+            )
+            write_runtime_receipt(evidence_root, marketplace_root=marketplace_root)
+            (evidence_root / "deployment-receipt.json").unlink()
+            fake_claude = root / "claude"
+            write_fake_claude(
+                fake_claude,
+                marketplace_source="github",
+                marketplace_root=marketplace_root,
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(VERIFIER),
+                    "--repo",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(evidence_root),
+                    "--claude",
+                    str(fake_claude),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 1, completed.stderr)
+        self.assertEqual(
+            completed.stdout.strip(), "METRIC CODE_INTEL_DEPLOYMENT_STAGE=2"
+        )
+
     def test_cli_reports_stage_one_for_worktree_backed_marketplace(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -517,6 +728,11 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            write_deployment_receipt(
+                evidence_root,
+                runtime_manifest=runtime_root / "manifest.json",
+                holdout_manifest=None,
+            )
             fake_claude = root / "claude"
             write_fake_claude(
                 fake_claude,
@@ -570,6 +786,11 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
             (runtime_root / "manifest.json").write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
+            )
+            write_deployment_receipt(
+                evidence_root,
+                runtime_manifest=runtime_root / "manifest.json",
+                holdout_manifest=None,
             )
             fake_claude = root / "claude"
             write_fake_claude(

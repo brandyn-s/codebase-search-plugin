@@ -6,15 +6,16 @@ SKILL = ROOT / "skills" / "code-intel" / "SKILL.md"
 
 
 class CodeIntelSkillContractTests(unittest.TestCase):
-    def test_final_evidence_is_exactly_pinned_and_cited(self):
+    def test_final_evidence_is_backend_issued_selected_and_cited(self):
         normalized = " ".join(SKILL.read_text(encoding="utf-8").split())
 
         self.assertIn("deletion test", normalized)
-        self.assertIn("successful exact `Read`", normalized)
-        self.assertIn("`offset=start`", normalized)
-        self.assertIn("`limit=end-start+1`", normalized)
-        self.assertIn("whole-file or unbounded Read is inspection-only", normalized)
+        self.assertIn("backend-issued", normalized)
+        self.assertIn("Never manufacture or edit source coordinates", normalized)
+        self.assertIn("Read is inspection-only and never creates evidence", normalized)
         self.assertIn("Cite every final evidence ID verbatim", normalized)
+        self.assertNotIn("successful exact `Read`", normalized)
+        self.assertNotIn("Shrink every `path:start-end` range", normalized)
 
     def test_semantic_route_does_not_accept_graph_text_corroboration(self):
         normalized = " ".join(SKILL.read_text(encoding="utf-8").split())

@@ -116,6 +116,20 @@ compact natural-language discovery and relationship workflow; it uses the
 same engines and preserves canonical evidence when the installed components
 expose it.
 
+### Verification boundary
+
+Evidence-capable backend tools issue typed, immutable `ev:v1` identifiers that
+bind exact source coordinates and index generation. The model selects those
+identifiers; it does not create or edit line ranges. One host-owned state
+machine enforces the required route, directed trace, observed evidence IDs, and
+terminal-output contract before an answer can complete.
+
+Deployment verification follows one canonical, hash-bound receipt containing
+explicit runtime and holdout manifest paths. Holdout manifests declare artifact
+roles directly, so verification does not infer control files from directory or
+filename patterns. Broad deterministic tests run in CI; a release uses one
+bounded five-route, two-repetition empirical holdout after installation.
+
 ### Skills
 
 | Skill | Purpose |

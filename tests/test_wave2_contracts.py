@@ -110,15 +110,16 @@ def test_code_intel_skill_binds_relationship_evidence_and_claim_identity():
     assert "byte-for-byte, including terminal punctuation" in normalized
 
 
-def test_code_intel_skill_requires_minimal_exact_evidence_ranges():
+def test_code_intel_skill_requires_minimal_backend_evidence_selection():
     skill = (ROOT / "skills" / "code-intel" / "SKILL.md").read_text(
         encoding="utf-8"
     )
     normalized = " ".join(skill.split())
 
     assert "smallest sufficient set" in normalized
-    assert "Shrink every `path:start-end` range" in normalized
-    assert "imports, blank lines, or surrounding context" in normalized
+    assert "backend-issued" in normalized
+    assert "Never manufacture or edit source coordinates" in normalized
+    assert "Read is inspection-only and never creates evidence" in normalized
     assert "deletion test" in normalized
     assert "claim-scoped, not flow-scoped" in normalized
     assert "imports and aliases are discovery context" in normalized

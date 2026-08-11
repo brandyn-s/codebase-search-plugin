@@ -30,9 +30,9 @@ Classify the question before calling tools. Use the first matching route:
 3. A callers-only or relationship-only question with an explicit symbol uses
    the narrowest graph tool directly.
 4. Pure literal or location lookup for an exact identifier or config key uses
-   `mcp__code-search__search_code` with `search_mode="keyword"`.
+   `mcp__code-search__search_code_evidence` with `search_mode="keyword"`.
 5. Conceptual how, why, or whether behavior uses code-search semantic/default
-   retrieval, even when it names an exact symbol or discusses security.
+   evidence retrieval, even when it names an exact symbol or discusses security.
 
 Do not call graph security tools for conceptual behavior unless the question
 explicitly requests a path, sink reachability, trust boundary, or
@@ -46,40 +46,39 @@ graph corroboration belongs only in graph, mixed, or security work.
 Use for localization and discovery: where code lives, exact identifiers,
 conceptual implementations, similar code, or files relevant to an issue.
 
-- Exact identifier/config literal: `mcp__code-search__search_code` with
+- Exact identifier/config literal: `mcp__code-search__search_code_evidence` with
   `search_mode="keyword"`.
-- Conceptual behavior: `mcp__code-search__search_code` with hybrid/default
-  retrieval.
-- Evidence-backed conceptual search: prefer the additive
-  `search_code_evidence` tool when the installed code-search component exposes
-  it. It uses the same retrieval pipeline and emits generation-bound
+- Conceptual behavior: `mcp__code-search__search_code_evidence` with
+  hybrid/default retrieval.
+- Discovery-only search may use `search_code`, but terminal evidence must come
+  from `search_code_evidence`. The evidence-capable tool uses the same retrieval
+  pipeline and emits generation-bound
   `evidence_ref` and `observation_ref` objects only when the semantic index
   identity is unchanged across the search. It emits `symbol_ref` only when a
   canonical qualified name is available; never convert a short or merged chunk
-  name into a graph identity. Until the tested component BOM includes that
-  tool, use the ordinary search tool and do not manufacture references.
+  name into a graph identity.
 - Issue-to-file localization: `mcp__code-search__code_localize`.
 
-Return the smallest sufficient set of file/line evidence. Shrink every
-`path:start-end` range to only the lines needed to prove the answer; omit
-imports, blank lines, or surrounding context unless they are necessary for an
-atomic claim or named relationship endpoint. Apply a deletion test to every
-location: remove it unless its deletion would leave an atomic clause or
-candidate-named endpoint unsupported. Do not return discovery, contextual, or duplicate
-corroborating locations. Evidence is claim-scoped, not flow-scoped. For a
-direct relationship, imports and aliases are discovery context; the direct
-call site is edge evidence. Include minimal definition or implementation
-evidence for every candidate-named endpoint; one location may satisfy both the
-edge and endpoint roles. Inspecting a location does not make it answer evidence.
-Do not cite an unnamed helper
-merely because retrieval found it or you read it; cite it only when it is the
-sole direct implementation of an atomic clause and no candidate-named or
-direct-call location supports that clause. Do not cite extra upstream or
-downstream endpoints, call sites, or relationships. After the deletion test,
-pin every final `path:start-end` with one successful exact `Read` using
-`offset=start` and `limit=end-start+1`. A whole-file or unbounded Read is
-inspection-only. Cite every final evidence ID verbatim in the answer; an
-uncited location is not answer evidence.
+Return the smallest sufficient set of backend-issued evidence. The backends
+own each immutable evidence ID and its exact source coordinates; select IDs
+from successful evidence-capable tool results rather than translating tool
+output into locations. Never manufacture or edit source coordinates, evidence
+IDs, or nested reference fields. If available evidence is too broad, ask the
+backend for narrower evidence or return `unresolved`; do not synthesize a range.
+
+Apply a deletion test to every selected ID: remove it unless its deletion would
+leave an atomic clause or candidate-named endpoint unsupported. Do not return
+discovery, contextual, or duplicate corroborating evidence. Evidence is
+claim-scoped, not flow-scoped. For a direct relationship, imports and aliases
+are discovery context; the backend-issued direct call-site relationship is edge
+evidence. Include evidence for every candidate-named endpoint; one reference
+may satisfy both the edge and endpoint roles. Read is inspection-only and never
+creates evidence. Do not cite an unnamed helper merely because retrieval found
+it or you read it; cite it only when it is the sole direct implementation of an
+atomic clause and no candidate-named or direct-call reference supports that
+clause. Do not cite extra upstream or downstream endpoints, call sites, or
+relationships. Cite every final evidence ID verbatim in the answer; an uncited
+ID is not answer evidence.
 
 ## UNDERSTAND
 
@@ -98,8 +97,9 @@ Callers of an exact function use `mcp__code-graph__trace_call_path` with
 `direction="inbound"`; callees use the same tool with `direction="outbound"`.
 Call the directed trace once. Do not add `search_graph` before or after it when
 the exact symbol resolves; use `search_graph` only when the exact function name
-is unresolved. Use `Read` only to corroborate the returned relationship and pin
-source lines. Resolve every named relationship endpoint before asserting the
+is unresolved. Use `Read` only to inspect or corroborate the returned
+relationship; it cannot create or alter answer evidence. Resolve every named
+relationship endpoint before asserting the
 edge, but keep inspection separate from answer evidence. Cite the direct call
 site for the edge and minimal source evidence for every candidate-named
 endpoint. Endpoint resolution is an adjudication check; do not promote other
@@ -198,13 +198,14 @@ using mixed evidence must return `blocked` when this gate fails.
 
 ## Evidence contract
 
-When a backend returns canonical `symbol_ref`, `relationship_ref`,
-`evidence_ref`, or `observation_ref` fields, preserve them through chaining
-rather than re-resolving by short symbol name. References are content-addressed;
-changing a field without recomputing the canonical ID invalidates the proof
-bundle. Relationship references also bind source and target symbols, edge type,
-resolver source, confidence, runtime confirmation, observation count, and index
-generation.
+Select only backend-issued canonical `symbol_ref`, `relationship_ref`,
+`evidence_ref`, or `observation_ref` fields from successful tool results and
+preserve them through chaining rather than re-resolving by short symbol name.
+The model selects evidence; it does not author evidence IDs or coordinates.
+References are content-addressed; changing a field without recomputing the
+canonical ID invalidates the proof bundle. Relationship references also bind
+source and target symbols, edge type, resolver source, confidence, runtime
+confirmation, observation count, and index generation.
 
 ## Output
 

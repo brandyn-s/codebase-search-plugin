@@ -29,6 +29,7 @@ from bench.e2e.pilot.run import (
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "bench" / "e2e" / "pilot" / "run.py"
+STATE_GUARD = ROOT / "scripts" / "code_intel_state_guard.py"
 
 
 class OperatorPilotAcceptanceTests(unittest.TestCase):
@@ -259,7 +260,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "target fixture differs"):
                 _validate_preregistered_controls(arguments, preregistration)
 
-    def test_v5_preregistration_binds_execution_identity_bundle(self):
+    def test_v6_preregistration_binds_unified_state_guard(self):
         cases = ROOT / "bench" / "e2e" / "pilot" / "cases-v2.jsonl"
         target_manifest = ROOT / "bench" / "e2e" / "target-repo-manifest.json"
         component_bom = ROOT / "component-bom.json"
@@ -408,7 +409,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     "timeout_seconds": 180.0,
                 },
                 "bindings": {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "cases_sha256": hashlib.sha256(
                         cases.read_bytes()
                     ).hexdigest(),
@@ -423,6 +424,9 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     ).hexdigest(),
                     "readiness_evidence_sha256": hashlib.sha256(
                         readiness_evidence.read_bytes()
+                    ).hexdigest(),
+                    "state_guard_sha256": hashlib.sha256(
+                        STATE_GUARD.read_bytes()
                     ).hexdigest(),
                 },
             }
@@ -475,6 +479,12 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     "readiness_evidence_sha256",
                     "0" * 64,
                     "readiness evidence SHA-256 differs",
+                ),
+                "state guard": (
+                    "binding",
+                    "state_guard_sha256",
+                    "0" * 64,
+                    "state guard SHA-256 differs",
                 ),
                 "code-search runtime": (
                     "argument",
@@ -843,6 +853,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             )
             self.assertTrue((output / "records.jsonl").is_file())
             self.assertTrue((output / "pilot-runner.py").is_file())
+            self.assertTrue((output / "code-intel-state-guard.py").is_file())
             self.assertTrue((output / "preregistration-v4.json").is_file())
             self.assertEqual(
                 json.loads((output / "outcome-gates.json").read_text())["status"],
@@ -860,6 +871,23 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                 hashlib.sha256(raw_path.read_bytes()).hexdigest(),
             )
             self.assertTrue(manifest["run_id"].startswith("wave43-"))
+            self.assertEqual(manifest["schema_version"], 2)
+            self.assertEqual(
+                manifest["artifact_roles"],
+                {
+                    "cases": "cases.jsonl",
+                    "component_bom": "component-bom.json",
+                    "consumption": "consumption.json",
+                    "outcome_gates": "outcome-gates.json",
+                    "pilot_runner": "pilot-runner.py",
+                    "preregistration": "preregistration-v4.json",
+                    "readiness_evidence": "readiness-evidence.json",
+                    "records": "records.jsonl",
+                    "state_guard": "code-intel-state-guard.py",
+                    "summary": "summary.json",
+                    "target_manifest": "target-manifest.json",
+                },
+            )
             self.assertIn("preregistration-v4.json", manifest["artifacts"])
             self.assertIn("outcome-gates.json", manifest["artifacts"])
 
@@ -1009,7 +1037,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertNotIn("ToolSearch", native_tools)
         self.assertIn("ToolSearch", composed_allowed)
 
-    def test_trace_contract_installs_exactly_once_runtime_hooks(self):
+    def test_composed_contract_installs_one_host_owned_state_machine(self):
         arguments = SimpleNamespace(
             claude=Path("/usr/bin/claude"),
             code_search=Path("/usr/bin/code-search"),
@@ -1033,78 +1061,47 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         command = _claude_command(arguments, arm="composed", case=case)
         settings = json.loads(command[command.index("--settings") + 1])
 
-        pre = settings["hooks"]["PreToolUse"][0]
-        terminal = settings["hooks"]["PreToolUse"][1]
-        post = settings["hooks"]["PostToolUse"][0]
-        failure = settings["hooks"]["PostToolUseFailure"][0]
-        stop = settings["hooks"]["Stop"][0]
-        self.assertEqual(pre["matcher"], "mcp__code-graph__trace_call_path")
-        self.assertEqual(terminal["matcher"], "StructuredOutput")
-        self.assertIn(
-            "code_intel_trace_guard.py pre-tool-use",
-            pre["hooks"][0]["command"],
-        )
-        self.assertIn(
-            "code_intel_trace_guard.py post-tool-use",
-            post["hooks"][0]["command"],
-        )
-        self.assertIn(
-            "code_intel_trace_guard.py post-tool-failure",
-            failure["hooks"][0]["command"],
-        )
-        self.assertIn(
-            "code_intel_trace_guard.py pre-terminal-output",
-            terminal["hooks"][0]["command"],
-        )
-        self.assertIn("code_intel_trace_guard.py stop", stop["hooks"][0]["command"])
-        contract_route = settings["hooks"]["PreToolUse"][2]
-        contract_read = settings["hooks"]["PreToolUse"][3]
-        contract_terminal = settings["hooks"]["PreToolUse"][4]
-        route = settings["hooks"]["PostToolUse"][1]
-        read = settings["hooks"]["PostToolUse"][2]
-        cleanup = settings["hooks"]["PostToolUse"][3]
+        pre_tool, pre_read, terminal = settings["hooks"]["PreToolUse"]
+        post_tool, cleanup = settings["hooks"]["PostToolUse"]
+        [failure] = settings["hooks"]["PostToolUseFailure"]
+        self.assertNotIn("Stop", settings["hooks"])
         self.assertEqual(
-            contract_route["matcher"],
+            pre_tool["matcher"],
             "mcp__code-search__.*|mcp__code-graph__.*",
         )
-        self.assertEqual(contract_read["matcher"], "Read")
-        self.assertEqual(contract_terminal["matcher"], "StructuredOutput")
+        self.assertEqual(pre_read["matcher"], "Read")
+        self.assertEqual(terminal["matcher"], "StructuredOutput")
         self.assertEqual(
-            route["matcher"], "mcp__code-search__.*|mcp__code-graph__.*"
+            post_tool["matcher"], "mcp__code-search__.*|mcp__code-graph__.*"
         )
-        self.assertEqual(read["matcher"], "Read")
         self.assertEqual(cleanup["matcher"], "StructuredOutput")
-        self.assertIn(
-            "code_intel_contract_guard.py pre-route-tool",
-            contract_route["hooks"][0]["command"],
+        self.assertEqual(
+            failure["matcher"], "mcp__code-search__.*|mcp__code-graph__.*"
         )
-        self.assertIn(
-            "code_intel_contract_guard.py pre-read",
-            contract_read["hooks"][0]["command"],
+        commands = [
+            hook["hooks"][0]["command"]
+            for group in settings["hooks"].values()
+            for hook in group
+        ]
+        self.assertTrue(
+            all("code_intel_state_guard.py" in command for command in commands)
         )
-        self.assertIn(
-            "code_intel_contract_guard.py pre-terminal-output",
-            contract_terminal["hooks"][0]["command"],
-        )
-        self.assertIn("--expected-route graph", contract_terminal["hooks"][0]["command"])
-        self.assertIn(
-            "--target " + str(Path("/tmp/target").resolve()),
-            contract_terminal["hooks"][0]["command"],
-        )
-        self.assertIn(
-            "code_intel_contract_guard.py record-route",
-            route["hooks"][0]["command"],
-        )
-        self.assertIn(
-            "code_intel_contract_guard.py record-read",
-            read["hooks"][0]["command"],
-        )
+        self.assertTrue(all("--expected-route graph" in command for command in commands))
+        self.assertTrue(all("--trace-direction inbound" in command for command in commands))
+        self.assertFalse(any("code_intel_trace_guard.py" in command for command in commands))
+        self.assertFalse(any("code_intel_contract_guard.py" in command for command in commands))
 
     def test_response_schema_binds_claim_identity_without_unsupported_combinators(
         self,
     ):
         claim = "Session creation calls login."
-        schema = _response_schema({"expected_claims": [{"text": claim}]})
+        case = {
+            "query": "What calls login?",
+            "expected_route": "graph",
+            "expected_claims": [{"text": claim}],
+        }
+        schema = _response_schema(case)
+        prompt = _prompt(case, "composed")
 
         self.assertEqual(schema["properties"]["candidate_assertion"], {"const": claim})
         self.assertEqual(
@@ -1125,21 +1122,19 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             schema["properties"]["evidence_ids"]["description"],
         )
         self.assertIn(
-            "Inspected locations",
+            "backend-issued",
             schema["properties"]["evidence_ids"]["description"],
         )
         self.assertIn(
-            "sole direct implementation",
-            schema["properties"]["evidence_ids"]["description"],
+            "^ev:v1:[0-9a-f]{64}$",
+            schema["properties"]["evidence_ids"]["items"]["pattern"],
         )
-        self.assertIn(
-            "candidate-named endpoint",
-            schema["properties"]["evidence_ids"]["description"],
-        )
-        self.assertIn(
-            "exact successful Read pin",
-            schema["properties"]["evidence_ids"]["description"],
-        )
+        self.assertNotIn("Read pin", schema["properties"]["evidence_ids"]["description"])
+        self.assertIn("backend-issued", prompt)
+        self.assertIn("ev:v1:", prompt)
+        self.assertIn("never invent", prompt)
+        self.assertNotIn("path:start-end", prompt)
+        self.assertNotIn("Read pin", prompt)
 
     def test_operator_environment_disables_incompatible_scrub_for_child_only(self):
         ambient = {
@@ -1173,6 +1168,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
         self.assertIn("explicit source-to-sink", prompt)
         self.assertIn('search_mode="keyword"', prompt)
+        self.assertIn("search_code_evidence", prompt)
         self.assertIn("Security vocabulary alone does not make", prompt)
         self.assertIn("Conceptual how, why, or whether behavior", prompt)
         self.assertIn("even when it names an exact symbol", prompt)
@@ -1195,23 +1191,21 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             prompt,
         )
         self.assertIn("Do not call trace_call_path in any other direction", prompt)
-        self.assertIn("use Read to corroborate", prompt)
+        self.assertIn("use get_relationship_evidence", prompt)
         self.assertIn("definition of every named endpoint", prompt)
         self.assertIn("Before setting disposition to supported", prompt)
-        self.assertIn("synthetic terminal line", prompt)
         self.assertIn("smallest sufficient evidence set", prompt)
-        self.assertIn("Shrink each path:start-end range", prompt)
-        self.assertIn("imports, blank lines, or surrounding context", prompt)
+        self.assertIn("backend-issued canonical", prompt)
+        self.assertIn("ev:v1:", prompt)
+        self.assertIn("never invent", prompt)
         self.assertIn("deletion test", prompt)
-        self.assertIn("exact successful Read pin", prompt)
-        self.assertIn("offset=start", prompt)
         self.assertIn("Cite every final evidence ID verbatim", prompt)
         self.assertIn("claim-scoped, not flow-scoped", prompt)
-        self.assertIn("imports and aliases are discovery context", prompt)
-        self.assertIn("upstream or downstream", prompt)
+        self.assertIn("Imports and aliases remain discovery context", prompt)
+        self.assertIn("upstream/downstream", prompt)
         self.assertIn("Finish the required retrieval route before any Read", prompt)
-        self.assertIn("Inspecting a location does not make it answer evidence", prompt)
-        self.assertIn("do not cite an unnamed helper", prompt)
+        self.assertIn("A Read is inspection-only and never creates evidence", prompt)
+        self.assertIn("unnamed helpers", prompt)
         self.assertIn("Endpoint resolution is an adjudication check", prompt)
         self.assertIn("every candidate-named endpoint", prompt)
         self.assertIn("Use not_supported only when", prompt)
@@ -1220,6 +1214,8 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("byte-for-byte, including terminal punctuation", prompt)
         self.assertIn("as candidate_assertion", prompt)
         self.assertIn("as asserted_claim", prompt)
+        self.assertNotIn("path:start-end", prompt)
+        self.assertNotIn("Read pin", prompt)
 
     def test_explain_symbol_counts_as_graph_relationship_work(self):
         tool_calls = [
@@ -1234,6 +1230,20 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         ]
 
         self.assertTrue(_route_satisfies("mixed", tool_calls))
+
+    def test_keyword_evidence_search_is_lexical_not_semantic(self):
+        tool_calls = [
+            {
+                "tool": "mcp__code-search__search_code_evidence",
+                "arguments": {
+                    "query": "CODE_SEARCH_STORAGE",
+                    "search_mode": "keyword",
+                },
+            }
+        ]
+
+        self.assertTrue(_route_satisfies("lexical", tool_calls))
+        self.assertFalse(_route_satisfies("semantic", tool_calls))
 
     def test_exact_callers_contract_allows_one_inbound_trace_and_read(self):
         case = {
@@ -1287,6 +1297,97 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
 
 class TranscriptProjectionTests(unittest.TestCase):
+    def test_projects_selected_backend_evidence_id_to_its_source_location(self):
+        evidence_payload = {
+            "schema_version": 1,
+            "repository_id": "repo-1",
+            "source_revision": "a" * 40,
+            "index_generation": "b" * 64,
+            "relative_path": "src/auth.py",
+            "start_line": 7,
+            "end_line": 9,
+            "evidence_type": "semantic_match",
+        }
+        evidence_id = "ev:v1:" + hashlib.sha256(
+            json.dumps(
+                evidence_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        evidence_ref = {"id": evidence_id, **evidence_payload}
+        claim = "Authentication checks the token signature."
+        case = {
+            "case_id": "typed-evidence",
+            "expected_route": "semantic",
+            "expected_disposition": "supported",
+            "expected_evidence": ["src/auth.py:7-9"],
+            "expected_claims": [
+                {
+                    "claim_id": "typed-evidence:signature",
+                    "text": claim,
+                    "required_evidence_ids": ["src/auth.py:7-9"],
+                }
+            ],
+            "expected_index_error": "none",
+        }
+        transcript = [
+            {"type": "system", "subtype": "init", "model": "claude-sonnet-5"},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-search",
+                            "name": "mcp__code-search__search_code_evidence",
+                            "input": {"query": "token signature"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "tool-search",
+                            "content": json.dumps(
+                                {"results": [{"evidence_ref": evidence_ref}]}
+                            ),
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "result",
+                "is_error": False,
+                "structured_output": {
+                    "candidate_assertion": claim,
+                    "disposition": "supported",
+                    "asserted_claim": claim,
+                    "evidence_ids": [evidence_id],
+                    "answer": f"Supported by {evidence_id}",
+                    "canary_violation": False,
+                },
+            },
+        ]
+
+        record = project_transcript(
+            transcript,
+            case=case,
+            arm="composed",
+            run_id="pilot-typed-evidence",
+        )
+
+        self.assertEqual(record["evidence"], ["src/auth.py:7-9"])
+        self.assertEqual(record["raw_evidence"], [evidence_id])
+        self.assertEqual(record["evidence_true_positives"], 1)
+        self.assertEqual(record["evidence_false_positives"], 0)
+        self.assertEqual(record["evidence_false_negatives"], 0)
+        self.assertTrue(record["adjudication_correct"])
+
     def test_model_declared_canary_is_non_gating_without_host_evidence(self):
         case = {
             "case_id": "canary-observation",
