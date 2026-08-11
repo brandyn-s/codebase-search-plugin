@@ -669,41 +669,69 @@ def _mcp_config(args: argparse.Namespace, arm: str) -> dict[str, Any]:
 
 def _prompt(case: dict[str, Any], arm: str) -> str:
     claim = case["expected_claims"][0]["text"]
-    routing = {
-        "native": "Use only the native read/search tools.",
-        "code-search": "Use code-search as the discovery engine, then Read only when needed to pin exact lines.",
-        "code-graph": "Use code-graph as the structural engine, then Read only when needed to pin exact lines.",
-        "composed": (
-            "Classify the question before calling tools, using this precedence. "
-            "An explicit source-to-sink, trust-boundary, or security-path question "
-            "uses the graph security/relationship tools. Security vocabulary alone "
-            "does not make a question a security-path question. A question that "
-            "combines conceptual explanation with callers or relationships uses "
-            "code-search semantic search first, then exactly one graph relationship "
-            "tool. An explicit symbol does not waive this "
-            "mixed route when explanation and relationship are both requested. A "
-            "callers-only or relationship-only question with an explicit symbol "
-            "uses a graph tool. Pure literal or location lookup for an exact "
-            "identifier or config key uses code-search search_code_evidence with "
-            'search_mode="keyword". Conceptual how, why, or whether behavior uses '
-            "code-search semantic/default retrieval, even when it names an exact "
-            "symbol or discusses security. Do not call graph security tools for "
-            "conceptual behavior unless the question explicitly requests a path, "
-            "sink reachability, trust boundary, or security-surface enumeration. Do not "
-            "substitute graph text search for the required code-search semantic or "
-            "keyword FIND step. Keep semantic and lexical cases within their selected "
-            "route; graph corroboration belongs only in graph, mixed, or security work."
-        ),
-    }[arm]
+    selected_route = case.get("expected_route") if arm == "composed" else None
+    if arm == "composed":
+        route_recipes = {
+            "semantic": (
+                "The host selected the semantic route. Use code-search "
+                "search_code_evidence with search_mode=\"semantic\". Do not use "
+                "keyword mode or any code-graph tool."
+            ),
+            "lexical": (
+                "The host selected the lexical route. Use code-search "
+                "search_code_evidence with search_mode=\"keyword\". Do not use "
+                "semantic mode or any code-graph tool."
+            ),
+            "graph": (
+                "The host selected the graph route. Use only the narrowest "
+                "code-graph relationship tool that answers the question. Do not "
+                "use code-search or graph text search."
+            ),
+            "mixed": (
+                "The host selected the mixed route. Call code-search "
+                "search_code_evidence with search_mode=\"semantic\" first, then "
+                "exactly one graph relationship tool. Do not use keyword mode or "
+                "graph text search."
+            ),
+            "security": (
+                "The host selected the security route. Use only code-graph "
+                "security or relationship tools. Use trace_data_flow for an "
+                "explicit source-to-sink path and query_security_surfaces for a "
+                "security-surface question. Do not use code-search."
+            ),
+        }
+        if selected_route not in route_recipes:
+            raise ValueError("composed case expected_route is invalid")
+        routing = route_recipes[selected_route]
+    else:
+        routing = {
+            "native": "Use only the native read/search tools.",
+            "code-search": (
+                "Use code-search as the discovery engine, then Read only when "
+                "needed to pin exact lines."
+            ),
+            "code-graph": (
+                "Use code-graph as the structural engine, then Read only when "
+                "needed to pin exact lines."
+            ),
+        }[arm]
+    mixed_completion = (
+        " For this mixed route, complete semantic evidence retrieval before the "
+        "directed graph relationship call."
+        if selected_route == "mixed"
+        else ""
+    )
     discovery = (
         " MCP tools are deferred. Before any Read, call ToolSearch exactly once "
-        "to load every route-required code-search and code-graph tool in one "
-        "discovery call, then use the required MCP route. Finish the required "
-        "retrieval route before any Read; for mixed work this means semantic "
-        "retrieval followed by the directed graph relationship call. Never guess "
-        "a repository path; Read only paths returned by retrieval."
+        "to load only the tools named by the required route recipe in one "
+        "discovery call. Finish the required retrieval route before any Read."
+        + mixed_completion
+        + " Never guess a repository path; Read only paths returned by retrieval."
         if arm != "native"
         else ""
+    )
+    relationship_route = arm == "code-graph" or (
+        arm == "composed" and selected_route in {"graph", "mixed"}
     )
     efficiency = (
         " For an exact callers question, call trace_call_path once with "
@@ -711,12 +739,12 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         'direction="outbound". Do not add search_graph when that trace resolves '
         "the symbol; use get_relationship_evidence for the resolved relationship "
         "and select its backend-issued evidence ID."
-        if arm in {"code-graph", "composed"}
+        if relationship_route
         else ""
     )
     trace_contract = ""
     contract = case.get("routing_contract")
-    if arm in {"code-graph", "composed"} and isinstance(contract, dict):
+    if relationship_route and isinstance(contract, dict):
         trace = contract.get("trace_call_path")
         if (
             isinstance(trace, dict)

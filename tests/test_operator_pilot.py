@@ -1172,9 +1172,10 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertEqual(ambient["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"], "1")
         self.assertNotIn("ENABLE_TOOL_SEARCH", ambient)
 
-    def test_composed_prompt_makes_route_precedence_explicit(self):
+    def test_composed_prompt_uses_only_the_host_selected_mixed_route(self):
         case = {
             "query": "Explain login and its callers",
+            "expected_route": "mixed",
             "expected_claims": [{"text": "Session creation calls login."}],
             "routing_contract": {
                 "trace_call_path": {"count": 1, "direction": "inbound"},
@@ -1184,23 +1185,18 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
         prompt = _prompt(case, "composed")
 
-        self.assertIn("explicit source-to-sink", prompt)
-        self.assertIn('search_mode="keyword"', prompt)
+        self.assertIn("The host selected the mixed route", prompt)
         self.assertIn("search_code_evidence", prompt)
-        self.assertIn("Security vocabulary alone does not make", prompt)
-        self.assertIn("Conceptual how, why, or whether behavior", prompt)
-        self.assertIn("even when it names an exact symbol", prompt)
+        self.assertIn('search_mode="semantic"', prompt)
         self.assertIn(
-            "Do not call graph security tools for conceptual behavior",
+            "then exactly one graph relationship tool",
             prompt,
         )
-        self.assertIn("Pure literal or location lookup", prompt)
-        self.assertIn(
-            "semantic search first, then exactly one graph relationship tool",
-            prompt,
-        )
-        self.assertIn("An explicit symbol does not waive this mixed route", prompt)
-        self.assertIn("Do not substitute graph text search", prompt)
+        self.assertIn("Do not use keyword mode or graph text search", prompt)
+        self.assertNotIn("Classify the question", prompt)
+        self.assertNotIn("explicit source-to-sink", prompt)
+        self.assertNotIn("Security vocabulary alone", prompt)
+        self.assertNotIn("Pure literal or location lookup", prompt)
         self.assertIn("MCP tools are deferred", prompt)
         self.assertIn("Before any Read, call ToolSearch exactly once", prompt)
         self.assertIn("Never guess a repository path", prompt)
@@ -1234,6 +1230,23 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("as asserted_claim", prompt)
         self.assertNotIn("path:start-end", prompt)
         self.assertNotIn("Read pin", prompt)
+
+    def test_semantic_prompt_excludes_other_route_recipes(self):
+        case = {
+            "query": "How is a value constrained?",
+            "expected_route": "semantic",
+            "expected_claims": [{"text": "The value is constrained."}],
+        }
+
+        prompt = _prompt(case, "composed")
+
+        self.assertIn("The host selected the semantic route", prompt)
+        self.assertIn("search_code_evidence", prompt)
+        self.assertIn('search_mode="semantic"', prompt)
+        self.assertIn("Do not use keyword mode or any code-graph tool", prompt)
+        self.assertNotIn("Classify the question", prompt)
+        self.assertNotIn("trace_call_path", prompt)
+        self.assertNotIn("query_security_surfaces", prompt)
 
     def test_explain_symbol_counts_as_graph_relationship_work(self):
         tool_calls = [
