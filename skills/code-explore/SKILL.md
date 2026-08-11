@@ -137,7 +137,21 @@ even when the trace already shows one endpoint.
 | Graph found a node | Read tool with file:line for exact implementation |
 | "How does X work?" partially answered | code-search: `find_similar_code` with chunk_id |
 
-### Step 4: Present combined answer
+### Step 4: Evidence Closure Gate
+
+Before treating a relationship as verified, decompose the candidate into
+atomic relationships and make a source-evidence ledger for every named
+endpoint. Read or retrieve the definition of each caller and callee, or each
+source and target. An import or call site does not substitute for the other
+endpoint's definition. If any endpoint is missing, retrieve it before
+answering; if it cannot be resolved, do not present the relationship as
+supported and state that it remains unresolved.
+
+When pinning coordinates, do not copy a synthetic terminal line from `Read`.
+`Read` can display one extra numbered empty line after a file-ending newline;
+the evidence range must stop at the final physical source line.
+
+### Step 5: Present combined answer
 
 1. Direct answer to the question
 2. Primary result (file, function, line numbers)

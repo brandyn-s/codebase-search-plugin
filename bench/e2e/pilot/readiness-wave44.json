@@ -1,0 +1,53 @@
+{
+  "bom_readiness_status": "ready",
+  "checkout_unchanged": true,
+  "components": {
+    "code-graph": {
+      "index_identity": {
+        "captured_at": "2026-08-11T00:30:55Z",
+        "checkout_id": "1e8443d6dea9c3d3e409a7fa1a4c63a10395bb369cc97653fa94d805e2319c41",
+        "dirty_fingerprint": "clean",
+        "index_generation": "d003e6b3c10404376b8994f8f7e7ee19272c0217b89b046f071ffe0c8f866ee6",
+        "repository_id": "1e8443d6dea9c3d3e409a7fa1a4c63a10395bb369cc97653fa94d805e2319c41",
+        "schema_version": 1,
+        "source_revision": "130f98ce38b708413227416049b2eaaa492034ad"
+      },
+      "install_descriptor_sha256": "6dcc9483f35523e31281578a953ecbc36c8542f00f4caa913fdcf160fa0f5cf4",
+      "status": "ready",
+      "version": "v0.8.0-redacted.2"
+    },
+    "code-search": {
+      "completion": {
+        "chunks_added": 12,
+        "error": null,
+        "files_added": 12,
+        "index_identity_status": "ready",
+        "index_ready": true,
+        "pipeline_version": "416d1031791551d4",
+        "success": true
+      },
+      "evidence_coordinate": {
+        "end_line": 3,
+        "index_generation": "d003e6b3c10404376b8994f8f7e7ee19272c0217b89b046f071ffe0c8f866ee6",
+        "relative_path": "src/config.py",
+        "start_line": 1,
+        "status": "verified"
+      },
+      "index_identity": {
+        "captured_at": "2026-08-11T00:30:54.771236Z",
+        "checkout_id": "1e8443d6dea9c3d3e409a7fa1a4c63a10395bb369cc97653fa94d805e2319c41",
+        "dirty_fingerprint": "clean",
+        "index_generation": "d003e6b3c10404376b8994f8f7e7ee19272c0217b89b046f071ffe0c8f866ee6",
+        "repository_id": "1e8443d6dea9c3d3e409a7fa1a4c63a10395bb369cc97653fa94d805e2319c41",
+        "schema_version": 1,
+        "source_revision": "130f98ce38b708413227416049b2eaaa492034ad"
+      },
+      "index_ready": true,
+      "install_descriptor_sha256": "cc991de9f920a8e20d6c7279db8f91e8bdafd7de0d691205d7ed0b8e10cd176a",
+      "version": "v0.3.1"
+    }
+  },
+  "evidence_mode": "ready-validation",
+  "producer": "scripts/generate_live_readiness_evidence.py:v2",
+  "schema_version": 1
+}

@@ -1,9 +1,11 @@
 import subprocess
 import sys
+from copy import deepcopy
 from pathlib import Path
 import hashlib
 import json
 import os
+import shutil
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -42,6 +44,302 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "arms differ"):
             _validate_preregistered_controls(arguments, preregistration)
+
+    def test_preregistration_rejects_cases_content_drift(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            cases = Path(temporary) / "cases.jsonl"
+            cases.write_text('{"case_id":"fresh-case"}\n', encoding="utf-8")
+            preregistration = {
+                "controls": {
+                    "arms": ["composed"],
+                    "case_ids": ["fresh-case"],
+                    "repetitions": 2,
+                    "model": "sonnet",
+                    "max_budget_usd_per_case": 1.0,
+                },
+                "bindings": {
+                    "cases_sha256": hashlib.sha256(
+                        cases.read_bytes()
+                    ).hexdigest(),
+                },
+            }
+            arguments = SimpleNamespace(
+                arms="composed",
+                case_ids="fresh-case",
+                repetitions=2,
+                model="sonnet",
+                max_budget_usd=1.0,
+                cases=cases,
+            )
+            cases.write_text(
+                '{"case_id":"changed-after-registration"}\n',
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "cases SHA-256 differs"):
+                _validate_preregistered_controls(arguments, preregistration)
+
+    def test_preregistration_rejects_target_fixture_content_drift(self):
+        cases = ROOT / "bench" / "e2e" / "pilot" / "cases-v2.jsonl"
+        source_manifest = ROOT / "bench" / "e2e" / "target-repo-manifest.json"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "target-repo"
+            target_manifest = root / "target-repo-manifest.json"
+            shutil.copytree(ROOT / "bench" / "e2e" / "target-repo", target)
+            shutil.copy2(source_manifest, target_manifest)
+            preregistration = {
+                "controls": {
+                    "arms": ["composed"],
+                    "case_ids": ["semantic-auth"],
+                    "repetitions": 2,
+                    "model": "sonnet",
+                    "max_budget_usd_per_case": 1.0,
+                },
+                "bindings": {
+                    "cases_sha256": hashlib.sha256(
+                        cases.read_bytes()
+                    ).hexdigest(),
+                    "target_manifest_sha256": hashlib.sha256(
+                        target_manifest.read_bytes()
+                    ).hexdigest(),
+                },
+            }
+            arguments = SimpleNamespace(
+                arms="composed",
+                case_ids="semantic-auth",
+                repetitions=2,
+                model="sonnet",
+                max_budget_usd=1.0,
+                cases=cases,
+                target=target,
+                target_manifest=target_manifest,
+            )
+            (target / "src" / "config.py").write_text(
+                'CODE_SEARCH_STORAGE = "changed"\n',
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "target fixture differs"):
+                _validate_preregistered_controls(arguments, preregistration)
+
+    def test_v5_preregistration_binds_execution_identity_bundle(self):
+        cases = ROOT / "bench" / "e2e" / "pilot" / "cases-v2.jsonl"
+        target_manifest = ROOT / "bench" / "e2e" / "target-repo-manifest.json"
+        component_bom = ROOT / "component-bom.json"
+        bom = json.loads(component_bom.read_text(encoding="utf-8"))
+
+        def install_descriptor_sha256(component: str) -> str:
+            encoded = json.dumps(
+                bom["components"][component]["install"],
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+            return hashlib.sha256(encoded).hexdigest()
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "target-repo"
+            readiness_evidence = root / "readiness-evidence.json"
+            shutil.copytree(ROOT / "bench" / "e2e" / "target-repo", target)
+            subprocess.run(
+                ["git", "init", "-q", str(target)], check=True
+            )
+            subprocess.run(
+                ["git", "-C", str(target), "add", "."], check=True
+            )
+            commit_environment = {
+                **os.environ,
+                "GIT_AUTHOR_NAME": "Wave 4 fixture",
+                "GIT_AUTHOR_EMAIL": "wave4@example.invalid",
+                "GIT_COMMITTER_NAME": "Wave 4 fixture",
+                "GIT_COMMITTER_EMAIL": "wave4@example.invalid",
+            }
+            subprocess.run(
+                ["git", "-C", str(target), "commit", "-qm", "fixture"],
+                check=True,
+                env=commit_environment,
+            )
+            source_revision = subprocess.run(
+                ["git", "-C", str(target), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            repository_id = hashlib.sha256(
+                str(target.resolve()).encode("utf-8")
+            ).hexdigest()
+            index_generation = hashlib.sha256(
+                (
+                    repository_id
+                    + "\0"
+                    + source_revision
+                    + "\0clean"
+                ).encode("utf-8")
+            ).hexdigest()
+            identity = {
+                "schema_version": 1,
+                "repository_id": repository_id,
+                "checkout_id": repository_id,
+                "source_revision": source_revision,
+                "dirty_fingerprint": "clean",
+                "index_generation": index_generation,
+                "captured_at": "2026-08-10T23:59:00Z",
+            }
+            readiness = {
+                "schema_version": 1,
+                "producer": "scripts/generate_live_readiness_evidence.py:v2",
+                "evidence_mode": "ready-validation",
+                "bom_readiness_status": "ready",
+                "checkout_unchanged": True,
+                "components": {
+                    "code-search": {
+                        "version": bom["components"]["code-search"]["install"][
+                            "tag"
+                        ],
+                        "install_descriptor_sha256": install_descriptor_sha256(
+                            "code-search"
+                        ),
+                        "completion": {"success": True, "error": None},
+                        "index_ready": True,
+                        "evidence_coordinate": {
+                            "status": "verified",
+                            "relative_path": "src/config.py",
+                            "start_line": 1,
+                            "end_line": 3,
+                            "index_generation": index_generation,
+                        },
+                        "index_identity": deepcopy(identity),
+                    },
+                    "code-graph": {
+                        "version": bom["components"]["code-graph"]["install"][
+                            "tag"
+                        ],
+                        "install_descriptor_sha256": install_descriptor_sha256(
+                            "code-graph"
+                        ),
+                        "status": "ready",
+                        "index_identity": deepcopy(identity),
+                    },
+                },
+            }
+            readiness_evidence.write_text(
+                json.dumps(readiness, indent=2) + "\n", encoding="utf-8"
+            )
+            preregistration = {
+                "controls": {
+                    "arms": ["composed"],
+                    "case_ids": ["semantic-auth"],
+                    "repetitions": 2,
+                    "model": "sonnet",
+                    "max_budget_usd_per_case": 1.0,
+                    "max_turns": 8,
+                    "timeout_seconds": 180.0,
+                },
+                "bindings": {
+                    "schema_version": 1,
+                    "cases_sha256": hashlib.sha256(
+                        cases.read_bytes()
+                    ).hexdigest(),
+                    "target_manifest_sha256": hashlib.sha256(
+                        target_manifest.read_bytes()
+                    ).hexdigest(),
+                    "pilot_runner_sha256": hashlib.sha256(
+                        RUNNER.read_bytes()
+                    ).hexdigest(),
+                    "component_bom_sha256": hashlib.sha256(
+                        component_bom.read_bytes()
+                    ).hexdigest(),
+                    "readiness_evidence_sha256": hashlib.sha256(
+                        readiness_evidence.read_bytes()
+                    ).hexdigest(),
+                },
+            }
+            arguments = SimpleNamespace(
+                arms="composed",
+                case_ids="semantic-auth",
+                repetitions=2,
+                model="sonnet",
+                max_budget_usd=1.0,
+                max_turns=8,
+                timeout_seconds=180.0,
+                cases=cases,
+                target=target,
+                target_manifest=target_manifest,
+                component_bom=component_bom,
+                readiness_evidence=readiness_evidence,
+            )
+
+            _validate_preregistered_controls(arguments, preregistration)
+
+            drift_cases = {
+                "max turns": ("control", "max_turns", 9, "max turns differs"),
+                "timeout": (
+                    "control",
+                    "timeout_seconds",
+                    181.0,
+                    "timeout differs",
+                ),
+                "runner": (
+                    "binding",
+                    "pilot_runner_sha256",
+                    "0" * 64,
+                    "pilot runner SHA-256 differs",
+                ),
+                "BOM": (
+                    "binding",
+                    "component_bom_sha256",
+                    "0" * 64,
+                    "component BOM SHA-256 differs",
+                ),
+                "readiness": (
+                    "binding",
+                    "readiness_evidence_sha256",
+                    "0" * 64,
+                    "readiness evidence SHA-256 differs",
+                ),
+            }
+            for label, (kind, field, value, error) in drift_cases.items():
+                with self.subTest(label=label):
+                    drifted_preregistration = deepcopy(preregistration)
+                    drifted_arguments = SimpleNamespace(**vars(arguments))
+                    if kind == "control":
+                        setattr(drifted_arguments, field, value)
+                    else:
+                        drifted_preregistration["bindings"][field] = value
+                    with self.assertRaisesRegex(ValueError, error):
+                        _validate_preregistered_controls(
+                            drifted_arguments, drifted_preregistration
+                        )
+
+            changed_revision = "f" * 40
+            changed_generation = hashlib.sha256(
+                (
+                    repository_id
+                    + "\0"
+                    + changed_revision
+                    + "\0clean"
+                ).encode("utf-8")
+            ).hexdigest()
+            for component in ("code-search", "code-graph"):
+                changed_identity = readiness["components"][component][
+                    "index_identity"
+                ]
+                changed_identity["source_revision"] = changed_revision
+                changed_identity["index_generation"] = changed_generation
+            readiness["components"]["code-search"]["evidence_coordinate"][
+                "index_generation"
+            ] = changed_generation
+            readiness_evidence.write_text(
+                json.dumps(readiness, indent=2) + "\n", encoding="utf-8"
+            )
+            preregistration["bindings"]["readiness_evidence_sha256"] = (
+                hashlib.sha256(readiness_evidence.read_bytes()).hexdigest()
+            )
+            with self.assertRaisesRegex(ValueError, "source revision differs"):
+                _validate_preregistered_controls(arguments, preregistration)
 
     def test_outcome_gates_do_not_block_on_generic_route_accuracy(self):
         summary = {
@@ -178,6 +476,96 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
             preregistration["outcome_gates"]["min_adjudication_accuracy"],
             1.0,
         )
+
+    def test_v5_preregistration_binds_fresh_holdout_corpus(self):
+        pilot_root = ROOT / "bench" / "e2e" / "pilot"
+        cases_path = pilot_root / "cases-v3.jsonl"
+        preregistration_path = pilot_root / "preregistration-v5.json"
+        readiness_path = pilot_root / "readiness-wave44.json"
+        target = ROOT / "bench" / "e2e" / "target-repo-v2"
+        target_manifest_path = ROOT / "bench" / "e2e" / "target-repo-v2-manifest.json"
+        cases = [
+            json.loads(line)
+            for line in cases_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        preregistration = json.loads(
+            preregistration_path.read_text(encoding="utf-8")
+        )
+        target_manifest = json.loads(
+            target_manifest_path.read_text(encoding="utf-8")
+        )
+        old_case_ids = {
+            json.loads(line)["case_id"]
+            for line in (pilot_root / "cases-v2.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.strip()
+        }
+        case_ids = [case["case_id"] for case in cases]
+
+        self.assertEqual(len(cases), 5)
+        self.assertEqual(len(set(case_ids)), 5)
+        self.assertTrue(set(case_ids).isdisjoint(old_case_ids))
+        self.assertEqual(
+            preregistration["decision"],
+            "wave4_4_fresh_holdout_confirmation",
+        )
+        self.assertEqual(preregistration["controls"]["case_ids"], case_ids)
+        self.assertEqual(preregistration["controls"]["arms"], ["composed"])
+        self.assertEqual(preregistration["controls"]["repetitions"], 2)
+        self.assertEqual(preregistration["controls"]["max_turns"], 8)
+        self.assertEqual(preregistration["controls"]["timeout_seconds"], 180.0)
+        self.assertEqual(preregistration["bindings"]["schema_version"], 1)
+        expected_bindings = {
+            "cases_sha256": cases_path,
+            "target_manifest_sha256": target_manifest_path,
+            "readiness_evidence_sha256": readiness_path,
+        }
+        for field, path in expected_bindings.items():
+            self.assertEqual(
+                preregistration["bindings"][field],
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+            )
+        self.assertEqual(
+            preregistration["bindings"]["pilot_runner_sha256"],
+            "e2d60431cb5823d7f851ac2c9f1f2a1fed4c0cd9db0c7670d5c551b4b3b65cea",
+        )
+        self.assertEqual(
+            preregistration["bindings"]["component_bom_sha256"],
+            "a65bee017668a9816c8b19193948d77c98d2c8450730c1e236742296b60290a5",
+        )
+        self.assertEqual(target_manifest["source_root"], "target-repo-v2")
+        actual_files = {
+            path.relative_to(target).as_posix(): hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+            for path in target.rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(target_manifest["files"], actual_files)
+        canonical_tree = "\n".join(
+            f"{relative}\0{actual_files[relative]}"
+            for relative in sorted(actual_files)
+        ).encode("utf-8")
+        self.assertEqual(
+            target_manifest["revision"],
+            hashlib.sha256(canonical_tree).hexdigest(),
+        )
+        for case in cases:
+            for evidence_id in case["expected_evidence"]:
+                relative, line_range = evidence_id.rsplit(":", 1)
+                start, end = line_range.split("-", 1)
+                line_count = len(
+                    (target / relative).read_text(encoding="utf-8").splitlines()
+                )
+                self.assertGreaterEqual(int(start), 1)
+                self.assertLessEqual(int(end), line_count)
+        self.assertEqual(
+            preregistration["source_evidence"]["wave4_3_run_id"],
+            "wave43-20260810T220737Z",
+        )
+        self.assertIn("run exactly once", preregistration["falsifier"])
 
     def test_help_exposes_bounded_operator_authorized_surface(self):
         completed = subprocess.run(
@@ -367,6 +755,9 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         self.assertIn("Do not call trace_call_path in any other direction", prompt)
         self.assertIn("use Read to corroborate", prompt)
         self.assertIn("every named relationship endpoint", prompt)
+        self.assertIn("Before setting disposition to supported", prompt)
+        self.assertIn("An import or call site does not substitute", prompt)
+        self.assertIn("synthetic terminal line", prompt)
         self.assertIn("byte-for-byte, including terminal punctuation", prompt)
         self.assertIn("as candidate_assertion", prompt)
         self.assertIn("as asserted_claim", prompt)
@@ -412,6 +803,112 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
 
 class TranscriptProjectionTests(unittest.TestCase):
+    def test_normalizes_only_a_synthetic_terminal_read_line(self):
+        case = {
+            "case_id": "terminal-newline",
+            "expected_route": "semantic",
+            "expected_disposition": "not_supported",
+            "expected_evidence": [
+                "src/api/webhooks.py:1-7",
+                "src/security/signatures.py:1-2",
+            ],
+            "expected_claims": [
+                {
+                    "claim_id": "terminal-newline:signature-skip",
+                    "text": "Webhooks are accepted without signature verification.",
+                    "required_evidence_ids": [
+                        "src/api/webhooks.py:1-7",
+                        "src/security/signatures.py:1-2",
+                    ],
+                }
+            ],
+            "expected_index_error": "none",
+        }
+        transcript = [
+            {"type": "system", "subtype": "init", "model": "claude-sonnet-5"},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "mcp__code-search__search_code",
+                            "input": {"query": "webhook signature verification"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "result",
+                "is_error": False,
+                "duration_ms": 100,
+                "total_cost_usd": 0.01,
+                "structured_output": {
+                    "candidate_assertion": "Webhooks are accepted without signature verification.",
+                    "disposition": "not_supported",
+                    "asserted_claim": None,
+                    "evidence_ids": [
+                        "src/api/webhooks.py:1-8",
+                        "src/security/signatures.py:1-2",
+                    ],
+                    "answer": "The signature check gates acceptance.",
+                    "canary_violation": False,
+                },
+            },
+        ]
+        boundaries = {
+            "src/api/webhooks.py": {
+                "line_count": 7,
+                "terminal_newline": True,
+            },
+            "src/security/signatures.py": {
+                "line_count": 2,
+                "terminal_newline": True,
+            },
+        }
+
+        record = project_transcript(
+            transcript,
+            case=case,
+            arm="composed",
+            run_id="pilot-terminal-newline",
+            source_boundaries=boundaries,
+        )
+
+        self.assertTrue(record["adjudication_correct"])
+        self.assertEqual(record["evidence_false_positives"], 0)
+        self.assertEqual(record["evidence_false_negatives"], 0)
+        self.assertEqual(record["evidence"][0], "src/api/webhooks.py:1-7")
+        self.assertEqual(
+            record["raw_evidence"],
+            ["src/api/webhooks.py:1-8", "src/security/signatures.py:1-2"],
+        )
+        self.assertEqual(
+            record["evidence_normalizations"],
+            [
+                {
+                    "normalized": "src/api/webhooks.py:1-7",
+                    "raw": "src/api/webhooks.py:1-8",
+                    "reason": "synthetic_terminal_read_line",
+                }
+            ],
+        )
+
+        transcript[-1]["structured_output"]["evidence_ids"][0] = (
+            "src/api/webhooks.py:1-9"
+        )
+        overrun = project_transcript(
+            transcript,
+            case=case,
+            arm="composed",
+            run_id="pilot-terminal-overrun",
+            source_boundaries=boundaries,
+        )
+        self.assertFalse(overrun["adjudication_correct"])
+        self.assertEqual(overrun["evidence_false_positives"], 1)
+        self.assertEqual(overrun["evidence_false_negatives"], 1)
+        self.assertEqual(overrun["evidence_normalizations"], [])
+
     def test_projects_schema_valid_stream_into_objective_case_record(self):
         case = {
             "case_id": "semantic-auth",

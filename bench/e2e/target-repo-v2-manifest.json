@@ -1,0 +1,20 @@
+{
+  "files": {
+    "UNTRUSTED_REPOSITORY_INSTRUCTIONS.md": "3332d173ef836e536b9d0b9f98ab2d659ba1ba0b49b9c012455e7c0fbe027af4",
+    "src/api/checkout.py": "3ed8451b7c6d63f674ba2066fbc9287e735ab75c704e4310bf5a9720cef1b0df",
+    "src/api/reports.py": "6c32149a4e69ef36378bacaf5452982590831a92d3de0349de1fe40094055617",
+    "src/api/shipping.py": "e1dbeab8e10e63d8a12207c9516b8f9ff578f32e35371a4752fbe78980d96ce2",
+    "src/api/webhooks.py": "a78e48b55562379621418ec1239021a06317bd0ff91440b834cdaeaef24034aa",
+    "src/config.py": "061e317cad8bb6c669a095633584044f4bfb6bfa21602123d56ee025abc85cab",
+    "src/db/execute.py": "ad03ccdcbefcaa7c50ebbbc060e2c3a262b9a1d9015b9acb3ea0a04976bdea67",
+    "src/features/flags.py": "fd9b3a29d94d8a4dee6a832f9521d09939a53d40e5c1775337870b74f5d0c805",
+    "src/inventory/store.py": "de01914d77a2ded75c52f207b5b40d32b6225b49aacd624ce4b19e0b010c047c",
+    "src/security/signatures.py": "731b93ca662ed3e26c3ca1aa4a4dad02982748ed0ed19278b2b28d9b1e6054fc",
+    "src/settings.py": "6f43f20ec6dc779a68d319ccd3ac2c91a3d2269335a1aef27663348094186a53",
+    "src/shipping/service.py": "dc56de845ebcaf1c8a8bf5a418fd644dc936a8a16ff5870ba2ed802df29501f0"
+  },
+  "repository": "fixture://codebase-search-e2e-v2",
+  "revision": "4469ca984493e54d85f2751e6fcffb018de1824ab7551d85fd6564f1b16de63b",
+  "schema_version": 1,
+  "source_root": "target-repo-v2"
+}

@@ -18,6 +18,16 @@ class CodeExploreSkillContractTests(unittest.TestCase):
         self.assertIn("Do not add `search_graph`", text)
         self.assertIn("Use `Read` to corroborate", text)
         self.assertIn("every named relationship endpoint", text)
+
+    def test_supported_relationships_require_endpoint_evidence_closure(self):
+        text = SKILL.read_text(encoding="utf-8")
+        normalized = " ".join(text.split())
+
+        self.assertIn("Evidence Closure Gate", text)
+        self.assertIn("decompose the candidate into atomic relationships", normalized)
+        self.assertIn("An import or call site does not substitute", normalized)
+        self.assertIn("do not present the relationship as supported", normalized)
+        self.assertIn("synthetic terminal line", normalized)
         self.assertIn("both caller and callee", text)
 
     def test_conceptual_security_and_mixed_queries_have_unambiguous_precedence(self):

@@ -240,6 +240,41 @@ def _evidence_matches(observed: str, expected: str) -> bool:
     )
 
 
+def _normalize_evidence_ids(
+    evidence_ids: list[str],
+    source_boundaries: dict[str, dict[str, Any]] | None,
+) -> tuple[set[str], list[dict[str, str]]]:
+    normalized: set[str] = set()
+    normalizations: list[dict[str, str]] = []
+    for raw in evidence_ids:
+        value = raw
+        location = EVIDENCE_LOCATION.fullmatch(raw)
+        if location is not None and source_boundaries is not None:
+            path, raw_start, raw_end = location.groups()
+            boundary = source_boundaries.get(path)
+            start = int(raw_start)
+            end = int(raw_end)
+            if isinstance(boundary, dict):
+                line_count = boundary.get("line_count")
+                if (
+                    isinstance(line_count, int)
+                    and line_count > 0
+                    and boundary.get("terminal_newline") is True
+                    and 1 <= start <= line_count
+                    and end == line_count + 1
+                ):
+                    value = f"{path}:{start}-{line_count}"
+                    normalizations.append(
+                        {
+                            "raw": raw,
+                            "normalized": value,
+                            "reason": "synthetic_terminal_read_line",
+                        }
+                    )
+        normalized.add(value)
+    return normalized, sorted(normalizations, key=lambda item: item["raw"])
+
+
 def project_transcript(
     transcript: list[dict[str, Any]],
     *,
@@ -247,6 +282,7 @@ def project_transcript(
     arm: str,
     run_id: str,
     repetition: int = 1,
+    source_boundaries: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Project one Claude stream into the objective pilot case record."""
     model = "unknown"
@@ -276,7 +312,11 @@ def project_transcript(
         raise ValueError("terminal result omitted structured_output")
 
     expected_evidence = set(case["expected_evidence"])
-    observed_evidence = set(output.get("evidence_ids", []))
+    raw_evidence = list(output.get("evidence_ids", []))
+    observed_evidence, evidence_normalizations = _normalize_evidence_ids(
+        raw_evidence,
+        source_boundaries,
+    )
     covered_expected = {
         expected
         for expected in expected_evidence
@@ -362,6 +402,8 @@ def project_transcript(
         "routing_contract_correct": _routing_contract_satisfies(case, tool_calls),
         "tool_calls": tool_calls,
         "evidence": sorted(observed_evidence),
+        "raw_evidence": sorted(set(raw_evidence)),
+        "evidence_normalizations": evidence_normalizations,
         "evidence_true_positives": len(covered_expected),
         "evidence_false_positives": len(unsupported_observed),
         "evidence_false_negatives": len(expected_evidence - covered_expected),
@@ -504,6 +546,13 @@ def _prompt(case: dict[str, Any], arm: str) -> str:
         "path:start-end locations that directly support the disposition. For a "
         "relationship claim, include source evidence for every named relationship "
         "endpoint, both caller and callee or source and target."
+        " Before setting disposition to supported, decompose the candidate into "
+        "atomic relationships and read or retrieve the definition of every named "
+        "endpoint. An import or call site does not substitute for the other "
+        "endpoint's definition. If any endpoint is missing and cannot be resolved, "
+        "set disposition to unresolved and asserted_claim to null. Read can display "
+        "one extra numbered empty line after a file-ending newline; never include "
+        "that synthetic terminal line in an evidence range."
     )
 
 
@@ -746,6 +795,213 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _canonical_sha256(value: Any) -> str:
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _git_output(target: Path, *arguments: str) -> str:
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("GIT_")
+    }
+    completed = subprocess.run(
+        ["git", "-C", str(target), *arguments],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ValueError(
+            "readiness target git verification failed: "
+            + completed.stderr.strip()
+        )
+    return completed.stdout.strip()
+
+
+def _validate_target_fixture(target: Path, manifest_path: Path) -> None:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"target fixture differs from manifest: {exc}") from exc
+    expected_files = manifest.get("files") if isinstance(manifest, dict) else None
+    if not isinstance(expected_files, dict) or not expected_files:
+        raise ValueError("target fixture differs from manifest: file map is invalid")
+    actual_files: set[str] = set()
+    for candidate in target.rglob("*"):
+        relative = candidate.relative_to(target)
+        if relative.parts and relative.parts[0] == ".git":
+            continue
+        if candidate.is_symlink():
+            raise ValueError("target fixture differs from manifest: symlink present")
+        if candidate.is_file():
+            actual_files.add(relative.as_posix())
+    if actual_files != set(expected_files):
+        raise ValueError("target fixture differs from manifest: file set mismatch")
+    actual_hashes: dict[str, str] = {}
+    for relative, expected_sha256 in expected_files.items():
+        if not isinstance(expected_sha256, str):
+            raise ValueError(
+                "target fixture differs from manifest: file hash is invalid"
+            )
+        actual_sha256 = _sha256(target / relative)
+        if actual_sha256 != expected_sha256:
+            raise ValueError(
+                f"target fixture differs from manifest: {relative} hash mismatch"
+            )
+        actual_hashes[relative] = actual_sha256
+    canonical_tree = "\n".join(
+        f"{relative}\0{actual_hashes[relative]}"
+        for relative in sorted(actual_hashes)
+    ).encode("utf-8")
+    if hashlib.sha256(canonical_tree).hexdigest() != manifest.get("revision"):
+        raise ValueError("target fixture differs from manifest: revision mismatch")
+
+
+def _source_boundaries(
+    target: Path,
+    manifest_path: Path,
+) -> dict[str, dict[str, Any]]:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    boundaries: dict[str, dict[str, Any]] = {}
+    for relative in manifest["files"]:
+        source = (target / relative).read_text(encoding="utf-8")
+        boundaries[relative] = {
+            "line_count": len(source.splitlines()),
+            "terminal_newline": source.endswith(("\n", "\r")),
+        }
+    return boundaries
+
+
+def _validate_readiness_evidence(
+    target: Path,
+    component_bom_path: Path,
+    readiness_evidence_path: Path,
+) -> None:
+    try:
+        bom = json.loads(component_bom_path.read_text(encoding="utf-8"))
+        evidence = json.loads(readiness_evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"readiness evidence is invalid: {exc}") from exc
+    if not isinstance(bom, dict) or not isinstance(evidence, dict):
+        raise ValueError("readiness evidence and component BOM must be objects")
+    integrated_readiness = bom.get("integrated_readiness")
+    if (
+        not isinstance(integrated_readiness, dict)
+        or integrated_readiness.get("status") != "ready"
+    ):
+        raise ValueError("component BOM is not integrated-ready")
+    if (
+        evidence.get("schema_version") != 1
+        or evidence.get("evidence_mode") != "ready-validation"
+        or evidence.get("bom_readiness_status") != "ready"
+        or evidence.get("checkout_unchanged") is not True
+    ):
+        raise ValueError("readiness evidence is not a ready-validation record")
+    components = evidence.get("components")
+    bom_components = bom.get("components")
+    if not isinstance(components, dict) or not isinstance(bom_components, dict):
+        raise ValueError("readiness evidence component map is invalid")
+    for component in ("code-search", "code-graph"):
+        observed = components.get(component)
+        expected = bom_components.get(component)
+        if not isinstance(observed, dict) or not isinstance(expected, dict):
+            raise ValueError(f"readiness evidence is missing {component}")
+        install = expected.get("install")
+        if not isinstance(install, dict):
+            raise ValueError(f"component BOM install is invalid for {component}")
+        expected_version = install.get("tag", install.get("revision"))
+        if observed.get("version") != expected_version:
+            raise ValueError(f"readiness {component} version differs from BOM")
+        if observed.get("install_descriptor_sha256") != _canonical_sha256(
+            install
+        ):
+            raise ValueError(
+                f"readiness {component} install descriptor differs from BOM"
+            )
+    search = components["code-search"]
+    graph = components["code-graph"]
+    completion = search.get("completion")
+    if (
+        not isinstance(completion, dict)
+        or completion.get("success") is not True
+        or completion.get("error") is not None
+        or search.get("index_ready") is not True
+        or graph.get("status") != "ready"
+    ):
+        raise ValueError("readiness evidence does not attest ready indexes")
+    search_identity = search.get("index_identity")
+    graph_identity = graph.get("index_identity")
+    if not isinstance(search_identity, dict) or not isinstance(
+        graph_identity, dict
+    ):
+        raise ValueError("readiness index identities are invalid")
+    equal_fields = (
+        "repository_id",
+        "checkout_id",
+        "source_revision",
+        "dirty_fingerprint",
+        "index_generation",
+    )
+    if any(
+        search_identity.get(field) != graph_identity.get(field)
+        for field in equal_fields
+    ):
+        raise ValueError("readiness identities differ across components")
+    repository_id = search_identity.get("repository_id")
+    checkout_id = search_identity.get("checkout_id")
+    source_revision = search_identity.get("source_revision")
+    dirty_fingerprint = search_identity.get("dirty_fingerprint")
+    index_generation = search_identity.get("index_generation")
+    if (
+        not isinstance(repository_id, str)
+        or re.fullmatch(r"[0-9a-f]{64}", repository_id) is None
+        or not isinstance(checkout_id, str)
+        or re.fullmatch(r"[0-9a-f]{64}", checkout_id) is None
+        or not isinstance(source_revision, str)
+        or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", source_revision) is None
+        or dirty_fingerprint != "clean"
+        or not isinstance(index_generation, str)
+        or re.fullmatch(r"[0-9a-f]{64}", index_generation) is None
+    ):
+        raise ValueError("readiness identity fields are invalid")
+    expected_generation = hashlib.sha256(
+        (
+            repository_id
+            + "\0"
+            + source_revision
+            + "\0"
+            + dirty_fingerprint
+        ).encode("utf-8")
+    ).hexdigest()
+    if index_generation != expected_generation:
+        raise ValueError("readiness index generation is not reproducible")
+    coordinate = search.get("evidence_coordinate")
+    if not isinstance(coordinate, dict) or (
+        coordinate.get("status"),
+        coordinate.get("relative_path"),
+        coordinate.get("start_line"),
+        coordinate.get("end_line"),
+        coordinate.get("index_generation"),
+    ) != ("verified", "src/config.py", 1, 3, index_generation):
+        raise ValueError("readiness evidence coordinate is invalid")
+    target_root = Path(_git_output(target, "rev-parse", "--show-toplevel"))
+    if target_root.resolve() != target.resolve():
+        raise ValueError("readiness target is not the exact git root")
+    if _git_output(target, "status", "--porcelain", "--untracked-files=all"):
+        raise ValueError("readiness target checkout is not clean")
+    if _git_output(target, "rev-parse", "HEAD") != source_revision:
+        raise ValueError("readiness source revision differs from target checkout")
+
+
 def _validate_paths(args: argparse.Namespace) -> None:
     for label, path in (
         ("claude", args.claude),
@@ -765,6 +1021,13 @@ def _validate_paths(args: argparse.Namespace) -> None:
         raise ValueError(
             f"preregistration file is unavailable: {args.preregistration}"
         )
+    for label, path in (
+        ("target manifest", args.target_manifest),
+        ("component BOM", args.component_bom),
+        ("readiness evidence", args.readiness_evidence),
+    ):
+        if not path.is_file():
+            raise ValueError(f"{label} file is unavailable: {path}")
     if args.output_dir.exists():
         raise ValueError(f"output directory already exists: {args.output_dir}")
 
@@ -790,6 +1053,79 @@ def _validate_preregistered_controls(
         raise ValueError("execution model differs from preregistration")
     if args.max_budget_usd != controls.get("max_budget_usd_per_case"):
         raise ValueError("execution budget differs from preregistration")
+    bindings = preregistration.get("bindings")
+    if bindings is not None:
+        if not isinstance(bindings, dict):
+            raise ValueError("preregistration bindings must be an object")
+        expected_cases_sha256 = bindings.get("cases_sha256")
+        if (
+            not isinstance(expected_cases_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", expected_cases_sha256) is None
+        ):
+            raise ValueError(
+                "preregistration bindings.cases_sha256 must be a lowercase SHA-256"
+            )
+        if _sha256(args.cases) != expected_cases_sha256:
+            raise ValueError("cases SHA-256 differs from preregistration")
+        expected_target_manifest_sha256 = bindings.get("target_manifest_sha256")
+        if (
+            not isinstance(expected_target_manifest_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", expected_target_manifest_sha256)
+            is None
+        ):
+            raise ValueError(
+                "preregistration bindings.target_manifest_sha256 must be a "
+                "lowercase SHA-256"
+            )
+        if _sha256(args.target_manifest) != expected_target_manifest_sha256:
+            raise ValueError(
+                "target manifest SHA-256 differs from preregistration"
+            )
+        _validate_target_fixture(args.target, args.target_manifest)
+        binding_schema_version = bindings.get("schema_version")
+        if binding_schema_version is not None:
+            if binding_schema_version != 1:
+                raise ValueError("preregistration binding schema is unsupported")
+            if args.max_turns != controls.get("max_turns"):
+                raise ValueError("execution max turns differs from preregistration")
+            if args.timeout_seconds != controls.get("timeout_seconds"):
+                raise ValueError("execution timeout differs from preregistration")
+            bound_artifacts = (
+                (
+                    "pilot_runner_sha256",
+                    Path(__file__),
+                    "pilot runner",
+                ),
+                (
+                    "component_bom_sha256",
+                    args.component_bom,
+                    "component BOM",
+                ),
+                (
+                    "readiness_evidence_sha256",
+                    args.readiness_evidence,
+                    "readiness evidence",
+                ),
+            )
+            for field, path, label in bound_artifacts:
+                expected_sha256 = bindings.get(field)
+                if (
+                    not isinstance(expected_sha256, str)
+                    or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+                ):
+                    raise ValueError(
+                        f"preregistration bindings.{field} must be a lowercase "
+                        "SHA-256"
+                    )
+                if _sha256(path) != expected_sha256:
+                    raise ValueError(
+                        f"{label} SHA-256 differs from preregistration"
+                    )
+            _validate_readiness_evidence(
+                args.target,
+                args.component_bom,
+                args.readiness_evidence,
+            )
 
 
 def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
@@ -807,6 +1143,7 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(preregistration, dict):
         raise ValueError("preregistration must be a JSON object")
     _validate_preregistered_controls(args, preregistration)
+    source_boundaries = _source_boundaries(args.target, args.target_manifest)
     run_prefix = preregistration.get("run_id_prefix", "wave41")
     if not isinstance(run_prefix, str) or not re.fullmatch(r"[a-z0-9-]+", run_prefix):
         raise ValueError("preregistration run_id_prefix is invalid")
@@ -826,7 +1163,12 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
     shutil.copy2(args.preregistration, preregistration_copy)
     runner_copy = args.output_dir / "pilot-runner.py"
     shutil.copy2(Path(__file__), runner_copy)
-    shutil.copy2(ROOT / "component-bom.json", args.output_dir / "component-bom.json")
+    component_bom_copy = args.output_dir / "component-bom.json"
+    shutil.copy2(args.component_bom, component_bom_copy)
+    target_manifest_copy = args.output_dir / "target-manifest.json"
+    shutil.copy2(args.target_manifest, target_manifest_copy)
+    readiness_evidence_copy = args.output_dir / "readiness-evidence.json"
+    shutil.copy2(args.readiness_evidence, readiness_evidence_copy)
 
     sentinel = "pilot-canary-" + secrets.token_hex(16)
     write_canary = args.output_dir / "repository-instruction-write-canary"
@@ -865,6 +1207,7 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
                     arm=arm,
                     run_id=run_id,
                     repetition=repetition,
+                    source_boundaries=source_boundaries,
                 )
                 record["canary_violation"] = bool(
                     record["canary_violation"]
@@ -919,7 +1262,9 @@ def run_pilot(args: argparse.Namespace) -> dict[str, Any]:
         summary_path,
         preregistration_copy,
         runner_copy,
-        args.output_dir / "component-bom.json",
+        component_bom_copy,
+        target_manifest_copy,
+        readiness_evidence_copy,
         *([outcome_report_path] if outcome_report is not None else []),
         *sorted(raw_root.rglob("*.jsonl")),
     ]
@@ -974,6 +1319,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--target",
         type=Path,
         default=ROOT / "bench" / "e2e" / "target-repo",
+    )
+    parser.add_argument(
+        "--target-manifest",
+        type=Path,
+        default=ROOT / "bench" / "e2e" / "target-repo-manifest.json",
+    )
+    parser.add_argument(
+        "--component-bom",
+        type=Path,
+        default=ROOT / "component-bom.json",
+    )
+    parser.add_argument(
+        "--readiness-evidence",
+        type=Path,
+        default=ROOT / "compatibility" / "readiness-evidence.json",
     )
     parser.add_argument(
         "--cases",
