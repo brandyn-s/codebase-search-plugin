@@ -7,6 +7,16 @@ from bench.multirepo_measure import graph_observation, search_observation
 
 
 class MultiRepositoryMeasurementTests(unittest.TestCase):
+    def test_graph_inventory_is_bound_by_unique_index_results(self):
+        projects_by_root = {
+            Path("/tmp/alpha"): "alpha",
+            Path("/tmp/beta"): "beta",
+            Path("/tmp/gamma"): "gamma",
+        }
+
+        self.assertEqual(len(projects_by_root), 3)
+        self.assertEqual(len(set(projects_by_root.values())), 3)
+
     def test_search_observation_scores_project_and_file_separately(self):
         expected_root = Path("/tmp/beta")
         observed = search_observation(

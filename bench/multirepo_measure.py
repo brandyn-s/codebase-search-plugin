@@ -361,10 +361,12 @@ def main() -> int:
             }
 
         search_projects = search.call_tool("list_projects", {})
-        graph_projects = graph.call_tool("list_projects", {})
         if search_projects.get("count") != len(cases):
             raise MultiRepoError("code-search project inventory count mismatch")
-        if not isinstance(graph_projects, list) or len(graph_projects) != len(cases):
+        if (
+            len(graph_projects_by_root) != len(cases)
+            or len(set(graph_projects_by_root.values())) != len(cases)
+        ):
             raise MultiRepoError("code-graph project inventory count mismatch")
 
         observations: list[dict] = []
@@ -439,6 +441,12 @@ def main() -> int:
             .replace("+00:00", "Z"),
             "case_count": len(cases),
             "language_model_calls": 0,
+            "provenance": {
+                "plugin_revision": git(ROOT, "rev-parse", "HEAD"),
+                "runner_sha256": sha256_file(Path(__file__).resolve()),
+                "cases_sha256": sha256_file(args.cases.resolve()),
+                "oracle_sha256": sha256_file(args.oracle.resolve()),
+            },
             "servers": {
                 "code-search_sha256": sha256_file(args.search_server),
                 "code-graph_sha256": sha256_file(args.graph_server),
