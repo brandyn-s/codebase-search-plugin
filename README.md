@@ -285,7 +285,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.6`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.6).
+[`v0.8.0-redacted.7`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.7).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -339,12 +339,13 @@ release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
 code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
 and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.24 pins code-search v0.3.5 and
-code-graph v0.8.0-redacted.6 and adds persistent
+a search- or graph-primary cascade. Plugin 0.4.25 pins code-search v0.3.5 and
+code-graph v0.8.0-redacted.7 and adds persistent
 per-project SCIP precision, an explicit reachability-versus-taint contract,
 isolated cross-project discovery, immutable graph-index comparison, automated
-Go and TypeScript SCIP preparation, and an independent Go SSA/RTA accuracy
-oracle. These changes receive deterministic regression, exact
+Go and TypeScript SCIP preparation, independent Go SSA/RTA and TypeScript
+compiler-tier CALLS oracles, and a lower-memory graph-localization path. These
+changes receive deterministic regression, exact
 installed-component readiness, and direct public/scale measurement rather than
 another model holdout. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
@@ -367,6 +368,13 @@ warm-query p50. Graph indexed it in 2,198.0 seconds with 9.43 GB peak RSS, a
 direct very-large-single-host evidence, not a distributed-fleet or
 class-leading-efficiency claim. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the complete scope.
+
+The latest graph release separately replays one fixed LLVM `code_localize`
+query over that preserved index. Median latency fell from 12.95 seconds to
+3.02 seconds (4.29x), and a fresh-process sample reduced peak RSS from 1.78 GB
+to 627 MB while preserving the ranked-output SHA-256 exactly. This improves the
+measured localization path; it does not retroactively change the historical
+full-indexing or broad warm-query measurements above.
 
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture

@@ -5,29 +5,29 @@
         "assets": {
           "darwin-amd64": {
             "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-            "sha256": "7a3b4fd97c2b5628a1f745065424e73a4eda718fd5c7febc5c9128422a764b25"
+            "sha256": "75a082b658824c29e000273682227829212506dc1259708d7243af15ae686f99"
           },
           "darwin-arm64": {
             "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-            "sha256": "77f91cb45cd179bd0f11bc9ed0c87b4334354a096e89a321303e1df0a70b6fc9"
+            "sha256": "87662fa9d480b33ea22ead89205405587882bd2bb6f3321212bcac949e36e3bc"
           },
           "linux-amd64": {
             "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-            "sha256": "be9731783b2aead9bb26eb7851d7c614f82176469a6881d7e5ded1e1573356ff"
+            "sha256": "2fd7ae7ac78eacd0a7b29d2d7cf4d34284bd5a0cfe7d0aa8523fd7642c080602"
           },
           "linux-arm64": {
             "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-            "sha256": "2091cf6e26373843eda84dedeee747eb528b75ceee0d3a4ca5595441a1cd14cd"
+            "sha256": "214a1a87e5e8c08fbb5d7414cf3b9fe63e70da7ed77230696f1f251b2fae8763"
           },
           "windows-amd64": {
             "name": "codebase-memory-mcp-windows-amd64.zip",
-            "sha256": "cb99adcd8e7e9b2b4f199ccd0f17b9ea6a4ebd4904597879cd219a19e1fe563b"
+            "sha256": "4fe42406d43b1a738f86563c4f69c1e58dae0bda72accb16731a408045f17394"
           }
         },
         "attestation": {
           "bundle": {
-            "path": "compatibility/attestations/code-graph-v0.8.0-redacted.6-provenance.jsonl",
-            "sha256": "7bde5e65123cc413dd17ef5ec917178d3be1ce75ee8e3201d52afdb43be4c455"
+            "path": "compatibility/attestations/code-graph-v0.8.0-redacted.7-provenance.jsonl",
+            "sha256": "c929eb62a257accf5e02b4cdfc462352a8227943f9b35d164ce1d567b03c66e3"
           },
           "deny_self_hosted_runners": true,
           "signer_workflow": "redacted-org/code-graph/.github/workflows/release.yml",
@@ -35,12 +35,12 @@
         },
         "checksums": {
           "name": "checksums.txt",
-          "sha256": "fb6eab7ea9cce568ff4b271954b8befef22331c0c449f00c3dbc97d04edefbb6"
+          "sha256": "14c5e79571ff91be899eed1e1c5aa8e1d11bf5aa50b4faddc2f77a35a5803847"
         },
         "kind": "github-release",
         "repository": "redacted-org/code-graph",
-        "source_revision": "3eae292836f45932be7faa237a1c2adc6721c69b",
-        "tag": "v0.8.0-redacted.6"
+        "source_revision": "d10625db5b63ea8df4bfac924a11693c949fa19f",
+        "tag": "v0.8.0-redacted.7"
       },
       "schema_snapshot": "compatibility/code-graph-tools.json",
       "tested_capabilities": {
