@@ -553,13 +553,25 @@ def sourcegraph_search(
         },
     )
     start = time.perf_counter_ns()
-    try:
-        with urllib.request.urlopen(
-            request, timeout=contract["sourcegraph"]["timeout_seconds"]
-        ) as response:
-            body = response.read().decode("utf-8", errors="strict")
-    except Exception as exc:
-        raise MeasurementError(f"Sourcegraph request failed: {exc}") from exc
+    max_attempts = contract["sourcegraph"].get("max_attempts", 1)
+    if not isinstance(max_attempts, int) or not 1 <= max_attempts <= 3:
+        raise MeasurementError("Sourcegraph max_attempts must be between 1 and 3")
+    failures: list[str] = []
+    body = ""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with urllib.request.urlopen(
+                request, timeout=contract["sourcegraph"]["timeout_seconds"]
+            ) as response:
+                body = response.read().decode("utf-8", errors="strict")
+            break
+        except Exception as exc:
+            failures.append(f"attempt {attempt}: {type(exc).__name__}: {exc}")
+            if attempt == max_attempts:
+                raise MeasurementError(
+                    "Sourcegraph request failed after bounded identical-query "
+                    f"retries: {'; '.join(failures)}"
+                ) from exc
     elapsed = time.perf_counter_ns() - start
     matches, progress, alerts = parse_sse(body)
     for item in matches:
@@ -574,6 +586,8 @@ def sourcegraph_search(
         "duration_ms_reported": progress.get("durationMs") if progress else None,
         "skipped": progress.get("skipped", []) if progress else [],
         "alerts": alerts,
+        "attempts": len(failures) + 1,
+        "retry_failures": failures,
     }
 
 
@@ -1326,7 +1340,10 @@ def run_measurement(args: argparse.Namespace) -> dict:
         },
         "incremental": incremental,
         "interpretation": {
-            "scope": "bounded balanced n=20 public file-localization comparison",
+            "scope": (
+                "bounded balanced n="
+                f"{len(cases)} public file-localization comparison"
+            ),
             "general_platform_superiority_claim_allowed": False,
             "narrow_acc_at_1_superiority_over_sourcegraph_allowed": narrow_superiority,
             "sourcegraph_failures": sourcegraph_failures,

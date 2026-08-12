@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import unittest
+from unittest import mock
 
 from bench.public_measure.run import (
     CATEGORIES,
@@ -15,6 +16,7 @@ from bench.public_measure.run import (
     route_aware_compose,
     rrf,
     score_ranking,
+    sourcegraph_search,
     validate_inputs,
     wilson_interval,
 )
@@ -26,6 +28,43 @@ EXTERNAL_PIN = Path(os.environ.get("CODE_INTEL_PUBLIC_SELECTION_PIN", ""))
 
 
 class PublicMeasurementTests(unittest.TestCase):
+    def test_sourcegraph_uses_only_bounded_identical_query_retries(self):
+        contract = {
+            "sourcegraph": {
+                "endpoint": "https://example.invalid/search",
+                "max_attempts": 3,
+                "query_version": "V3",
+                "requested_matches": 100,
+                "timeout_seconds": 1,
+            },
+            "top_k_files": 10,
+        }
+        case = {
+            "case_id": "owner__repo-1",
+            "repository": "owner/repo",
+            "revision": "a" * 40,
+        }
+        body = (
+            'event: matches\ndata: [{"path":"src/right.py","commit":"'
+            + "a" * 40
+            + '"}]\n\n'
+            'event: progress\ndata: {"done":true,"matchCount":1}\n\n'
+        ).encode()
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = body
+        with mock.patch(
+            "bench.public_measure.run.urllib.request.urlopen",
+            side_effect=[TimeoutError("transient"), response],
+        ) as opened:
+            files, _elapsed, metadata = sourcegraph_search(
+                contract, case, ["right_symbol"]
+            )
+
+        self.assertEqual(files, ["src/right.py"])
+        self.assertEqual(metadata["attempts"], 2)
+        self.assertEqual(len(metadata["retry_failures"]), 1)
+        self.assertEqual(opened.call_count, 2)
+
     def test_balanced_n20_summary_preserves_claim_and_scale_boundaries(self):
         summary = json.loads(
             (

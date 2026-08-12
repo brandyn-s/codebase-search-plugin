@@ -1,6 +1,4 @@
 {
-  "schema_version": 1,
-  "policy": "LocBench edit_functions must agree with a merged GitHub PR at the same base revision, changed path, and diff hunk function header",
   "cases": [
     {
       "case_id": "UXARRAY__uxarray-1117",
@@ -13,14 +11,21 @@
         "uxarray/grid/coordinates.py:_construct_face_centroids"
       ],
       "github_pr": {
-        "number": 1117,
-        "merged_at": "2025-02-05T17:04:58Z",
         "base_revision": "fe4cae1311db7fb21187b505e06018334a015c48",
+        "files_response_sha256": "bb538fc69071ac1271f044fb970b11918b8be8be45baaf666fc2362fb0d8e38a",
+        "function_header_terminals": [
+          "_build_n_nodes_per_face",
+          "_construct_face_centroids"
+        ],
         "head_revision": "5a2ef875f4ae4ebced7124728ad24a08a51cc140",
         "hunk_functions": [
           "uxarray/grid/connectivity.py:_build_n_nodes_per_face",
           "uxarray/grid/coordinates.py:_construct_face_centroids"
-        ]
+        ],
+        "merge_commit": "f5f5a1b4f8feb503554d537092a46ca38d389946",
+        "merged_at": "2025-02-05T17:04:58Z",
+        "number": 1117,
+        "summary_response_sha256": "6ad1d71efc110350f44f798892adedd7d2c775a63e8d6ea4e8bbfde7463ad1e0"
       }
     },
     {
@@ -37,9 +42,16 @@
         "backend/chainlit/socket.py:window_message"
       ],
       "github_pr": {
-        "number": 1575,
-        "merged_at": "2024-12-12T11:21:58Z",
         "base_revision": "8b2d4bacfd4fa2c8af72e2d140d527d20125b07b",
+        "files_response_sha256": "b78c81c50ecda577d6eeb8124a9718ca490dcabd2f788ca6f2a43fd34205857e",
+        "function_header_terminals": [
+          "connect",
+          "emit_call_fn",
+          "emit_fn",
+          "get_html_template",
+          "load_user_env",
+          "message"
+        ],
         "head_revision": "827201202fa3588d249f79ba59566d20e7265efd",
         "hunk_functions": [
           "backend/chainlit/server.py:get_html_template",
@@ -47,7 +59,11 @@
           "backend/chainlit/socket.py:connect",
           "backend/chainlit/socket.py:connection_successful",
           "backend/chainlit/socket.py:window_message"
-        ]
+        ],
+        "merge_commit": "d5316335d515806d486532e24b1c579299682284",
+        "merged_at": "2024-12-12T11:21:58Z",
+        "number": 1575,
+        "summary_response_sha256": "b43722f5713ae7083c9b0b612b861516b4993e3805cf0d789e8991d4e7a0347e"
       }
     },
     {
@@ -67,9 +83,17 @@
         "mslib/utils/airdata.py:get_airspaces"
       ],
       "github_pr": {
-        "number": 1967,
-        "merged_at": "2023-09-06T07:13:12Z",
         "base_revision": "56e9528b552a9d8f2e267661473b8f0e724fd093",
+        "files_response_sha256": "23338ed9d06198083c895ac83da0da228bb15bb838c2df091e03ad15049c30a8",
+        "function_header_terminals": [
+          "add_operation",
+          "change_category_handler",
+          "change_description_handler",
+          "get_airspaces",
+          "logout",
+          "rename_operation_handler",
+          "save_file"
+        ],
         "head_revision": "8cec3d8cf773ddddc6400a34be5d2f3c75fdd568",
         "hunk_functions": [
           "mslib/msui/mscolab.py:MSUIMscolab.add_operation",
@@ -79,7 +103,11 @@
           "mslib/msui/mscolab.py:MSUIMscolab.logout",
           "mslib/msui/socket_control.py:ConnectionManager.disconnect",
           "mslib/utils/airdata.py:get_airspaces"
-        ]
+        ],
+        "merge_commit": "38cb1f082c525378b60b807282f8be7a9bcc5b4c",
+        "merged_at": "2023-09-06T07:13:12Z",
+        "number": 1967,
+        "summary_response_sha256": "91afec2071effd77c5d5ed47c6de88500776f464e486a101e4fbba755cb5fd0c"
       }
     },
     {
@@ -96,9 +124,17 @@
         "sopel/builtins/url.py:get_tinyurl"
       ],
       "github_pr": {
-        "number": 2285,
-        "merged_at": "2024-10-13T17:40:04Z",
         "base_revision": "51300a1ab854d6ec82d90df1bc876188c03335ff",
+        "files_response_sha256": "c3e8dada431b4ee6373235f07da4521e9d9024a75f3e7b02586bb26fe027b0c2",
+        "function_header_terminals": [
+          "check_callbacks",
+          "configure",
+          "find_title",
+          "get_or_create_shorturl",
+          "process_urls",
+          "title_auto",
+          "title_command"
+        ],
         "head_revision": "acff99a78cc6bb6980539ef7df7eefd421dee554",
         "hunk_functions": [
           "sopel/builtins/url.py:configure",
@@ -107,7 +143,11 @@
           "sopel/builtins/url.py:process_urls",
           "sopel/builtins/url.py:find_title",
           "sopel/builtins/url.py:get_tinyurl"
-        ]
+        ],
+        "merge_commit": "065165a407ad39718fd5e0f3c1d5fac24bada20d",
+        "merged_at": "2024-10-13T17:40:04Z",
+        "number": 2285,
+        "summary_response_sha256": "828b12ab90f0c23b47e35a284351e4607bbfe65bfe04d42d4e0a8cb3c5a73bc2"
       }
     },
     {
@@ -120,14 +160,21 @@
         "mesonbuild/minstall.py:rebuild_all"
       ],
       "github_pr": {
-        "number": 11366,
-        "merged_at": "2023-02-21T12:20:22Z",
         "base_revision": "088727164de8496c4bada040c2f4690e42f66b69",
+        "files_response_sha256": "bf1ff16c87bd3fc21b5a042c14809dadab946121520533645c28435ef796591e",
+        "function_header_terminals": [
+          "do_install",
+          "rebuild_all"
+        ],
         "head_revision": "616bf1f79d855c6d5494f71806ce42961d8ce85e",
         "hunk_functions": [
           "mesonbuild/minstall.py:Installer.do_install",
           "mesonbuild/minstall.py:rebuild_all"
-        ]
+        ],
+        "merge_commit": "616bf1f79d855c6d5494f71806ce42961d8ce85e",
+        "merged_at": "2023-02-21T12:20:22Z",
+        "number": 11366,
+        "summary_response_sha256": "037a4739fe1b9cbd411ba4e1055896a4cb0599527653ad8c72782385f89c6850"
       }
     },
     {
@@ -139,13 +186,19 @@
         "src/pip/_internal/commands/install.py:InstallCommand.run"
       ],
       "github_pr": {
-        "number": 13085,
-        "merged_at": "2024-12-07T19:37:07Z",
         "base_revision": "fe0925b3c00bf8956a0d33408df692ac364217d4",
+        "files_response_sha256": "22a88f18d36b556bc3b2b76722c2a9952119fb2ad8a7a0684ce1ae5028c9a2ab",
+        "function_header_terminals": [
+          "run"
+        ],
         "head_revision": "0f7bc6aa7ed84bbe6a25b6f331239ea03b0001b3",
         "hunk_functions": [
           "src/pip/_internal/commands/install.py:InstallCommand.run"
-        ]
+        ],
+        "merge_commit": "634bf25b5869bcfc1d2a221bfad6ed322bdeee93",
+        "merged_at": "2024-12-07T19:37:07Z",
+        "number": 13085,
+        "summary_response_sha256": "35d67b3884c05e5030f19a15c7392676dfa3dae528ccc458197c1a3044e6f33d"
       }
     },
     {
@@ -158,14 +211,21 @@
         "benchmarks/benchmark_serving.py:main"
       ],
       "github_pr": {
-        "number": 9390,
-        "merged_at": "2024-10-18T18:15:28Z",
         "base_revision": "83450458339b07765b0e72a822e5fe93eeaf5258",
+        "files_response_sha256": "ed21d2929ec7860254676a3cc437364f792c7495730f4ecdfd60a1602f2f94a9",
+        "function_header_terminals": [
+          "benchmark",
+          "main"
+        ],
         "head_revision": "a37c18f37eb40dc8c3ec759147e277bc5cb17547",
         "hunk_functions": [
           "benchmarks/benchmark_serving.py:benchmark",
           "benchmarks/benchmark_serving.py:main"
-        ]
+        ],
+        "merge_commit": "7dbe738d653b563c646883c1ae6f6df927436d01",
+        "merged_at": "2024-10-18T18:15:28Z",
+        "number": 9390,
+        "summary_response_sha256": "65434fc4638b4ae91464529ef81b0ef4c821beb3dcfbf662118f71f921f418c0"
       }
     },
     {
@@ -179,15 +239,23 @@
         "sklearn/ensemble/_iforest.py:IsolationForest._compute_score_samples"
       ],
       "github_pr": {
-        "number": 25186,
-        "merged_at": "2023-01-24T15:03:14Z",
         "base_revision": "b2fe9746a862272a60ffc7d2c6563d28dd13a6c6",
+        "files_response_sha256": "2d058fd2765c17c742ed631f7e8c180327cfd1185a94481b00d1781694ca68bc",
+        "function_header_terminals": [
+          "_compute_score_samples",
+          "fit",
+          "score_samples"
+        ],
         "head_revision": "4c96d5963d8315d9feadc9cbdb36e75b646a29b2",
         "hunk_functions": [
           "sklearn/ensemble/_iforest.py:IsolationForest.fit",
           "sklearn/ensemble/_iforest.py:IsolationForest.score_samples",
           "sklearn/ensemble/_iforest.py:IsolationForest._compute_score_samples"
-        ]
+        ],
+        "merge_commit": "99562100e941f0972a5a65484ff80f407eeb5137",
+        "merged_at": "2023-01-24T15:03:14Z",
+        "number": 25186,
+        "summary_response_sha256": "73ff90bd3dc51871c0537f33002a1d03c7e7cb883e95c670a45f74761bd8bddf"
       }
     },
     {
@@ -201,15 +269,47 @@
         "okta_jwt_verifier/jwt_utils.py:JWTUtils.verify_signature"
       ],
       "github_pr": {
-        "number": 59,
-        "merged_at": "2024-08-01T18:51:47Z",
         "base_revision": "cb4e6780c55c234690299fa4ccef5ad33746c2c2",
+        "files_response_sha256": "9410034fbd7fdc951a92e267de5e36e5a725f58c965da1198f01ab65a452da62",
+        "function_header_terminals": [
+          "parse_token",
+          "verify_claims"
+        ],
         "head_revision": "712ced619164144c6e50f2235e2a3f55f4bdb44d",
         "hunk_functions": [
           "okta_jwt_verifier/jwt_utils.py:JWTUtils.parse_token",
           "okta_jwt_verifier/jwt_utils.py:JWTUtils.verify_claims",
           "okta_jwt_verifier/jwt_utils.py:JWTUtils.verify_signature"
-        ]
+        ],
+        "merge_commit": "20bf0ffee6396dc9ffa28714bbb3bdf955cd03a6",
+        "merged_at": "2024-08-01T18:51:47Z",
+        "number": 59,
+        "summary_response_sha256": "45e91f8e4336ada206188a30c9611d9edb4378f85412f578a59f510c621d2d30"
+      }
+    },
+    {
+      "case_id": "gitpython-developers__GitPython-1636",
+      "expected_files": [
+        "git/cmd.py"
+      ],
+      "expected_functions": [
+        "git/cmd.py:Git.execute"
+      ],
+      "github_pr": {
+        "base_revision": "e19abe75bbd7d766d7f06171c6524431e4653545",
+        "files_response_sha256": "181eb79797645a08f48f6a6800982bf5cd36bd8e78ebf3d22af8780603d59228",
+        "function_header_terminals": [
+          "execute",
+          "update_environment"
+        ],
+        "head_revision": "7611cd909b890b971d23bce3bd4244ad1c381f22",
+        "hunk_functions": [
+          "git/cmd.py:Git.execute"
+        ],
+        "merge_commit": "8b75434e2c8a082cdeb4971cc6f0ee2bafec45bc",
+        "merged_at": "2023-09-01T06:01:51Z",
+        "number": 1636,
+        "summary_response_sha256": "2e5dd4af0f9a4ca42eb122fb7559c3b3e5e6a33de88c74f91322615d65ec22ff"
       }
     },
     {
@@ -221,13 +321,19 @@
         "optimum_benchmark/trackers/latency.py:LatencyTracker.__init__"
       ],
       "github_pr": {
-        "number": 266,
-        "merged_at": "2024-09-20T09:48:22Z",
         "base_revision": "1992de306378f7d5848d36ddc73f15ba711c8d70",
+        "files_response_sha256": "0eade707a3f98b33aabc2d875f27c45d10ccd172ead384143a7d7028575a29be",
+        "function_header_terminals": [
+          "__init__"
+        ],
         "head_revision": "1ee08825d79245bc202844ed664d8837bd7a30f2",
         "hunk_functions": [
           "optimum_benchmark/trackers/latency.py:LatencyTracker.__init__"
-        ]
+        ],
+        "merge_commit": "99a90c9b7ca414e68efe537586f446369de53efc",
+        "merged_at": "2024-09-20T09:48:22Z",
+        "number": 266,
+        "summary_response_sha256": "b05d93b03a9a1c597b9b4e0f47c65dcedd095c1ccfe197a672db02727b00f9fe"
       }
     },
     {
@@ -248,9 +354,20 @@
         "jmclient/jmclient/wallet_service.py:WalletService.sync_addresses"
       ],
       "github_pr": {
-        "number": 1180,
-        "merged_at": "2022-03-25T12:53:41Z",
         "base_revision": "aabfd3f7c2ec33391b89369bd1fe354659f10f0f",
+        "files_response_sha256": "e38b95d8b1959c70d72fc512b15e8c29aa14cfeb1b98edaaa3baf2ecbdfc7f78",
+        "function_header_terminals": [
+          "__init__",
+          "_get_addr_from_desc",
+          "check_callback_called",
+          "check_for_reuse",
+          "get_all_transactions",
+          "import_addresses_if_needed",
+          "register_callbacks",
+          "sync_addresses",
+          "sync_wallet",
+          "transaction_monitor"
+        ],
         "head_revision": "8fe5b7b712ed9409d75907e34c1702a1e2d96213",
         "hunk_functions": [
           "jmclient/jmclient/blockchaininterface.py:BitcoinCoreInterface._yield_transactions",
@@ -262,7 +379,161 @@
           "jmclient/jmclient/wallet_service.py:WalletService.sync_wallet",
           "jmclient/jmclient/wallet_service.py:WalletService.get_all_transactions",
           "jmclient/jmclient/wallet_service.py:WalletService.sync_addresses"
-        ]
+        ],
+        "merge_commit": "15e9dc03bf1defa72f7fe4d995c971678bab2cae",
+        "merged_at": "2022-03-25T12:53:41Z",
+        "number": 1180,
+        "summary_response_sha256": "2a999d9341dbd3138d5b0fc141cb397f53c99ddfd5cbc595e9caf97e4cd9834b"
+      }
+    },
+    {
+      "case_id": "TagStudioDev__TagStudio-735",
+      "expected_files": [
+        "tagstudio/src/qt/modals/tag_search.py",
+        "tagstudio/src/qt/widgets/tag.py"
+      ],
+      "expected_functions": [
+        "tagstudio/src/qt/modals/tag_search.py:TagSearchPanel.__init__",
+        "tagstudio/src/qt/modals/tag_search.py:TagSearchPanel.construct_tag_button",
+        "tagstudio/src/qt/modals/tag_search.py:TagSearchPanel.update_tags",
+        "tagstudio/src/qt/widgets/tag.py:TagWidget.__init__"
+      ],
+      "github_pr": {
+        "base_revision": "921a8875de22f7c136316edfb5d3038236414b57",
+        "files_response_sha256": "924eb61027d32ee268fce076682affa05718d01b4edea4ace7e98f8a470f8e77",
+        "function_header_terminals": [
+          "__build_row_item_widget",
+          "__init__",
+          "leaveEvent",
+          "update_tags"
+        ],
+        "head_revision": "0b8f79e2849ad6fcb67bb8de68976c6bcbc1136f",
+        "hunk_functions": [
+          "tagstudio/src/qt/modals/tag_search.py:TagSearchPanel.__init__",
+          "tagstudio/src/qt/modals/tag_search.py:TagSearchPanel.construct_tag_button",
+          "tagstudio/src/qt/modals/tag_search.py:TagSearchPanel.update_tags",
+          "tagstudio/src/qt/widgets/tag.py:TagWidget.__init__"
+        ],
+        "merge_commit": "f2a2f9a36d76592b22ab6c1aec454843ccbbffd2",
+        "merged_at": "2025-01-26T09:50:36Z",
+        "number": 735,
+        "summary_response_sha256": "8f79443a63ed2c92d75e6c7c6502c014e6eb2a761daba2332746d2240d47968c"
+      }
+    },
+    {
+      "case_id": "micropython__micropython-lib-947",
+      "expected_files": [
+        "python-ecosys/requests/requests/__init__.py"
+      ],
+      "expected_functions": [
+        "python-ecosys/requests/requests/__init__.py:request"
+      ],
+      "github_pr": {
+        "base_revision": "e4cf09527bce7569f5db742cf6ae9db68d50c6a9",
+        "files_response_sha256": "e1cfec82df5e4ef30825c01e4ca3f5214d237035691b8dbdfb373b0de834ac94",
+        "function_header_terminals": [
+          "request"
+        ],
+        "head_revision": "65a14116d503dd544cbba92284517c99e5e9a448",
+        "hunk_functions": [
+          "python-ecosys/requests/requests/__init__.py:request"
+        ],
+        "merge_commit": "65a14116d503dd544cbba92284517c99e5e9a448",
+        "merged_at": "2025-01-28T00:47:34Z",
+        "number": 947,
+        "summary_response_sha256": "9929deba290aef1739bf17d1213680111aa1a3b167a597ba9dfb5e29096cf251"
+      }
+    },
+    {
+      "case_id": "fortra__impacket-1636",
+      "expected_files": [
+        "examples/ntlmrelayx.py",
+        "impacket/examples/ntlmrelayx/servers/socksserver.py"
+      ],
+      "expected_functions": [
+        "examples/ntlmrelayx.py:MiniShell.__init__",
+        "examples/ntlmrelayx.py:MiniShell.do_socks",
+        "impacket/examples/ntlmrelayx/servers/socksserver.py:webService",
+        "impacket/examples/ntlmrelayx/servers/socksserver.py:SOCKS.__init__"
+      ],
+      "github_pr": {
+        "base_revision": "33058eb2fde6976ea62e04bc7d6b629d64d44712",
+        "files_response_sha256": "60e87030c06486ee8ee16417da27bee66a74ccf344cc15614753192f44d4146c",
+        "function_header_terminals": [
+          "__init__",
+          "activeConnectionsWatcher",
+          "do_socks",
+          "handle",
+          "stop_servers"
+        ],
+        "head_revision": "b183343f46e9c868ae2595985e897b76865bb1c2",
+        "hunk_functions": [
+          "examples/ntlmrelayx.py:MiniShell.__init__",
+          "examples/ntlmrelayx.py:MiniShell.do_socks",
+          "impacket/examples/ntlmrelayx/servers/socksserver.py:webService",
+          "impacket/examples/ntlmrelayx/servers/socksserver.py:SOCKS.__init__"
+        ],
+        "merge_commit": "6c9a1aadbfc11e321858a640b596530535b11fd1",
+        "merged_at": "2024-01-11T20:46:39Z",
+        "number": 1636,
+        "summary_response_sha256": "ec22925541a7af642117f4baa6ab5c8b7a46a70800badfe3f246e5b0603b12dc"
+      }
+    },
+    {
+      "case_id": "AzureAD__microsoft-authentication-library-for-python-454",
+      "expected_files": [
+        "msal/authority.py"
+      ],
+      "expected_functions": [
+        "msal/authority.py:Authority.http_client",
+        "msal/authority.py:Authority.__init__",
+        "msal/authority.py:Authority.user_realm_discovery"
+      ],
+      "github_pr": {
+        "base_revision": "66a1c5a935e59c66281ccf73a3931681eeedee23",
+        "files_response_sha256": "240a5ad27d69bf93dc2bf7710994484614610d48f398227a221d936587b11975",
+        "function_header_terminals": [
+          "__init__",
+          "user_realm_discovery"
+        ],
+        "head_revision": "304e0692141c089c54a4e00a8c598fa2b855aa78",
+        "hunk_functions": [
+          "msal/authority.py:Authority.http_client",
+          "msal/authority.py:Authority.__init__",
+          "msal/authority.py:Authority.user_realm_discovery"
+        ],
+        "merge_commit": "636a58ccb4e000335ae251cc374bdc17baa68fc2",
+        "merged_at": "2022-01-24T20:47:22Z",
+        "number": 454,
+        "summary_response_sha256": "039ecbb172b2f7a10bd6724434ee5cd469604ab5b45553eb7c09d9ffd7918b64"
+      }
+    },
+    {
+      "case_id": "Chainlit__chainlit-1441",
+      "expected_files": [
+        "backend/chainlit/server.py"
+      ],
+      "expected_functions": [
+        "backend/chainlit/server.py:upload_file",
+        "backend/chainlit/server.py:get_file"
+      ],
+      "github_pr": {
+        "base_revision": "beb44ca74f18b352fa078baf7038c2dc6b729e0c",
+        "files_response_sha256": "29cf988beba9dfcab2a362cd8d702b998b04462cd23448f502684c05bc08459d",
+        "function_header_terminals": [
+          "delete_thread",
+          "get_file",
+          "upload_file"
+        ],
+        "head_revision": "70f09d4c44ec2f1677b2cb56e1c4c32661b866d1",
+        "hunk_functions": [
+          "backend/chainlit/server.py:upload_file",
+          "backend/chainlit/server.py:get_file"
+        ],
+        "merge_commit": "e65f191ccbbf86d618564c9f02b1653e99b00f81",
+        "merged_at": "2024-10-17T11:18:40Z",
+        "number": 1441,
+        "summary_response_sha256": "f6f46d924e41c56d8297b79f7427e152dae96eeb0f217ad63bd0dc6c05987e81"
       }
     },
     {
@@ -276,14 +547,57 @@
         "django/shortcuts.py:redirect"
       ],
       "github_pr": {
-        "number": 18616,
-        "merged_at": "2024-11-14T18:53:49Z",
         "base_revision": "b9aa3239ab1328c915684d89b87a49459cabd30b",
+        "files_response_sha256": "a51cc2f2ef4ad64b85ef5f6473182f1dfa79727c8949c68a007d362092dcd326",
+        "function_header_terminals": [
+          "__repr__",
+          "redirect",
+          "render",
+          "set_headers"
+        ],
         "head_revision": "784cabb87370f7633be3a8a7d1664669c9c67fb6",
         "hunk_functions": [
           "django/http/response.py:HttpResponseRedirectBase.__init__",
           "django/shortcuts.py:redirect"
-        ]
+        ],
+        "merge_commit": "91c879eda595c12477bbfa6f51115e88b75ddf88",
+        "merged_at": "2024-11-14T18:53:49Z",
+        "number": 18616,
+        "summary_response_sha256": "7efb9363ddb7b3fb7ae2078ea7ba77f96625884e564cb537a6fa0af0811e12b0"
+      }
+    },
+    {
+      "case_id": "Bears-R-Us__arkouda-1969",
+      "expected_files": [
+        "arkouda/dataframe.py",
+        "arkouda/io.py"
+      ],
+      "expected_functions": [
+        "arkouda/dataframe.py:DataFrame._prep_data",
+        "arkouda/io.py:_parse_errors",
+        "arkouda/io.py:to_parquet",
+        "arkouda/io.py:read"
+      ],
+      "github_pr": {
+        "base_revision": "6e3da833ae55173cfc7488faa1e1951c8506a255",
+        "files_response_sha256": "33a226f09c1212d8fd92aa7f33c03a7d88307f129d02aa0bb8db9efbad9d2aa5",
+        "function_header_terminals": [
+          "_parse_errors",
+          "_prep_data",
+          "read",
+          "to_parquet"
+        ],
+        "head_revision": "751a56c537c20a9d51a0eb62671d824caf398fbf",
+        "hunk_functions": [
+          "arkouda/dataframe.py:DataFrame._prep_data",
+          "arkouda/io.py:_parse_errors",
+          "arkouda/io.py:to_parquet",
+          "arkouda/io.py:read"
+        ],
+        "merge_commit": "f6565f6e2fb2cfd032e5ea0e4a7d27b7610d865e",
+        "merged_at": "2022-12-20T17:46:03Z",
+        "number": 1969,
+        "summary_response_sha256": "3c654f9731969e59598a2cb62ade3699ae74beceec5cbca887724b725c07b275"
       }
     },
     {
@@ -295,13 +609,19 @@
         "django/core/management/commands/runserver.py:Command.on_bind"
       ],
       "github_pr": {
-        "number": 18435,
-        "merged_at": "2024-08-09T08:34:11Z",
         "base_revision": "95827452571eb976c4f0d5e9ac46843948dd5fe6",
+        "files_response_sha256": "5be2e563da7229040e064653e1822cc789265e5fa0eafc4c3c3b7f8b47652e72",
+        "function_header_terminals": [
+          "on_bind"
+        ],
         "head_revision": "58971d76d52c3c56adee96c92664492c2b000376",
         "hunk_functions": [
           "django/core/management/commands/runserver.py:Command.on_bind"
-        ]
+        ],
+        "merge_commit": "69aa13ffb92f6a7c62661c616a8c7b0f515ea43d",
+        "merged_at": "2024-08-09T08:34:11Z",
+        "number": 18435,
+        "summary_response_sha256": "b55b31f6222d607317a84706265e01bfed99abb133eabf23e41590db62b105fe"
       }
     },
     {
@@ -315,15 +635,46 @@
         "src/sqlfluff/core/config/loader.py:load_config_up_to_path"
       ],
       "github_pr": {
-        "number": 6399,
-        "merged_at": "2024-11-21T15:12:08Z",
         "base_revision": "80f4fc2d3bbc7839e41a9018ae4918118c309656",
+        "files_response_sha256": "f6534023ecb98fdd2e1700ecee19081763491062cb3ecb979705cd04a201d803",
+        "function_header_terminals": [
+          "load_config_at_path",
+          "load_config_up_to_path"
+        ],
         "head_revision": "893567425c9404e57fc2d2dfd1f21a80e6910da9",
         "hunk_functions": [
           "src/sqlfluff/core/config/loader.py:_get_user_config_dir_path",
           "src/sqlfluff/core/config/loader.py:_load_user_appdir_config",
           "src/sqlfluff/core/config/loader.py:load_config_up_to_path"
-        ]
+        ],
+        "merge_commit": "4dc390f077ccef497c31e9421d73cd287891aa92",
+        "merged_at": "2024-11-21T15:12:08Z",
+        "number": 6399,
+        "summary_response_sha256": "694a490a495c2bb663d19869791cbce02bf2777b30c7afb69138640c8f5dfcc6"
+      }
+    },
+    {
+      "case_id": "mathesar-foundation__mathesar-3117",
+      "expected_files": [
+        "db/install.py"
+      ],
+      "expected_functions": [
+        "db/install.py:_create_database"
+      ],
+      "github_pr": {
+        "base_revision": "e7b175bc2f7db0ae6e69c723c6a054c6dc2152d8",
+        "files_response_sha256": "0890ed128e3add28024963bd18a9165417f9b126375e8759b773a1ad7e8c6351",
+        "function_header_terminals": [
+          "_create_database"
+        ],
+        "head_revision": "a77dbd2a61b2a65d98f14a38ebdc42d90d655295",
+        "hunk_functions": [
+          "db/install.py:_create_database"
+        ],
+        "merge_commit": "00204a7198cd21351c121e739fcd76014790942b",
+        "merged_at": "2023-09-11T17:08:40Z",
+        "number": 3117,
+        "summary_response_sha256": "a41e5a21f4645a5a26f769863a59ac097166d5cfbfaab8597be5ad31a4be3349"
       }
     },
     {
@@ -342,9 +693,17 @@
         "src/transformers/training_args.py:TrainingArguments.__post_init__"
       ],
       "github_pr": {
-        "number": 22498,
-        "merged_at": "2023-04-04T13:05:04Z",
         "base_revision": "6fc44656b43f1de939a1e62dd59c45d1fec9f1aa",
+        "files_response_sha256": "03775483597a7ebe0e8f6585ac88f02f44b13defd62906da2acaeb9679033b7d",
+        "function_header_terminals": [
+          "__post_init__",
+          "_load_best_model",
+          "_load_from_checkpoint",
+          "_push_from_checkpoint",
+          "_save",
+          "load_sharded_checkpoint",
+          "shard_checkpoint"
+        ],
         "head_revision": "2a9d22183ed883604fc140c5039b7a5b70c0e4a6",
         "hunk_functions": [
           "src/transformers/modeling_utils.py:load_sharded_checkpoint",
@@ -353,7 +712,1107 @@
           "src/transformers/trainer.py:Trainer._save",
           "src/transformers/trainer.py:Trainer._push_from_checkpoint",
           "src/transformers/training_args.py:TrainingArguments.__post_init__"
-        ]
+        ],
+        "merge_commit": "871598be552c38537bc047a409b4a6840ba1c1e4",
+        "merged_at": "2023-04-04T13:05:04Z",
+        "number": 22498,
+        "summary_response_sha256": "0e37aa9ffc16b59a94eee8ec6e89d330cbefef1c140735dcdf48423fda422956"
+      }
+    },
+    {
+      "case_id": "JackPlowman__repo_standards_validator-137",
+      "expected_files": [
+        "validator/__main__.py",
+        "validator/repository_checks.py"
+      ],
+      "expected_functions": [
+        "validator/__main__.py:main",
+        "validator/repository_checks.py:check_repository",
+        "validator/repository_checks.py:check_repository_security_details"
+      ],
+      "github_pr": {
+        "base_revision": "35962a9fbb5711ab436edca91026428aed1e2d1c",
+        "files_response_sha256": "f835fbd7f52003ee1e80d607f4b598757d5074d9c8c871ab001e5644c112800c",
+        "function_header_terminals": [
+          "check_repository_details",
+          "check_repository_security_details",
+          "get_code_scanning_alerts",
+          "main"
+        ],
+        "head_revision": "88e7a74b752ac2d5d7fb0ee1f82f5753d26b4a4b",
+        "hunk_functions": [
+          "validator/__main__.py:main",
+          "validator/repository_checks.py:check_repository",
+          "validator/repository_checks.py:check_repository_security_details"
+        ],
+        "merge_commit": "e973fa6da182c4857b74960e0130a3ab67a2aec5",
+        "merged_at": "2025-02-07T22:42:05Z",
+        "number": 137,
+        "summary_response_sha256": "e0bb4fe5fe5ff576057e72cf87bc7db4003a95beb7cd662b9839d803494dd3c4"
+      }
+    },
+    {
+      "case_id": "pandas-dev__pandas-29944",
+      "expected_files": [
+        "pandas/plotting/_matplotlib/core.py"
+      ],
+      "expected_functions": [
+        "pandas/plotting/_matplotlib/core.py:MPLPlot.__init__",
+        "pandas/plotting/_matplotlib/core.py:MPLPlot._setup_subplots",
+        "pandas/plotting/_matplotlib/core.py:MPLPlot._get_ax"
+      ],
+      "github_pr": {
+        "base_revision": "aae9234e816469391512910e8265552f215d6263",
+        "files_response_sha256": "27b0974a7204bfe5ed2d4062606148c812ebae636851c568fd78e11993702708",
+        "function_header_terminals": [
+          "__init__",
+          "_get_ax_layer",
+          "_maybe_right_yaxis"
+        ],
+        "head_revision": "69efd1874d02f6eea5a56dd8958bb843920834c7",
+        "hunk_functions": [
+          "pandas/plotting/_matplotlib/core.py:MPLPlot.__init__",
+          "pandas/plotting/_matplotlib/core.py:MPLPlot._setup_subplots",
+          "pandas/plotting/_matplotlib/core.py:MPLPlot._get_ax"
+        ],
+        "merge_commit": "297c59abbe218f3ccb89fb25bee48f619c1e0d2d",
+        "merged_at": "2022-06-09T12:44:15Z",
+        "number": 29944,
+        "summary_response_sha256": "f9e60a62e1e3b4a334041e38c55dd4a47ab00855ccb4ce2e27dbe10c09ffbe2c"
+      }
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-16948",
+      "expected_files": [
+        "sklearn/decomposition/_nmf.py",
+        "sklearn/utils/estimator_checks.py"
+      ],
+      "expected_functions": [
+        "sklearn/decomposition/_nmf.py:norm",
+        "sklearn/decomposition/_nmf.py:_beta_divergence",
+        "sklearn/decomposition/_nmf.py:_fit_coordinate_descent",
+        "sklearn/decomposition/_nmf.py:_multiplicative_update_w",
+        "sklearn/decomposition/_nmf.py:_multiplicative_update_h",
+        "sklearn/decomposition/_nmf.py:_fit_multiplicative_update",
+        "sklearn/decomposition/_nmf.py:non_negative_factorization",
+        "sklearn/decomposition/_nmf.py:NMF._fit_transform",
+        "sklearn/utils/estimator_checks.py:_set_checking_parameters"
+      ],
+      "github_pr": {
+        "base_revision": "7d93ca87ea14ef8f16be43d75cff72d05f48f7ed",
+        "files_response_sha256": "f713d6036dc0412fa0b0acbfc8b954798f2386e75a0df1bfa57f8ecd3c7e4831",
+        "function_header_terminals": [
+          "_beta_divergence",
+          "_fit_coordinate_descent",
+          "_fit_multiplicative_update",
+          "_fit_transform",
+          "_multiplicative_update_h",
+          "_multiplicative_update_w",
+          "_set_checking_parameters",
+          "inverse_transform",
+          "non_negative_factorization"
+        ],
+        "head_revision": "99ec76cd8904ff3763dff86a025a4e1010370929",
+        "hunk_functions": [
+          "sklearn/decomposition/_nmf.py:norm",
+          "sklearn/decomposition/_nmf.py:_beta_divergence",
+          "sklearn/decomposition/_nmf.py:_fit_coordinate_descent",
+          "sklearn/decomposition/_nmf.py:_multiplicative_update_w",
+          "sklearn/decomposition/_nmf.py:_multiplicative_update_h",
+          "sklearn/decomposition/_nmf.py:_fit_multiplicative_update",
+          "sklearn/decomposition/_nmf.py:non_negative_factorization",
+          "sklearn/decomposition/_nmf.py:NMF._fit_transform",
+          "sklearn/utils/estimator_checks.py:_set_checking_parameters"
+        ],
+        "merge_commit": "69132ebbd39f070590ca01813340b5b12c0d02ab",
+        "merged_at": "2022-04-22T15:51:06Z",
+        "number": 16948,
+        "summary_response_sha256": "372f65036d337ed9c9d4aa4475778d9d44feb1edddee5757614b16c38025568a"
+      }
+    },
+    {
+      "case_id": "jobatabs__textec-53",
+      "expected_files": [
+        "src/repositories/reference_repository.py"
+      ],
+      "expected_functions": [
+        "src/repositories/reference_repository.py:create_reference"
+      ],
+      "github_pr": {
+        "base_revision": "951409c20a2cf9243690b9bda7f7a22bb7c999a7",
+        "files_response_sha256": "34b11f4c3f760d85dc196db4aacb72691f855f6ef00dd1bdda88a0959262a4b8",
+        "function_header_terminals": [
+          "delete_reference"
+        ],
+        "head_revision": "c11dd27b639b7da15f0782199981ff23f2257d21",
+        "hunk_functions": [
+          "src/repositories/reference_repository.py:create_reference"
+        ],
+        "merge_commit": "52251be7595ec5f357595c5c675a7ab9619698a9",
+        "merged_at": "2024-12-06T11:26:49Z",
+        "number": 53,
+        "summary_response_sha256": "3f6844c460f471727d45d59bcd85a768559aea16e8a2e40f4fa1caa65e635df8"
+      }
+    },
+    {
+      "case_id": "django__django-19009",
+      "expected_files": [
+        "django/contrib/gis/db/backends/base/models.py"
+      ],
+      "expected_functions": [
+        "django/contrib/gis/db/backends/base/models.py:SpatialRefSysMixin.srs"
+      ],
+      "github_pr": {
+        "base_revision": "5f30fd2358fd60a514bdba31594bfc8122f30167",
+        "files_response_sha256": "caf59bf6aa4df0e7e5243a0183edd16f0523491d503d2e98146f3819be18af30",
+        "function_header_terminals": [],
+        "head_revision": "97f3cf851703e7abb6ca231b6fc83aa771632954",
+        "hunk_functions": [
+          "django/contrib/gis/db/backends/base/models.py:SpatialRefSysMixin.srs"
+        ],
+        "merge_commit": "8ff1399f0656b4ff8181fe7872e426c331d1b1ee",
+        "merged_at": "2025-02-04T07:40:03Z",
+        "number": 19009,
+        "summary_response_sha256": "517fb7dcbbaeea4fa025d4a9b6598920ab69a7dfcbe9435664398eb0d2fd3a07"
+      }
+    },
+    {
+      "case_id": "internetarchive__openlibrary-3196",
+      "expected_files": [
+        "openlibrary/plugins/upstream/utils.py"
+      ],
+      "expected_functions": [
+        "openlibrary/plugins/upstream/utils.py:setup"
+      ],
+      "github_pr": {
+        "base_revision": "061f07ec54cec6ffd169580641eb87144fe7ea14",
+        "files_response_sha256": "87dd8697336be77e67de9d25d2a89e325f76b6cb5eafb3858a22ad16e6d06422",
+        "function_header_terminals": [
+          "setup"
+        ],
+        "head_revision": "c7a2ebb2a20e239f0ffd6f1c00c6a0fa1063b3b0",
+        "hunk_functions": [
+          "openlibrary/plugins/upstream/utils.py:setup"
+        ],
+        "merge_commit": "63e40038567871ade4e91428b3bc9041720533b9",
+        "merged_at": "2020-04-07T00:23:26Z",
+        "number": 3196,
+        "summary_response_sha256": "3a04a3c9b30c9953d897e8aca9e125e4662a85c92f117c05f3d2481011e34e29"
+      }
+    },
+    {
+      "case_id": "webcompat__webcompat.com-2731",
+      "expected_files": [
+        "webcompat/api/endpoints.py",
+        "webcompat/helpers.py"
+      ],
+      "expected_functions": [
+        "webcompat/api/endpoints.py:proxy_issue",
+        "webcompat/api/endpoints.py:edit_issue",
+        "webcompat/api/endpoints.py:proxy_issues",
+        "webcompat/api/endpoints.py:get_user_activity_issues",
+        "webcompat/api/endpoints.py:get_issue_category",
+        "webcompat/api/endpoints.py:get_search_results",
+        "webcompat/api/endpoints.py:proxy_comments",
+        "webcompat/helpers.py:get_request_headers",
+        "webcompat/helpers.py:get_comment_data",
+        "webcompat/helpers.py:api_request"
+      ],
+      "github_pr": {
+        "base_revision": "384c4feeef14a13655b8264dde9f10bfa5614134",
+        "files_response_sha256": "12bc4284d5a223eda388c865d7a8e65363d6c12013294825df48ca9ee21a4577",
+        "function_header_terminals": [
+          "api_request",
+          "edit_issue",
+          "format_link_header",
+          "get_issue_category",
+          "get_response_headers",
+          "get_search_results",
+          "get_user_activity_issues",
+          "proxy_comments",
+          "proxy_issue",
+          "proxy_issues",
+          "proxy_request"
+        ],
+        "head_revision": "a1c74ffebb416f07db1bfc383d424a39c9ed27ec",
+        "hunk_functions": [
+          "webcompat/api/endpoints.py:proxy_issue",
+          "webcompat/api/endpoints.py:edit_issue",
+          "webcompat/api/endpoints.py:proxy_issues",
+          "webcompat/api/endpoints.py:get_user_activity_issues",
+          "webcompat/api/endpoints.py:get_issue_category",
+          "webcompat/api/endpoints.py:get_search_results",
+          "webcompat/api/endpoints.py:proxy_comments",
+          "webcompat/helpers.py:get_request_headers",
+          "webcompat/helpers.py:get_comment_data",
+          "webcompat/helpers.py:api_request"
+        ],
+        "merge_commit": "0133d3dfc2070dda72979b199dff30af1074806c",
+        "merged_at": "2019-01-08T22:07:21Z",
+        "number": 2731,
+        "summary_response_sha256": "ad994c136d6756a2c9f7311d0015e5fdb5052bb4f757ecc6c25de619c7eed555"
+      }
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-14012",
+      "expected_files": [
+        "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py"
+      ],
+      "expected_functions": [
+        "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py:BaseHistGradientBoosting.__init__",
+        "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py:BaseHistGradientBoosting.fit",
+        "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py:HistGradientBoostingRegressor.__init__",
+        "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py:HistGradientBoostingClassifier.__init__"
+      ],
+      "github_pr": {
+        "base_revision": "15b54340ee7dc7cb870a418d1b5f6f553672f5dd",
+        "files_response_sha256": "4be85b5e1c7449bc3cd2eb8c2afe06b5d5cd32fff207d62fd51845a4adeadb8b",
+        "function_header_terminals": [
+          "__init__",
+          "fit"
+        ],
+        "head_revision": "5fc28800c3850bdc5d1416a41e683f44813981b3",
+        "hunk_functions": [
+          "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py:BaseHistGradientBoosting.__init__",
+          "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py:BaseHistGradientBoosting.fit",
+          "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py:HistGradientBoostingRegressor.__init__",
+          "sklearn/ensemble/_hist_gradient_boosting/gradient_boosting.py:HistGradientBoostingClassifier.__init__"
+        ],
+        "merge_commit": "da96da96f0dca3d23ee53722a617ee0cb5992286",
+        "merged_at": "2019-06-21T13:18:25Z",
+        "number": 14012,
+        "summary_response_sha256": "b4926f44ccf0a1a84a62c29b6c412b87f3419fdd10b0ff8e66c9455526a47a99"
+      }
+    },
+    {
+      "case_id": "airbnb__knowledge-repo-558",
+      "expected_files": [
+        "knowledge_repo/app/routes/comment.py"
+      ],
+      "expected_functions": [
+        "knowledge_repo/app/routes/comment.py:post_comment"
+      ],
+      "github_pr": {
+        "base_revision": "d1874d3e71994cd9bb769d60133c046b6d2b8bb5",
+        "files_response_sha256": "50eb9ad88b8625b0a1b8e5e2a6b710fe3141bd84d44c761bc85b2fc09cfbc2d4",
+        "function_header_terminals": [
+          "post_comment"
+        ],
+        "head_revision": "41ad22aa904e40911fa42078d44045f6c1e299cf",
+        "hunk_functions": [
+          "knowledge_repo/app/routes/comment.py:post_comment"
+        ],
+        "merge_commit": "f026ad2afea14e0ffc91f1aa0eaedcdc72c63167",
+        "merged_at": "2020-06-03T07:09:00Z",
+        "number": 558,
+        "summary_response_sha256": "496c5c706c4ec790582c3423b4cfe2a21bf5de725f8d5e37c961def3fa358219"
+      }
+    },
+    {
+      "case_id": "pulp__pulp_rpm-3224",
+      "expected_files": [
+        "pulp_rpm/app/tasks/publishing.py",
+        "pulp_rpm/app/tasks/synchronizing.py"
+      ],
+      "expected_functions": [
+        "pulp_rpm/app/tasks/publishing.py:PublicationData.publish_artifacts",
+        "pulp_rpm/app/tasks/publishing.py:generate_repo_metadata",
+        "pulp_rpm/app/tasks/synchronizing.py:add_metadata_to_publication"
+      ],
+      "github_pr": {
+        "base_revision": "6b999b4d8a16d936927e3fc9dec74fe506c25226",
+        "files_response_sha256": "ce644b178aec3b005c7be9c85012b9391bf453ac2f3ba0d76a18242f38c09aea",
+        "function_header_terminals": [
+          "add_metadata_to_publication",
+          "generate_repo_metadata",
+          "publish_artifacts"
+        ],
+        "head_revision": "a3e8991fcc284c38dd2125b4a8306ef51bd3aee7",
+        "hunk_functions": [
+          "pulp_rpm/app/tasks/publishing.py:PublicationData.publish_artifacts",
+          "pulp_rpm/app/tasks/publishing.py:generate_repo_metadata",
+          "pulp_rpm/app/tasks/synchronizing.py:add_metadata_to_publication"
+        ],
+        "merge_commit": "5a603b00218436cf9e1a1acd4d2b7e65a25fe5dd",
+        "merged_at": "2023-08-16T18:13:52Z",
+        "number": 3224,
+        "summary_response_sha256": "cd73b77ef1c38baffbfda52203266c2bb26d092cec4254c3dc114b2d846c36c0"
+      }
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-6116",
+      "expected_files": [
+        "sklearn/ensemble/gradient_boosting.py"
+      ],
+      "expected_functions": [
+        "sklearn/ensemble/gradient_boosting.py:BaseGradientBoosting._staged_decision_function",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.decision_function",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.staged_decision_function",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.predict",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.staged_predict",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.predict_proba",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.predict_log_proba",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.staged_predict_proba",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingRegressor.predict",
+        "sklearn/ensemble/gradient_boosting.py:GradientBoostingRegressor.staged_predict"
+      ],
+      "github_pr": {
+        "base_revision": "5e4f524f8408e5a0efb96f8128504f8ca747a95e",
+        "files_response_sha256": "c6feb463fdbb8a019ba3d591b59bdc95bde261299dc64634307ddb9fbbc098d3",
+        "function_header_terminals": [
+          "_staged_decision_function",
+          "decision_function",
+          "predict",
+          "predict_log_proba",
+          "predict_proba",
+          "staged_decision_function",
+          "staged_predict",
+          "staged_predict_proba"
+        ],
+        "head_revision": "9a771208d04463e91b19794c33f85e8223bcda30",
+        "hunk_functions": [
+          "sklearn/ensemble/gradient_boosting.py:BaseGradientBoosting._staged_decision_function",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.decision_function",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.staged_decision_function",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.predict",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.staged_predict",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.predict_proba",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.predict_log_proba",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingClassifier.staged_predict_proba",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingRegressor.predict",
+          "sklearn/ensemble/gradient_boosting.py:GradientBoostingRegressor.staged_predict"
+        ],
+        "merge_commit": "78dbcb2838bb863dcf2e930c29aeef4f4cde5949",
+        "merged_at": "2016-10-15T10:41:44Z",
+        "number": 6116,
+        "summary_response_sha256": "2c992156de251e7b7b5191b89f95668d97ef5d2cec0204c8baeacc144349f13f"
+      }
+    },
+    {
+      "case_id": "duncanscanga__VDRS-Solutions-73",
+      "expected_files": [
+        "app/models.py"
+      ],
+      "expected_functions": [
+        "app/models.py:register"
+      ],
+      "github_pr": {
+        "base_revision": "c97e24d072fe1bffe3dc9e3b363d40b725a70be9",
+        "files_response_sha256": "f81752d5596ef5650e867c273441894f9a4b1e2a3a6a5ad9ad3aa9a863f43762",
+        "function_header_terminals": [
+          "register"
+        ],
+        "head_revision": "5ad6028a77a7d2c91a3d52a7caff3bf128d90bac",
+        "hunk_functions": [
+          "app/models.py:register"
+        ],
+        "merge_commit": "4bcc4cad1c7132f5a0ff3bd372b573d4eeadffcc",
+        "merged_at": "2022-11-17T05:29:39Z",
+        "number": 73,
+        "summary_response_sha256": "9f1f3248b308e8882858e343ae5c3e0cbad1df01b743e82afaa4f7372848fd60"
+      }
+    },
+    {
+      "case_id": "scipy__scipy-5647",
+      "expected_files": [
+        "benchmarks/benchmarks/spatial.py"
+      ],
+      "expected_functions": [
+        "benchmarks/benchmarks/spatial.py:Neighbors.setup",
+        "benchmarks/benchmarks/spatial.py:Neighbors.time_sparse_distance_matrix",
+        "benchmarks/benchmarks/spatial.py:Neighbors.time_count_neighbors"
+      ],
+      "github_pr": {
+        "base_revision": "ccb338fa0521070107200a9ebcab67905b286a7a",
+        "files_response_sha256": "3291c4c1c58c524a1f5a1c23572647b42da5e1177328bb6a4f75cc3c3093238b",
+        "function_header_terminals": [],
+        "head_revision": "df03bb107ea8eb7e0e67c272dee707dcbff804bc",
+        "hunk_functions": [
+          "benchmarks/benchmarks/spatial.py:Neighbors.setup",
+          "benchmarks/benchmarks/spatial.py:Neighbors.time_sparse_distance_matrix",
+          "benchmarks/benchmarks/spatial.py:Neighbors.time_count_neighbors"
+        ],
+        "merge_commit": "9cd960bc9567e271555b62113f47fd69967c2e6c",
+        "merged_at": "2016-11-18T20:34:20Z",
+        "number": 5647,
+        "summary_response_sha256": "473568e7a2fbcf23adb92dcec9da842a4afa9e19326aa131e0b81cec9ab19b8c"
+      }
+    },
+    {
+      "case_id": "plone__plone.restapi-859",
+      "expected_files": [
+        "src/plone/restapi/deserializer/local_roles.py"
+      ],
+      "expected_functions": [
+        "src/plone/restapi/deserializer/local_roles.py:DeserializeFromJson.__call__"
+      ],
+      "github_pr": {
+        "base_revision": "32a80ab4850252f1d5b9d1b3c847e9e32d3aa45e",
+        "files_response_sha256": "b3e672430bae4cf9c8e8739e02d20bfa966071e5823e8dd121ab50fb36256f30",
+        "function_header_terminals": [
+          "__call__"
+        ],
+        "head_revision": "900c1478634c9f34600f15851362467b35406811",
+        "hunk_functions": [
+          "src/plone/restapi/deserializer/local_roles.py:DeserializeFromJson.__call__"
+        ],
+        "merge_commit": "6f7c08b722c39579d2b7103937f60a1bb450a030",
+        "merged_at": "2020-01-22T13:37:17Z",
+        "number": 859,
+        "summary_response_sha256": "54bcb160ccda6f8f1924ef5a33eef3eb462cfa1ab2a961e1e11ff0bf8b36b6b6"
+      }
+    },
+    {
+      "case_id": "openwisp__openwisp-users-286",
+      "expected_files": [
+        "openwisp_users/admin.py"
+      ],
+      "expected_functions": [
+        "openwisp_users/admin.py:UserAdmin.get_readonly_fields"
+      ],
+      "github_pr": {
+        "base_revision": "6c083027ed7bb467351f8f05ac201fa60d9bdc24",
+        "files_response_sha256": "b944de7cdef967ad4037b23d7148b599a1ea80d1cdafe4add44252cb3490c27b",
+        "function_header_terminals": [
+          "get_readonly_fields",
+          "queryset"
+        ],
+        "head_revision": "1266dbec98b11e48d77d0af7cd3c138295e7b4c6",
+        "hunk_functions": [
+          "openwisp_users/admin.py:UserAdmin.get_readonly_fields"
+        ],
+        "merge_commit": "969780d22ccb92195718237ddef32e204e391a12",
+        "merged_at": "2021-10-15T18:14:47Z",
+        "number": 286,
+        "summary_response_sha256": "2058b933713eb9fc188690fea224aefaf3cc77d97c33d2575b8e5df6b4b2c900"
+      }
+    },
+    {
+      "case_id": "rucio__rucio-4930",
+      "expected_files": [
+        "lib/rucio/web/ui/flask/common/utils.py"
+      ],
+      "expected_functions": [
+        "lib/rucio/web/ui/flask/common/utils.py:add_cookies",
+        "lib/rucio/web/ui/flask/common/utils.py:redirect_to_last_known_url",
+        "lib/rucio/web/ui/flask/common/utils.py:finalize_auth",
+        "lib/rucio/web/ui/flask/common/utils.py:authenticate"
+      ],
+      "github_pr": {
+        "base_revision": "92474868cec7d64b83b46b451ecdc4a294ef2711",
+        "files_response_sha256": "2367eff9db17406b33127a84cd859b2f5e044b6cab17d87332003a93d1a49b63",
+        "function_header_terminals": [
+          "authenticate",
+          "finalize_auth",
+          "html_escape",
+          "prepare_saml_request"
+        ],
+        "head_revision": "1dba6b57c91fd9856c59831e51a95f9e73b5815f",
+        "hunk_functions": [
+          "lib/rucio/web/ui/flask/common/utils.py:add_cookies",
+          "lib/rucio/web/ui/flask/common/utils.py:redirect_to_last_known_url",
+          "lib/rucio/web/ui/flask/common/utils.py:finalize_auth",
+          "lib/rucio/web/ui/flask/common/utils.py:authenticate"
+        ],
+        "merge_commit": "004d185deb158caa1e9adcbedda971da96cc23c8",
+        "merged_at": "2021-10-21T17:35:46Z",
+        "number": 4930,
+        "summary_response_sha256": "88cdf566dd6121a386ec4e17544e2b87ec563e9f7f44beeafbe0d8dc93b46e67"
+      }
+    },
+    {
+      "case_id": "home-assistant__core-15182",
+      "expected_files": [
+        "homeassistant/components/http/__init__.py",
+        "homeassistant/components/http/real_ip.py"
+      ],
+      "expected_functions": [
+        "homeassistant/components/http/__init__.py:HomeAssistantHTTP.__init__",
+        "homeassistant/components/http/real_ip.py:setup_real_ip"
+      ],
+      "github_pr": {
+        "base_revision": "4fbe3bb07062b81ac4562d4080550d92cbd47828",
+        "files_response_sha256": "94a183be8a3efc3f90af224a651a419a6e8bb83b697366431990b19f2f7c951f",
+        "function_header_terminals": [
+          "__init__"
+        ],
+        "head_revision": "72d54ba9df247435a71722b433b66bbe2169002e",
+        "hunk_functions": [
+          "homeassistant/components/http/__init__.py:HomeAssistantHTTP.__init__",
+          "homeassistant/components/http/real_ip.py:setup_real_ip"
+        ],
+        "merge_commit": "19f2bbf52f2ff947699ebd8e513ba2da6ebc6241",
+        "merged_at": "2018-06-28T13:16:12Z",
+        "number": 15182,
+        "summary_response_sha256": "774c15c8be0cadca5758ce37ba86c6da96fd46aadcfa1443b6aae8c2b871c3c9"
+      }
+    },
+    {
+      "case_id": "jazzband__django-two-factor-auth-390",
+      "expected_files": [
+        "two_factor/views/profile.py"
+      ],
+      "expected_functions": [
+        "two_factor/views/profile.py:DisableView.get",
+        "two_factor/views/profile.py:DisableView.form_valid"
+      ],
+      "github_pr": {
+        "base_revision": "430ef08a2c6cec4e0ce6cfa4a08686d4e62f73b7",
+        "files_response_sha256": "407797769df66956ae27a7f4b3fbf83722108ba9a4dde3c21db9cc1155670215",
+        "function_header_terminals": [
+          "get_context_data"
+        ],
+        "head_revision": "cd7a2e1befd0acb7000c57c7d374684289c94e8b",
+        "hunk_functions": [
+          "two_factor/views/profile.py:DisableView.get",
+          "two_factor/views/profile.py:DisableView.form_valid"
+        ],
+        "merge_commit": "e1812e14a2dda8a6e4fc9d4d1c5651890c5d5164",
+        "merged_at": "2020-10-02T21:04:27Z",
+        "number": 390,
+        "summary_response_sha256": "1e0bc9a19d26cc39873418f6ea809ec157df4bdddbee3e22b7807b7d383f1f1c"
+      }
+    },
+    {
+      "case_id": "zulip__zulip-14091",
+      "expected_files": [
+        "zerver/lib/rate_limiter.py"
+      ],
+      "expected_functions": [
+        "zerver/lib/rate_limiter.py:RateLimitedObject.rate_limit",
+        "zerver/lib/rate_limiter.py:RateLimitedObject.__init__",
+        "zerver/lib/rate_limiter.py:RateLimitedObject.max_api_calls",
+        "zerver/lib/rate_limiter.py:RateLimitedObject.max_api_window",
+        "zerver/lib/rate_limiter.py:RateLimiterBackend.block_access",
+        "zerver/lib/rate_limiter.py:RedisRateLimiterBackend.is_ratelimited",
+        "zerver/lib/rate_limiter.py:RedisRateLimiterBackend.incr_ratelimit",
+        "zerver/lib/rate_limiter.py:RedisRateLimiterBackend.rate_limit_entity"
+      ],
+      "github_pr": {
+        "base_revision": "cb85763c7870bd6c83e84e4e7bca0900810457e9",
+        "files_response_sha256": "a8c6f8fa20a2cf08be6715ea2985415d1804420081281dd577dce965920fcae7",
+        "function_header_terminals": [
+          "api_calls_left",
+          "clear_history",
+          "get_api_calls_left",
+          "incr_ratelimit",
+          "is_ratelimited",
+          "rate_limit_entity"
+        ],
+        "head_revision": "18a375ca67fefea5e7ee03d1f5bfe307a3deff36",
+        "hunk_functions": [
+          "zerver/lib/rate_limiter.py:RateLimitedObject.rate_limit",
+          "zerver/lib/rate_limiter.py:RateLimitedObject.__init__",
+          "zerver/lib/rate_limiter.py:RateLimitedObject.max_api_calls",
+          "zerver/lib/rate_limiter.py:RateLimitedObject.max_api_window",
+          "zerver/lib/rate_limiter.py:RateLimiterBackend.block_access",
+          "zerver/lib/rate_limiter.py:RedisRateLimiterBackend.is_ratelimited",
+          "zerver/lib/rate_limiter.py:RedisRateLimiterBackend.incr_ratelimit",
+          "zerver/lib/rate_limiter.py:RedisRateLimiterBackend.rate_limit_entity"
+        ],
+        "merge_commit": "fbc8325d0ed2d760f498e0bee145c91238b42e6d",
+        "merged_at": "2020-04-15T18:20:38Z",
+        "number": 14091,
+        "summary_response_sha256": "31cab62b80aaa80e671a9865f90dfa111666076420aefc418d47fb0c9d20f938"
+      }
+    },
+    {
+      "case_id": "jax-ml__jax-25114",
+      "expected_files": [
+        "jax/_src/compiler.py"
+      ],
+      "expected_functions": [
+        "jax/_src/compiler.py:get_compile_options"
+      ],
+      "github_pr": {
+        "base_revision": "df6758f021167b1c0b85f5d6e4986f6f0d2a1169",
+        "files_response_sha256": "7cdcfa36cdfc52a1a30f54f84030b9bda750f39c11742b80f42df400885b57ef",
+        "function_header_terminals": [
+          "get_compile_options"
+        ],
+        "head_revision": "c65ce4b09318cd41ea3549f5791d8a8b3f9a195f",
+        "hunk_functions": [
+          "jax/_src/compiler.py:get_compile_options"
+        ],
+        "merge_commit": "182e53267509c16f3abe6b7263f8725ba1ed7595",
+        "merged_at": "2024-12-05T00:04:21Z",
+        "number": 25114,
+        "summary_response_sha256": "cd6e6ee3793dc13ac884c5e5aca8a08df39d2a1c1d42eec941ba7e12e365c062"
+      }
+    },
+    {
+      "case_id": "PlasmaPy__PlasmaPy-2542",
+      "expected_files": [
+        "plasmapy/formulary/lengths.py"
+      ],
+      "expected_functions": [
+        "plasmapy/formulary/lengths.py:gyroradius"
+      ],
+      "github_pr": {
+        "base_revision": "db62754e6150dc841074afe2e155f21a806e7f1b",
+        "files_response_sha256": "8a3a3804617e5664915f4aa140249778ee1647ebe533cfb4ecd299761e29d3ae",
+        "function_header_terminals": [
+          "Debye_length",
+          "gyroradius"
+        ],
+        "head_revision": "476894d8a8231250d1aba1ab019a6a0bcce10a45",
+        "hunk_functions": [
+          "plasmapy/formulary/lengths.py:gyroradius"
+        ],
+        "merge_commit": "c42a0e71668745ef40e0112eaacfa0e9eefbeb2a",
+        "merged_at": "2024-02-27T23:00:18Z",
+        "number": 2542,
+        "summary_response_sha256": "b2088feb4a3b6fad105a5a80eea4db3a22f333287f3fe964e498a412340cca63"
+      }
+    },
+    {
+      "case_id": "kedro-org__kedro-4367",
+      "expected_files": [
+        "kedro/config/omegaconf_config.py"
+      ],
+      "expected_functions": [
+        "kedro/config/omegaconf_config.py:OmegaConfigLoader.__init__",
+        "kedro/config/omegaconf_config.py:OmegaConfigLoader.load_and_merge_dir_config",
+        "kedro/config/omegaconf_config.py:OmegaConfigLoader._get_globals_value",
+        "kedro/config/omegaconf_config.py:OmegaConfigLoader._get_runtime_value"
+      ],
+      "github_pr": {
+        "base_revision": "70734ce00ee46b58c85b4cf04afbe89d32c06758",
+        "files_response_sha256": "445149bc94769f78488b3811d9d661ee166ce6259013e6b5087aad51a441adaa",
+        "function_header_terminals": [
+          "__init__",
+          "_get_globals_value",
+          "load_and_merge_dir_config"
+        ],
+        "head_revision": "4eb7fac9cd9ca5e1e050048bb955b9df80f1e150",
+        "hunk_functions": [
+          "kedro/config/omegaconf_config.py:OmegaConfigLoader.__init__",
+          "kedro/config/omegaconf_config.py:OmegaConfigLoader.load_and_merge_dir_config",
+          "kedro/config/omegaconf_config.py:OmegaConfigLoader._get_globals_value",
+          "kedro/config/omegaconf_config.py:OmegaConfigLoader._get_runtime_value"
+        ],
+        "merge_commit": "057de3457a778698001d9fd2f5797ca3b4a9ba3a",
+        "merged_at": "2025-01-03T18:38:45Z",
+        "number": 4367,
+        "summary_response_sha256": "3c1d3990d70ef2dc0e7674b71d348d730dcbf31f596e99552f16219cf0905210"
+      }
+    },
+    {
+      "case_id": "Deltares__imod-python-1159",
+      "expected_files": [
+        "imod/mf6/simulation.py",
+        "imod/schemata.py",
+        "imod/typing/grid.py"
+      ],
+      "expected_functions": [
+        "imod/mf6/simulation.py:Modflow6Simulation.from_imod5_data",
+        "imod/schemata.py:scalar_None",
+        "imod/typing/grid.py:as_ugrid_dataarray"
+      ],
+      "github_pr": {
+        "base_revision": "4f3b71675708c5a832fb78e05f679bb89158f95d",
+        "files_response_sha256": "0ae492257d8e01b305ce0e38cfa6594250135525254a6bfaedc91ee2347a4cf1",
+        "function_header_terminals": [
+          "from_imod5_data",
+          "is_transient_data_grid",
+          "scalar_None"
+        ],
+        "head_revision": "be685f109286dda516c8a1f549d8a295c2b702ce",
+        "hunk_functions": [
+          "imod/mf6/simulation.py:Modflow6Simulation.from_imod5_data",
+          "imod/schemata.py:scalar_None",
+          "imod/typing/grid.py:as_ugrid_dataarray"
+        ],
+        "merge_commit": "ccf9f217452e5ddb035b5103b34fa614ac1c339c",
+        "merged_at": "2024-08-20T09:33:54Z",
+        "number": 1159,
+        "summary_response_sha256": "a905fcc50c33e685078872f0874239b880894df4c7a6b54a4edaa2d5dae1950d"
+      }
+    },
+    {
+      "case_id": "ivadomed__ivadomed-1081",
+      "expected_files": [
+        "ivadomed/evaluation.py",
+        "ivadomed/main.py",
+        "ivadomed/metrics.py"
+      ],
+      "expected_functions": [
+        "ivadomed/evaluation.py:evaluate",
+        "ivadomed/evaluation.py:Evaluation3DMetrics.__init__",
+        "ivadomed/evaluation.py:Evaluation3DMetrics.get_ltpr",
+        "ivadomed/evaluation.py:Evaluation3DMetrics.get_lfdr",
+        "ivadomed/main.py:run_command",
+        "ivadomed/metrics.py:get_metric_fns"
+      ],
+      "github_pr": {
+        "base_revision": "dee79e6bd90b30095267a798da99c4033cc5991b",
+        "files_response_sha256": "83b8498d9490bf5915741e53c7d2be18ed5791b3ea2728ba2047c396d148b7fd",
+        "function_header_terminals": [
+          "__init__",
+          "evaluate",
+          "get_lfdr",
+          "get_ltpr",
+          "run_command"
+        ],
+        "head_revision": "27732b4010047e5dcb7be6dbd13a1795bb31614d",
+        "hunk_functions": [
+          "ivadomed/evaluation.py:evaluate",
+          "ivadomed/evaluation.py:Evaluation3DMetrics.__init__",
+          "ivadomed/evaluation.py:Evaluation3DMetrics.get_ltpr",
+          "ivadomed/evaluation.py:Evaluation3DMetrics.get_lfdr",
+          "ivadomed/main.py:run_command",
+          "ivadomed/metrics.py:get_metric_fns"
+        ],
+        "merge_commit": "a260b42c5c15ac70237de8d5264e52ae794c97a1",
+        "merged_at": "2022-09-11T20:27:39Z",
+        "number": 1081,
+        "summary_response_sha256": "7735d87365ad4e54b43bf5b76a3fd730539d77138fffbab5504c34692e82cc42"
+      }
+    },
+    {
+      "case_id": "zulip__zulip-31168",
+      "expected_files": [
+        "zerver/views/streams.py"
+      ],
+      "expected_functions": [
+        "zerver/views/streams.py:principal_to_user_profile",
+        "zerver/views/streams.py:remove_subscriptions_backend",
+        "zerver/views/streams.py:add_subscriptions_backend"
+      ],
+      "github_pr": {
+        "base_revision": "3d58a7ec0455ba609955c13470d31854687eff7a",
+        "files_response_sha256": "44bd51f5d5d117bc22cb3dab0d626f3e65ed0886cb7b2e0b4c4ab84b62386480",
+        "function_header_terminals": [
+          "add_subscriptions_backend",
+          "remove_subscriptions_backend"
+        ],
+        "head_revision": "5a63b758299e0229f20a841540c76d114b2b8cfa",
+        "hunk_functions": [
+          "zerver/views/streams.py:principal_to_user_profile",
+          "zerver/views/streams.py:remove_subscriptions_backend",
+          "zerver/views/streams.py:add_subscriptions_backend"
+        ],
+        "merge_commit": "00c9f364342478039a1ac84d041f59d312f40cd6",
+        "merged_at": "2024-08-17T00:46:19Z",
+        "number": 31168,
+        "summary_response_sha256": "9d5d6c6bc3b342c592dde32638e9b03a4f4d64ef5e2c9693fd2fea15cb993879"
+      }
+    },
+    {
+      "case_id": "ckan__ckan-8226",
+      "expected_files": [
+        "ckan/config/middleware/flask_app.py",
+        "ckan/lib/helpers.py",
+        "ckan/lib/jinja_extensions.py"
+      ],
+      "expected_functions": [
+        "ckan/config/middleware/flask_app.py:_ungettext_alias",
+        "ckan/config/middleware/flask_app.py:make_flask_stack",
+        "ckan/config/middleware/flask_app.py:helper_functions",
+        "ckan/config/middleware/flask_app.py:c_object",
+        "ckan/lib/helpers.py:snippet",
+        "ckan/lib/jinja_extensions.py:CkanFileSystemLoader.get_source",
+        "ckan/lib/jinja_extensions.py:SnippetExtension._call"
+      ],
+      "github_pr": {
+        "base_revision": "15f32e57e229db6436d10adddf73bcff84bdd453",
+        "files_response_sha256": "b2b6083ffb034337f2a593cb5048544fc1d843d31a8f899304cedd578b608026",
+        "function_header_terminals": [
+          "__call__",
+          "ckan_after_request",
+          "dump_json",
+          "get_source",
+          "make_call_node",
+          "make_flask_stack"
+        ],
+        "head_revision": "5745cb45eeed7251193d66878fba19b33c8d4502",
+        "hunk_functions": [
+          "ckan/config/middleware/flask_app.py:_ungettext_alias",
+          "ckan/config/middleware/flask_app.py:make_flask_stack",
+          "ckan/config/middleware/flask_app.py:helper_functions",
+          "ckan/config/middleware/flask_app.py:c_object",
+          "ckan/lib/helpers.py:snippet",
+          "ckan/lib/jinja_extensions.py:CkanFileSystemLoader.get_source",
+          "ckan/lib/jinja_extensions.py:SnippetExtension._call"
+        ],
+        "merge_commit": "516d16098ccb8ef744f919f48a2c4ec2cd101f6c",
+        "merged_at": "2024-06-14T13:46:12Z",
+        "number": 8226,
+        "summary_response_sha256": "a4e8e9bdac31fdbfb6c0714013b50e487c3346e643c1052b85ce5f4e9854e272"
+      }
+    },
+    {
+      "case_id": "UXARRAY__uxarray-1144",
+      "expected_files": [
+        "uxarray/formatting_html.py",
+        "uxarray/grid/grid.py"
+      ],
+      "expected_functions": [
+        "uxarray/formatting_html.py:_grid_sections",
+        "uxarray/grid/grid.py:Grid.__repr__",
+        "uxarray/grid/grid.py:Grid.face_node_connectivity"
+      ],
+      "github_pr": {
+        "base_revision": "81ac5bd50ed2a2faca24008dc261029be30c37c4",
+        "files_response_sha256": "e70444d5e8a3f7433a221401648b69fdeecb3ed744152da84fe698bb7137f6ee",
+        "function_header_terminals": [
+          "__repr__",
+          "_grid_sections",
+          "face_node_connectivity"
+        ],
+        "head_revision": "63e7afa4a0550e08815a2ed033a0b19f6fb1ecaf",
+        "hunk_functions": [
+          "uxarray/formatting_html.py:_grid_sections",
+          "uxarray/grid/grid.py:Grid.__repr__",
+          "uxarray/grid/grid.py:Grid.face_node_connectivity"
+        ],
+        "merge_commit": "0b46bd741bfc841bf696ea765d31a0f54da98211",
+        "merged_at": "2025-02-03T18:33:03Z",
+        "number": 1144,
+        "summary_response_sha256": "f267c0fee3d4fa8dfd868f4f395d784002be36e380b5f81f5058ee3fae5920e7"
+      }
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-8478",
+      "expected_files": [
+        "sklearn/utils/estimator_checks.py"
+      ],
+      "expected_functions": [
+        "sklearn/utils/estimator_checks.py:_yield_non_meta_checks"
+      ],
+      "github_pr": {
+        "base_revision": "312f64053d7249a326a19a07fa635ef5b5c6ed99",
+        "files_response_sha256": "92b594ec72f40925e87f2938937b27ffffac0a78d2f850c595106212c54e56c4",
+        "function_header_terminals": [
+          "_yield_non_meta_checks"
+        ],
+        "head_revision": "1c38fd643b605507614da80ebe3f80d4ce6ee1db",
+        "hunk_functions": [
+          "sklearn/utils/estimator_checks.py:_yield_non_meta_checks"
+        ],
+        "merge_commit": "b97eda5d2ad146a4efdc332a67403908f45a69d1",
+        "merged_at": "2018-04-16T08:18:29Z",
+        "number": 8478,
+        "summary_response_sha256": "0045d39b39e4d334829b9fdde5ddaa1aae4117bc74d7df991c660a8e54a03934"
+      }
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-17443",
+      "expected_files": [
+        "examples/calibration/plot_calibration_curve.py",
+        "sklearn/metrics/_plot/base.py"
+      ],
+      "expected_functions": [
+        "examples/calibration/plot_calibration_curve.py:plot_calibration_curve",
+        "sklearn/metrics/_plot/base.py:_get_response"
+      ],
+      "github_pr": {
+        "base_revision": "c3db2cdbf5244229af2c5eb54f9216a69f77a146",
+        "files_response_sha256": "8e5cb45d1c2c579939748abeac6f2c0bc95f0be11c5c35445e928aa26d5119d0",
+        "function_header_terminals": [
+          "_get_response"
+        ],
+        "head_revision": "b25f03b1f79cd7bbf8afca1ef1e877292589e328",
+        "hunk_functions": [
+          "examples/calibration/plot_calibration_curve.py:plot_calibration_curve",
+          "sklearn/metrics/_plot/base.py:_get_response"
+        ],
+        "merge_commit": "da36f72cc2960d47792157597d67a488d35a05f3",
+        "merged_at": "2021-08-31T07:43:05Z",
+        "number": 17443,
+        "summary_response_sha256": "c4b608af60e84b7e0b6ce2ec9903a90d02cb213470ba553e5761bd4ba1002917"
+      }
+    },
+    {
+      "case_id": "Qiskit__qiskit-13141",
+      "expected_files": [
+        "qiskit/transpiler/passes/synthesis/unitary_synthesis.py"
+      ],
+      "expected_functions": [
+        "qiskit/transpiler/passes/synthesis/unitary_synthesis.py:UnitarySynthesis.run"
+      ],
+      "github_pr": {
+        "base_revision": "90e92a46643c72a21c5852299243213907453c21",
+        "files_response_sha256": "2c410c4844270d39374bcf4491ae3fdfa6da6f4f67b5ab3eddb5e14c46c8170d",
+        "function_header_terminals": [
+          "run"
+        ],
+        "head_revision": "0bbf16a28b4ef29d851eb42e508842e24e9e6119",
+        "hunk_functions": [
+          "qiskit/transpiler/passes/synthesis/unitary_synthesis.py:UnitarySynthesis.run"
+        ],
+        "merge_commit": "a9b8f4acda8dabf4e4acd8c97409f5d2344f92ea",
+        "merged_at": "2024-10-18T21:24:18Z",
+        "number": 13141,
+        "summary_response_sha256": "9d4a16858ab7fdc5f4c3f434d561f5646e02cd55655301a1d50e557b192aa057"
+      }
+    },
+    {
+      "case_id": "numpy__numpy-17394",
+      "expected_files": [
+        "numpy/lib/stride_tricks.py"
+      ],
+      "expected_functions": [
+        "numpy/lib/stride_tricks.py:as_strided"
+      ],
+      "github_pr": {
+        "base_revision": "43683b3256a86659f230dcadbcde1f8020398bfa",
+        "files_response_sha256": "8864689f5261ab2119c709df399f26e28b7a24f9eab52b614a312cfbba670171",
+        "function_header_terminals": [
+          "as_strided"
+        ],
+        "head_revision": "c6ef8d68dc56abf92485193332bc7d67b6988604",
+        "hunk_functions": [
+          "numpy/lib/stride_tricks.py:as_strided"
+        ],
+        "merge_commit": "43f80863ba2994a186293d86d516204ef38b0043",
+        "merged_at": "2020-11-05T16:51:17Z",
+        "number": 17394,
+        "summary_response_sha256": "b3cca0c9992909a3f5d172927b1bc2c2a5416a1b12425229ec3e0894aed320ae"
+      }
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-10280",
+      "expected_files": [
+        "sklearn/_config.py",
+        "sklearn/metrics/pairwise.py"
+      ],
+      "expected_functions": [
+        "sklearn/_config.py:set_config",
+        "sklearn/_config.py:config_context",
+        "sklearn/metrics/pairwise.py:pairwise_distances_argmin_min",
+        "sklearn/metrics/pairwise.py:pairwise_distances_argmin",
+        "sklearn/metrics/pairwise.py:cosine_similarity",
+        "sklearn/metrics/pairwise.py:pairwise_distances"
+      ],
+      "github_pr": {
+        "base_revision": "1557cb8a1910bce6dc33cd5cd3a08c380bdec566",
+        "files_response_sha256": "4fbc3f6ce7145f26f8b237d9a7c35a35dd50b5bb94ca4607d8d5c8b698e7a512",
+        "function_header_terminals": [
+          "_pairwise_callable",
+          "config_context",
+          "cosine_similarity",
+          "euclidean_distances",
+          "get_config",
+          "pairwise_distances",
+          "pairwise_distances_argmin",
+          "pairwise_distances_argmin_min",
+          "set_config"
+        ],
+        "head_revision": "6252941ee8c17effc4065faac47bc1168da37e38",
+        "hunk_functions": [
+          "sklearn/_config.py:set_config",
+          "sklearn/_config.py:config_context",
+          "sklearn/metrics/pairwise.py:pairwise_distances_argmin_min",
+          "sklearn/metrics/pairwise.py:pairwise_distances_argmin",
+          "sklearn/metrics/pairwise.py:cosine_similarity",
+          "sklearn/metrics/pairwise.py:pairwise_distances"
+        ],
+        "merge_commit": "ef8d22af7c4e1df2b872722b4a4f2f58630b2c45",
+        "merged_at": "2018-05-25T02:04:05Z",
+        "number": 10280,
+        "summary_response_sha256": "c4cc39912bfa58e489384b27baf213a235a46b916a16308d2297e19433c3c39c"
+      }
+    },
+    {
+      "case_id": "pandas-dev__pandas-22762",
+      "expected_files": [
+        "pandas/core/arrays/categorical.py",
+        "pandas/core/series.py"
+      ],
+      "expected_functions": [
+        "pandas/core/arrays/categorical.py:Categorical._reduce",
+        "pandas/core/series.py:Series._reduce"
+      ],
+      "github_pr": {
+        "base_revision": "c8ce3d01e9ffafc24c6f9dd568cd9eb7e42c610c",
+        "files_response_sha256": "374f666b4e8f4afc9757dadba399f494670541a0086781dda01201b9d91df6fc",
+        "function_header_terminals": [
+          "_reduce",
+          "_reverse_indexer"
+        ],
+        "head_revision": "aeaf5f32c0939d6bedc99240b47dd54252dda96a",
+        "hunk_functions": [
+          "pandas/core/arrays/categorical.py:Categorical._reduce",
+          "pandas/core/series.py:Series._reduce"
+        ],
+        "merge_commit": "08e27520eb56927f96cf9b0f0f3fb11eca480abe",
+        "merged_at": "2018-10-12T12:19:58Z",
+        "number": 22762,
+        "summary_response_sha256": "30b5a5ea81cf289eb0e0f3613ad9f599156d64ce061b37bc85a568b9c11a8941"
+      }
+    },
+    {
+      "case_id": "numpy__numpy-8206",
+      "expected_files": [
+        "numpy/lib/function_base.py"
+      ],
+      "expected_functions": [
+        "numpy/lib/function_base.py:diff"
+      ],
+      "github_pr": {
+        "base_revision": "6feb18ce79bacdac09945cf2ca0ddf85f8294298",
+        "files_response_sha256": "d3e5d3497de87c62473ec45e108a5417086a2a94ba3f99920896e92cad681359",
+        "function_header_terminals": [
+          "diff",
+          "gradient"
+        ],
+        "head_revision": "8ec391a3384fc1637e3a6ba0a6a6a7b06a348ea1",
+        "hunk_functions": [
+          "numpy/lib/function_base.py:diff"
+        ],
+        "merge_commit": "fe1c1fbac3dbd0d314b96ad95447e370dceae079",
+        "merged_at": "2018-09-26T23:26:12Z",
+        "number": 8206,
+        "summary_response_sha256": "2265d7b2dce49fa0f90464e03c07fb56375300f21ca6d6aa918f723e16241d1f"
+      }
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-30128",
+      "expected_files": [
+        "sklearn/metrics/_regression.py"
+      ],
+      "expected_functions": [
+        "sklearn/metrics/_regression.py:_check_reg_targets",
+        "sklearn/metrics/_regression.py:mean_absolute_error",
+        "sklearn/metrics/_regression.py:mean_absolute_percentage_error",
+        "sklearn/metrics/_regression.py:mean_squared_error",
+        "sklearn/metrics/_regression.py:mean_squared_log_error",
+        "sklearn/metrics/_regression.py:root_mean_squared_log_error",
+        "sklearn/metrics/_regression.py:r2_score",
+        "sklearn/metrics/_regression.py:mean_tweedie_deviance",
+        "sklearn/metrics/_regression.py:d2_tweedie_score"
+      ],
+      "github_pr": {
+        "base_revision": "6bf2061f76ba0977c1f7ffb9ddc48db794e5c7ec",
+        "files_response_sha256": "a99d834ca83482a3a23393145c7bcb6ff1504371ebc943a4b77fc8f0db2b9767",
+        "function_header_terminals": [
+          "_check_reg_targets",
+          "d2_tweedie_score",
+          "mean_absolute_error",
+          "mean_absolute_percentage_error",
+          "mean_squared_error",
+          "mean_squared_log_error",
+          "mean_tweedie_deviance",
+          "r2_score",
+          "root_mean_squared_log_error"
+        ],
+        "head_revision": "e868d9d71f7c2129d3323acdf5eaeb545619b9a5",
+        "hunk_functions": [
+          "sklearn/metrics/_regression.py:_check_reg_targets",
+          "sklearn/metrics/_regression.py:mean_absolute_error",
+          "sklearn/metrics/_regression.py:mean_absolute_percentage_error",
+          "sklearn/metrics/_regression.py:mean_squared_error",
+          "sklearn/metrics/_regression.py:mean_squared_log_error",
+          "sklearn/metrics/_regression.py:root_mean_squared_log_error",
+          "sklearn/metrics/_regression.py:r2_score",
+          "sklearn/metrics/_regression.py:mean_tweedie_deviance",
+          "sklearn/metrics/_regression.py:d2_tweedie_score"
+        ],
+        "merge_commit": "33f08f1c5202cc0bdb6cdc09a92442f977fd2bb3",
+        "merged_at": "2024-12-02T10:11:08Z",
+        "number": 30128,
+        "summary_response_sha256": "53d3c2ce0f9467333dfa6efa80841d63c4af52b0b61e71815c9657646fe5950a"
       }
     },
     {
@@ -366,14 +1825,69 @@
         "src/prefect/flows.py:select_flow"
       ],
       "github_pr": {
-        "number": 16117,
-        "merged_at": "2024-11-26T15:22:06Z",
         "base_revision": "fb919c67427d230ecea03a5273dfdd6de59bd697",
+        "files_response_sha256": "1d8a21479ed61f5d749d0d85502b34a5832230048acf0d603724641c64ec5c0a",
+        "function_header_terminals": [
+          "flow",
+          "validate_parameters"
+        ],
         "head_revision": "754cec72a50427efa07596569d78c4cbb7f34d15",
         "hunk_functions": [
           "src/prefect/flows.py:Flow.validate_parameters",
           "src/prefect/flows.py:select_flow"
-        ]
+        ],
+        "merge_commit": "a6bdfdfa09967af43e22f7fbff46a49181e00ef8",
+        "merged_at": "2024-11-26T15:22:06Z",
+        "number": 16117,
+        "summary_response_sha256": "29b935855d9218447d746a5497d1e4a03816d1fd2e3d15223b8dac25b6c62a46"
+      }
+    },
+    {
+      "case_id": "PrefectHQ__prefect-14693",
+      "expected_files": [
+        "src/integrations/prefect-docker/prefect_docker/worker.py"
+      ],
+      "expected_functions": [
+        "src/integrations/prefect-docker/prefect_docker/worker.py:DockerWorker._build_container_settings"
+      ],
+      "github_pr": {
+        "base_revision": "80181d73383659c27f4e16122328f6c383e852fe",
+        "files_response_sha256": "787f90391d973cd3edfedf8e4b6519962d45d3eb08a054fb6253add1e86fb464",
+        "function_header_terminals": [
+          "_build_container_settings"
+        ],
+        "head_revision": "7a482c0a3cede20749ed7ed50cd6b44b343b0110",
+        "hunk_functions": [
+          "src/integrations/prefect-docker/prefect_docker/worker.py:DockerWorker._build_container_settings"
+        ],
+        "merge_commit": "7e60a4950b998899dadeb08c6e4fe1e97e5d8d6a",
+        "merged_at": "2024-07-22T15:45:58Z",
+        "number": 14693,
+        "summary_response_sha256": "d1e9e97ade9aa286cf81c92e964b8a137c9d079262c34f8af4841af09f9a7f3a"
+      }
+    },
+    {
+      "case_id": "PrefectHQ__prefect-13259",
+      "expected_files": [
+        "src/prefect/client/orchestration.py"
+      ],
+      "expected_functions": [
+        "src/prefect/client/orchestration.py:PrefectClient.update_deployment_schedule"
+      ],
+      "github_pr": {
+        "base_revision": "dbf132b346df079c4565abbe2cb31f61117b1b13",
+        "files_response_sha256": "ca335f18b49b58296bb57430b41fbf37d9aed798bc5121db47b39e4a4c9d762f",
+        "function_header_terminals": [
+          "update_deployment_schedule"
+        ],
+        "head_revision": "0d1f088c5d9094a93738d0f738d33764196c7a9f",
+        "hunk_functions": [
+          "src/prefect/client/orchestration.py:PrefectClient.update_deployment_schedule"
+        ],
+        "merge_commit": "d25ad0d7969fd14af3dba58b613913da18343cbc",
+        "merged_at": "2024-05-06T21:15:02Z",
+        "number": 13259,
+        "summary_response_sha256": "e64ab8b7d4724042b602389f40f21eac992ba9de894236a79c9a9d1bb829b2f7"
       }
     },
     {
@@ -385,13 +1899,19 @@
         "dask/array/reshape.py:reshape_blockwise"
       ],
       "github_pr": {
-        "number": 11541,
-        "merged_at": "2024-11-20T10:18:37Z",
         "base_revision": "5b115c4360fec6a4aa6e0edf8ad1d89a87c986dd",
+        "files_response_sha256": "f2ded328310fbd1702b63fd52e3f12fc0a2fd1bdc912316efe6ea3cbb53b226a",
+        "function_header_terminals": [
+          "reshape_blockwise"
+        ],
         "head_revision": "c366854b7a2c0d9ce0cd60f2c7cbf2917ce579e8",
         "hunk_functions": [
           "dask/array/reshape.py:reshape_blockwise"
-        ]
+        ],
+        "merge_commit": "33291a1453ac910e63badaccef96f77f0f886f0b",
+        "merged_at": "2024-11-20T10:18:37Z",
+        "number": 11541,
+        "summary_response_sha256": "7919f2162d727ada91c4067c73940ddd4f8809696054061d906305563c998035"
       }
     },
     {
@@ -404,14 +1924,22 @@
         "docling/backend/msword_backend.py:MsWordDocumentBackend.handle_pictures"
       ],
       "github_pr": {
-        "number": 330,
-        "merged_at": "2024-11-14T12:33:34Z",
         "base_revision": "bf2a85f1d45bcff38ff5f9b6269dd1edf7cff0ae",
+        "files_response_sha256": "93fbc82c1ecdba776cd13e5ef73238762822be1a1bdf3f08da2acc558387da25",
+        "function_header_terminals": [
+          "get_level",
+          "get_rowspan",
+          "walk_linear"
+        ],
         "head_revision": "0e56549082954483ed1bd3be85bf8175576ca26f",
         "hunk_functions": [
           "docling/backend/msword_backend.py:MsWordDocumentBackend.walk_linear",
           "docling/backend/msword_backend.py:MsWordDocumentBackend.handle_pictures"
-        ]
+        ],
+        "merge_commit": "8533039b0c0eff131b524da765f15c3279b554c5",
+        "merged_at": "2024-11-14T12:33:34Z",
+        "number": 330,
+        "summary_response_sha256": "326e5299e83db041ec653900926ad324b832a3aab36fa82f4f40b98c1da9c291"
       }
     },
     {
@@ -423,13 +1951,19 @@
         "moto/iotdata/models.py:FakeShadow.parse_payload"
       ],
       "github_pr": {
-        "number": 8342,
-        "merged_at": "2024-11-23T11:14:49Z",
         "base_revision": "60328d54ee14c390f00d83167da94bf273a58a6b",
+        "files_response_sha256": "1f78387afd887dec5505a780097f59277de4545724e92fab66a4c7e2e1fa2f69",
+        "function_header_terminals": [
+          "create_from_previous_version"
+        ],
         "head_revision": "4ea75615bddd7d642f27fdc471eb5299daaf6ed4",
         "hunk_functions": [
           "moto/iotdata/models.py:FakeShadow.parse_payload"
-        ]
+        ],
+        "merge_commit": "73588d5d36dc57def9b83a5b04752c56b18993bd",
+        "merged_at": "2024-11-23T11:14:49Z",
+        "number": 8342,
+        "summary_response_sha256": "9bbce379c5d0ec6ac1eba1856cecaea9c2ea025436f8fb5028d934c67b358275"
       }
     },
     {
@@ -441,14 +1975,390 @@
         "moto/ec2/responses/fleets.py:Fleets.create_fleet"
       ],
       "github_pr": {
-        "number": 8316,
-        "merged_at": "2024-11-15T10:15:28Z",
         "base_revision": "c9536b117e39fef41b9ccb5e07463eecda15ba2a",
+        "files_response_sha256": "c63686cf2ed721e2235b1e3a58ac5f0e848612f54e7d7c04afb7307164dc479b",
+        "function_header_terminals": [
+          "create_fleet"
+        ],
         "head_revision": "a6543232a9de81685a1911b5e9610ba5c55c3ffb",
         "hunk_functions": [
           "moto/ec2/responses/fleets.py:Fleets.create_fleet"
-        ]
+        ],
+        "merge_commit": "10bdd0837c8dfef21f22118521cf687119168e99",
+        "merged_at": "2024-11-15T10:15:28Z",
+        "number": 8316,
+        "summary_response_sha256": "35a363357df40c6926c365b754c47410002db20b4ea539efc5a3fdcd3751e415"
+      }
+    },
+    {
+      "case_id": "ray-project__ray-49236",
+      "expected_files": [
+        "python/ray/dag/compiled_dag_node.py"
+      ],
+      "expected_functions": [
+        "python/ray/dag/compiled_dag_node.py:CompiledDAG.__init__",
+        "python/ray/dag/compiled_dag_node.py:CompiledDAG._preprocess",
+        "python/ray/dag/compiled_dag_node.py:CompiledDAG._get_or_compile"
+      ],
+      "github_pr": {
+        "base_revision": "b78a78037bb8730eaa480e09df2805da5712b0bf",
+        "files_response_sha256": "95f7780483e84126d316f08b19475d533d67cc58790dab690a79462ab1e8d6a9",
+        "function_header_terminals": [
+          "__init__",
+          "_get_or_compile",
+          "_preprocess",
+          "visualize"
+        ],
+        "head_revision": "ac2f090b37061d61e84312ec5fb30ba877c12fac",
+        "hunk_functions": [
+          "python/ray/dag/compiled_dag_node.py:CompiledDAG.__init__",
+          "python/ray/dag/compiled_dag_node.py:CompiledDAG._preprocess",
+          "python/ray/dag/compiled_dag_node.py:CompiledDAG._get_or_compile"
+        ],
+        "merge_commit": "1e0916ea187a4441dafe6aee0a40f829ca32f4d3",
+        "merged_at": "2024-12-15T00:03:01Z",
+        "number": 49236,
+        "summary_response_sha256": "814bf179c783adec5382e515d85cfdb3a15deb4d48a7ca632f0a79acc04cc248"
+      }
+    },
+    {
+      "case_id": "ray-project__ray-49221",
+      "expected_files": [
+        "python/ray/data/dataset.py"
+      ],
+      "expected_functions": [
+        "python/ray/data/dataset.py:Dataset.add_column"
+      ],
+      "github_pr": {
+        "base_revision": "bc41605ee1c91e6666fa0f30a07bc90520c030f9",
+        "files_response_sha256": "c8685e24944186ad05735219396f4e5965a84c0bd7c86443f4c3149a8db05073",
+        "function_header_terminals": [
+          "add_column"
+        ],
+        "head_revision": "96673ddba2c95ad7ff308c2c6606474348454b0e",
+        "hunk_functions": [
+          "python/ray/data/dataset.py:Dataset.add_column"
+        ],
+        "merge_commit": "5da66eaa2b241839178c25028fea7785390ab617",
+        "merged_at": "2024-12-14T00:00:39Z",
+        "number": 49221,
+        "summary_response_sha256": "e61ccce5142210c92e426f0cc1676b39e3cad60ab0d1dc057f7995890f75a2b5"
+      }
+    },
+    {
+      "case_id": "bridgecrewio__checkov-6909",
+      "expected_files": [
+        "checkov/serverless/graph_builder/local_graph.py"
+      ],
+      "expected_functions": [
+        "checkov/serverless/graph_builder/local_graph.py:ServerlessLocalGraph._create_vertex"
+      ],
+      "github_pr": {
+        "base_revision": "a657e60794302e971ff39b9566520067d67f1bf9",
+        "files_response_sha256": "856dd2b417b75683dc6ac24e04fe2c17915e622957c5123562b5b7c48542199b",
+        "function_header_terminals": [
+          "_create_vertex"
+        ],
+        "head_revision": "25d571502beb0a2e98b3a47384eee77b7ffb0409",
+        "hunk_functions": [
+          "checkov/serverless/graph_builder/local_graph.py:ServerlessLocalGraph._create_vertex"
+        ],
+        "merge_commit": "fbd434524593c340d27d2dc707c8dd3edfba73e7",
+        "merged_at": "2024-12-17T10:21:40Z",
+        "number": 6909,
+        "summary_response_sha256": "814c134ffce79d1b2f80e7faf8d18c677fcd6daa21b852b1cf0845b3653e0748"
+      }
+    },
+    {
+      "case_id": "bridgecrewio__checkov-6895",
+      "expected_files": [
+        "checkov/terraform/checks/resource/azure/PostgreSQLFlexiServerGeoBackupEnabled.py"
+      ],
+      "expected_functions": [
+        "checkov/terraform/checks/resource/azure/PostgreSQLFlexiServerGeoBackupEnabled.py:PostgreSQLFlexiServerGeoBackupEnabled.__init__",
+        "checkov/terraform/checks/resource/azure/PostgreSQLFlexiServerGeoBackupEnabled.py:PostgreSQLFlexiServerGeoBackupEnabled.get_inspected_key"
+      ],
+      "github_pr": {
+        "base_revision": "a94c1682b275bbf755342c0164d2ac0c379c0c16",
+        "files_response_sha256": "402e4abe0d7a16fd83815030e55e01f0a4be048fdc20aa7ce5d62d6bd77ddbb6",
+        "function_header_terminals": [],
+        "head_revision": "1d936fc0faaa09249eee9f17c443bfc3bcbdfca9",
+        "hunk_functions": [
+          "checkov/terraform/checks/resource/azure/PostgreSQLFlexiServerGeoBackupEnabled.py:PostgreSQLFlexiServerGeoBackupEnabled.__init__",
+          "checkov/terraform/checks/resource/azure/PostgreSQLFlexiServerGeoBackupEnabled.py:PostgreSQLFlexiServerGeoBackupEnabled.get_inspected_key"
+        ],
+        "merge_commit": "fac2c724dc9cb8998803333e501dd3b7685e6937",
+        "merged_at": "2024-12-09T08:43:41Z",
+        "number": 6895,
+        "summary_response_sha256": "a21d345f052c1a4ce79db1f286fc9c1e24f167e342141ce1f34f1c25dec61528"
+      }
+    },
+    {
+      "case_id": "keras-team__keras-20626",
+      "expected_files": [
+        "keras/src/layers/preprocessing/normalization.py"
+      ],
+      "expected_functions": [
+        "keras/src/layers/preprocessing/normalization.py:Normalization.build"
+      ],
+      "github_pr": {
+        "base_revision": "a0f586beb7842d86fce623cab5d3a7fdb2419e9b",
+        "files_response_sha256": "551bc23dde9e323aa974c84df6951c4adbd620b0c11e7ebe7c6efeec4e8159da",
+        "function_header_terminals": [
+          "build"
+        ],
+        "head_revision": "f10dc1835d2b1c60757cdb1004c2598bd26490b4",
+        "hunk_functions": [
+          "keras/src/layers/preprocessing/normalization.py:Normalization.build"
+        ],
+        "merge_commit": "aab9458ed43de7b117ece0e563a630afe72cb5db",
+        "merged_at": "2024-12-11T12:14:37Z",
+        "number": 20626,
+        "summary_response_sha256": "ee83d3a6d88f96744ac0cdf33284992cac7fe92ecac834debe8cc79c35265021"
+      }
+    },
+    {
+      "case_id": "keras-team__keras-20550",
+      "expected_files": [
+        "keras/src/models/cloning.py"
+      ],
+      "expected_functions": [
+        "keras/src/models/cloning.py:_clone_sequential_model"
+      ],
+      "github_pr": {
+        "base_revision": "553521ee92f72c993ddb3c40d0ced406a3a4b7db",
+        "files_response_sha256": "304f64a81a3ee6e3bdb77137a7e5d092fc3eda568ae839078de99256876c63b5",
+        "function_header_terminals": [
+          "_clone_sequential_model"
+        ],
+        "head_revision": "fe2cbb425ba5bf9846662d83e17f8faca1d9d08b",
+        "hunk_functions": [
+          "keras/src/models/cloning.py:_clone_sequential_model"
+        ],
+        "merge_commit": "b6d305f82957ef57089298ebbcb01920fea4bf8e",
+        "merged_at": "2024-11-26T15:52:23Z",
+        "number": 20550,
+        "summary_response_sha256": "d781235378580e21d76190791b7d92a17870f0b8a3845d9323cb230383de0af2"
+      }
+    },
+    {
+      "case_id": "keras-team__keras-20443",
+      "expected_files": [
+        "keras/src/utils/io_utils.py"
+      ],
+      "expected_functions": [
+        "keras/src/utils/io_utils.py:print_msg"
+      ],
+      "github_pr": {
+        "base_revision": "f9ea1a013c29e24001dc6cb7b10d9f740545fe58",
+        "files_response_sha256": "6e18c6cdc1ba009e997b193a683a2e62ecb9858fc27cea29b45d8347d261ebfa",
+        "function_header_terminals": [
+          "ask_to_proceed_with_overwrite",
+          "set_logging_verbosity"
+        ],
+        "head_revision": "8fd041032bc0f60bc08dd9c374057fbadd8a51bc",
+        "hunk_functions": [
+          "keras/src/utils/io_utils.py:print_msg"
+        ],
+        "merge_commit": "0adc924e17ce0b1a6dbe769d594f66fbe79e988a",
+        "merged_at": "2024-11-03T17:59:17Z",
+        "number": 20443,
+        "summary_response_sha256": "d04a365aa03445f938dff82ffd13b1da47f6278aa2691dc5438e102b20f10f03"
+      }
+    },
+    {
+      "case_id": "python__mypy-18164",
+      "expected_files": [
+        "mypy/subtypes.py"
+      ],
+      "expected_functions": [
+        "mypy/subtypes.py:SubtypeVisitor.visit_typeddict_type"
+      ],
+      "github_pr": {
+        "base_revision": "8ef21976cfd190d0b1974f438a7d30e8eaea5272",
+        "files_response_sha256": "1e625e21a655b7bec20f762c340dbe454156474e48f5923835a318e5aaf6edc9",
+        "function_header_terminals": [
+          "visit_typeddict_type"
+        ],
+        "head_revision": "4e88ddb672cd5eef3be48cf8bbfe641969b860ac",
+        "hunk_functions": [
+          "mypy/subtypes.py:SubtypeVisitor.visit_typeddict_type"
+        ],
+        "merge_commit": "87998c8674d4addfa632914770312b8647cbc392",
+        "merged_at": "2024-11-19T09:11:23Z",
+        "number": 18164,
+        "summary_response_sha256": "2d44da19c884ac037a928b3774ad185f3245d1905cdd42cc598db324c3c8bb19"
+      }
+    },
+    {
+      "case_id": "python__mypy-18160",
+      "expected_files": [
+        "mypy/checkexpr.py"
+      ],
+      "expected_functions": [
+        "mypy/checkexpr.py:ExpressionChecker.visit_slice_expr"
+      ],
+      "github_pr": {
+        "base_revision": "8ef21976cfd190d0b1974f438a7d30e8eaea5272",
+        "files_response_sha256": "124268a8471dce2c134c72cacc62f536028bcd6fae893b0b94ef9e6874ae7c0c",
+        "function_header_terminals": [
+          "visit_slice_expr"
+        ],
+        "head_revision": "510455ac289cadbe1926a1fbceea83dd23560a46",
+        "hunk_functions": [
+          "mypy/checkexpr.py:ExpressionChecker.visit_slice_expr"
+        ],
+        "merge_commit": "6759dbd5bbcca4501748dc52d93d5a50060a825a",
+        "merged_at": "2024-11-19T08:26:02Z",
+        "number": 18160,
+        "summary_response_sha256": "992387e642bfe4b72fc44ea4fe42663687de99c14137e4614e69b39d4b749f9b"
+      }
+    },
+    {
+      "case_id": "django__django-18906",
+      "expected_files": [
+        "django/forms/forms.py"
+      ],
+      "expected_functions": [
+        "django/forms/forms.py:BaseForm.full_clean"
+      ],
+      "github_pr": {
+        "base_revision": "1860a1afc9ac20750f932e8e0a94b32d096f2848",
+        "files_response_sha256": "d4a8fd07a1468e5e46840f017bbc82000f28c69e830dbf6a31ae84a403be5cab",
+        "function_header_terminals": [
+          "full_clean"
+        ],
+        "head_revision": "6eed97e15f04fa4cd747e9bdeb50e8f6f7389029",
+        "hunk_functions": [
+          "django/forms/forms.py:BaseForm.full_clean"
+        ],
+        "merge_commit": "02628c051c18d000256424daffe996c22bed5ae3",
+        "merged_at": "2024-12-10T11:13:45Z",
+        "number": 18906,
+        "summary_response_sha256": "42949fcaed2e6979fbbe2b635a6f928c87272283610456932529e2f2f90b4da1"
+      }
+    },
+    {
+      "case_id": "django__django-18795",
+      "expected_files": [
+        "django/db/models/fields/__init__.py"
+      ],
+      "expected_functions": [
+        "django/db/models/fields/__init__.py:Field._check_db_default"
+      ],
+      "github_pr": {
+        "base_revision": "2bc43ccbdb28b9d87da172ef119ff3b48e6ff71a",
+        "files_response_sha256": "779b4a6ecc6d1013c28942250259499bf1e5f172a4819a1bc17aef0f34f4723c",
+        "function_header_terminals": [
+          "_check_db_default"
+        ],
+        "head_revision": "e9544b178ef3b1c0d3c5e4fd1725c835108ee2ec",
+        "hunk_functions": [
+          "django/db/models/fields/__init__.py:Field._check_db_default"
+        ],
+        "merge_commit": "c4614b53d355561d426b0fed903e96c3c198e10d",
+        "merged_at": "2024-11-11T15:05:09Z",
+        "number": 18795,
+        "summary_response_sha256": "09f08d938101447fd5365d6d1d02102b76cd3148c7fa9863296ad651d1f23dc5"
+      }
+    },
+    {
+      "case_id": "django__django-18785",
+      "expected_files": [
+        "django/template/base.py"
+      ],
+      "expected_functions": [
+        "django/template/base.py:Template.get_exception_info"
+      ],
+      "github_pr": {
+        "base_revision": "c12bc980e5b2bb25e447cd8dee550cad767f1ad2",
+        "files_response_sha256": "cfa2e0357b72e79decb2ddc9a55435b8300eece69ce64e97e8f439dce857dfdc",
+        "function_header_terminals": [
+          "get_exception_info"
+        ],
+        "head_revision": "10af0b6a577dd0007d34a90620469f001040e49d",
+        "hunk_functions": [
+          "django/template/base.py:Template.get_exception_info"
+        ],
+        "merge_commit": "1722f2db5808708de6fc6e0f48af2d518be1e348",
+        "merged_at": "2024-11-28T14:53:31Z",
+        "number": 18785,
+        "summary_response_sha256": "97b5820f559209305a88d0b40660033e77ea61a2b62c95c7ced8823b0ae42b74"
+      }
+    },
+    {
+      "case_id": "roboflow__supervision-1698",
+      "expected_files": [
+        "supervision/detection/core.py"
+      ],
+      "expected_functions": [
+        "supervision/detection/core.py:Detections.__getitem__"
+      ],
+      "github_pr": {
+        "base_revision": "6889e33da587ed6e161334d815274d520f2844c4",
+        "files_response_sha256": "588c584b550c16a3a54454a9b78d7299d3283aaf755616898e83e1f166874a62",
+        "function_header_terminals": [
+          "__getitem__"
+        ],
+        "head_revision": "7141f11c0b2a738fb24f0c99d044df55c34df63a",
+        "hunk_functions": [
+          "supervision/detection/core.py:Detections.__getitem__"
+        ],
+        "merge_commit": "ae8e6b297692f39b547b75b18c4864ce3f3df2f7",
+        "merged_at": "2024-12-04T10:15:31Z",
+        "number": 1698,
+        "summary_response_sha256": "c3e6570a9474a42518739978c144b9f7456ba6950538ffcaab390a1f2f69f88f"
+      }
+    },
+    {
+      "case_id": "huggingface__trl-2450",
+      "expected_files": [
+        "trl/trainer/utils.py"
+      ],
+      "expected_functions": [
+        "trl/trainer/utils.py:DataCollatorForChatML.__call__"
+      ],
+      "github_pr": {
+        "base_revision": "9c5388b69e0842f76edc46a2ff9d0b51e1db4337",
+        "files_response_sha256": "d7bb31c4c512de13de23792a205b719145ce9d4e3fc4225fb01db4f9e4c4b9b0",
+        "function_header_terminals": [
+          "__call__"
+        ],
+        "head_revision": "b29ff551ffaae8eddefef2b410952c6abb49d4ea",
+        "hunk_functions": [
+          "trl/trainer/utils.py:DataCollatorForChatML.__call__"
+        ],
+        "merge_commit": "c9c4f1803943e5e489f749c5ece933e91781134e",
+        "merged_at": "2024-12-11T14:18:54Z",
+        "number": 2450,
+        "summary_response_sha256": "bf033bfffe296ca0b721281f167a58e144a70e482d23f53bbca024bdf58b8bab"
+      }
+    },
+    {
+      "case_id": "rq__rq-2138",
+      "expected_files": [
+        "rq/job.py"
+      ],
+      "expected_functions": [
+        "rq/job.py:Job.set_id"
+      ],
+      "github_pr": {
+        "base_revision": "bb7f34053730da924486f97baa0d34fee9b1918b",
+        "files_response_sha256": "e7e95ea5a8ffe10402e4080903273f5f1b9712dd9aae6fec55cd208a89558471",
+        "function_header_terminals": [
+          "set_id"
+        ],
+        "head_revision": "fa87c43e8278e8c4f95817a77b74494e16170fe9",
+        "hunk_functions": [
+          "rq/job.py:Job.set_id"
+        ],
+        "merge_commit": "b44ae85a8d9e81041c949a380193b1999ed7759b",
+        "merged_at": "2024-11-09T07:03:55Z",
+        "number": 2138,
+        "summary_response_sha256": "4fd9e736c8e587546e9c9adf0c790459c898ca5aab78ea54a18142c0a3a3814d"
       }
     }
-  ]
+  ],
+  "policy": "LocBench edit_functions corroborated by immutable merged GitHub PR summary and files responses before retrieval",
+  "schema_version": 1
 }

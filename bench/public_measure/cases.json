@@ -1,151 +1,571 @@
 {
-  "schema_version": 1,
-  "dataset": {
-    "repository": "czlll/Loc-Bench_V1",
-    "revision": "c44cf3b74e07ca642cec841b471a9939907c12a7",
-    "parquet_path": "data/test-00000-of-00001.parquet",
-    "parquet_sha256": "8df0833c2c1276c5837aab923d489ab97d7654529abe759d0f59242c4978a662"
-  },
   "cases": [
     {
       "case_id": "UXARRAY__uxarray-1117",
       "category": "Performance Issue",
+      "query": "Optimize Face Centroid Calculations\nIf `Grid.face_lon` does not exist, `_populate_face_centroids()`, actually `_construct_face_centroids()` in it, takes extremely long for large datasets. For instance, the benchmark/profiling below is for a ~4GB SCREAM dataset, around 5 mins:",
       "repository": "UXARRAY/uxarray",
-      "revision": "fe4cae1311db7fb21187b505e06018334a015c48",
-      "query": "Optimize Face Centroid Calculations\nIf `Grid.face_lon` does not exist, `_populate_face_centroids()`, actually `_construct_face_centroids()` in it, takes extremely long for large datasets. For instance, the benchmark/profiling below is for a ~4GB SCREAM dataset, around 5 mins:"
+      "revision": "fe4cae1311db7fb21187b505e06018334a015c48"
     },
     {
       "case_id": "Chainlit__chainlit-1575",
       "category": "Security Vulnerability",
+      "query": "Security: allowed origins should not be * by default\nCORS headers should be restricted to the current domain at least, by default.",
       "repository": "Chainlit/chainlit",
-      "revision": "8b2d4bacfd4fa2c8af72e2d140d527d20125b07b",
-      "query": "Security: allowed origins should not be * by default\nCORS headers should be restricted to the current domain at least, by default."
+      "revision": "8b2d4bacfd4fa2c8af72e2d140d527d20125b07b"
     },
     {
       "case_id": "Open-MSS__MSS-1967",
       "category": "Performance Issue",
+      "query": "What to do with \"UserWarning: An unhandled message box popped up during your test!\"?\nThere are many of these warnings in the CI logs basically spamming the output and drowning out other more interesting warnings.",
       "repository": "Open-MSS/MSS",
-      "revision": "56e9528b552a9d8f2e267661473b8f0e724fd093",
-      "query": "What to do with \"UserWarning: An unhandled message box popped up during your test!\"?\nThere are many of these warnings in the CI logs basically spamming the output and drowning out other more interesting warnings."
+      "revision": "56e9528b552a9d8f2e267661473b8f0e724fd093"
     },
     {
       "case_id": "sopel-irc__sopel-2285",
       "category": "Security Vulnerability",
+      "query": "url: private_resolution/dns_resolution useless\n### Description\nThe url.enable_private_resolution and url.enable_dns_resolution settings do not work as advertised, and the concept of the latter is fatally flawed.",
       "repository": "sopel-irc/sopel",
-      "revision": "51300a1ab854d6ec82d90df1bc876188c03335ff",
-      "query": "url: private_resolution/dns_resolution useless\n### Description\nThe url.enable_private_resolution and url.enable_dns_resolution settings do not work as advertised, and the concept of the latter is fatally flawed."
+      "revision": "51300a1ab854d6ec82d90df1bc876188c03335ff"
     },
     {
       "case_id": "mesonbuild__meson-11366",
       "category": "Security Vulnerability",
+      "query": "'ninja install' attempts to gain elevated privileges\nIt is disturbing for 'ninja install' to prompt for a sudo password with polkit.",
       "repository": "mesonbuild/meson",
-      "revision": "088727164de8496c4bada040c2f4690e42f66b69",
-      "query": "'ninja install' attempts to gain elevated privileges\nIt is disturbing for 'ninja install' to prompt for a sudo password with polkit."
+      "revision": "088727164de8496c4bada040c2f4690e42f66b69"
     },
     {
       "case_id": "pypa__pip-13085",
       "category": "Security Vulnerability",
+      "query": "Lazy import allows wheel to execute code on install.",
       "repository": "pypa/pip",
-      "revision": "fe0925b3c00bf8956a0d33408df692ac364217d4",
-      "query": "Lazy import allows wheel to execute code on install."
+      "revision": "fe0925b3c00bf8956a0d33408df692ac364217d4"
     },
     {
       "case_id": "vllm-project__vllm-9390",
       "category": "Feature Request",
+      "query": "Benchmarking script does not limit the maximum concurrency\nThe current benchmarking script if specified with `INF` arrivals, will not limit the maximum concurrency level as shown [here](https://github.com/vllm-project/vllm/blob/703e42ee4b3efed3c71e7ae7d15f0f96e05722d4/benchmarks/benchmark_serving.py#L191).",
       "repository": "vllm-project/vllm",
-      "revision": "83450458339b07765b0e72a822e5fe93eeaf5258",
-      "query": "Benchmarking script does not limit the maximum concurrency\nThe current benchmarking script if specified with `INF` arrivals, will not limit the maximum concurrency level as shown [here](https://github.com/vllm-project/vllm/blob/703e42ee4b3efed3c71e7ae7d15f0f96e05722d4/benchmarks/benchmark_serving.py#L191)."
+      "revision": "83450458339b07765b0e72a822e5fe93eeaf5258"
     },
     {
       "case_id": "scikit-learn__scikit-learn-25186",
       "category": "Performance Issue",
+      "query": "Improving IsolationForest predict time\n### Discussed in https://github.com/scikit-learn/scikit-learn/discussions/25142",
       "repository": "scikit-learn/scikit-learn",
-      "revision": "b2fe9746a862272a60ffc7d2c6563d28dd13a6c6",
-      "query": "Improving IsolationForest predict time\n### Discussed in https://github.com/scikit-learn/scikit-learn/discussions/25142"
+      "revision": "b2fe9746a862272a60ffc7d2c6563d28dd13a6c6"
     },
     {
       "case_id": "okta__okta-jwt-verifier-python-59",
       "category": "Security Vulnerability",
+      "query": "Dependency python-Jose appears to be unmaintained\nHey - just a heads-up that it appears this library is using `python-jose` as a dependency, which hasn't been updated in ~2 years. Maintainers haven't shown any activity in GitHub for issues or pull requests in quite a while, either. It would probably be prudent to pivot to PyJWT or JWCrypto, before CVEs start cropping up against the abandoned library.\nDependency python-Jose appears to be unmaintained\nHey - just a heads-up that it appears this library is using `python-jose` as a dependency, which hasn't been updated in ~2 years. Maintainers haven't shown any activity in GitHub for issues or pull requests in quite a while, either. It would probably be prudent to pivot to PyJWT or JWCrypto, before CVEs start cropping up against the abandoned library.",
       "repository": "okta/okta-jwt-verifier-python",
-      "revision": "cb4e6780c55c234690299fa4ccef5ad33746c2c2",
-      "query": "Dependency python-Jose appears to be unmaintained\nHey - just a heads-up that it appears this library is using `python-jose` as a dependency, which hasn't been updated in ~2 years. Maintainers haven't shown any activity in GitHub for issues or pull requests in quite a while, either. It would probably be prudent to pivot to PyJWT or JWCrypto, before CVEs start cropping up against the abandoned library.\nDependency python-Jose appears to be unmaintained\nHey - just a heads-up that it appears this library is using `python-jose` as a dependency, which hasn't been updated in ~2 years. Maintainers haven't shown any activity in GitHub for issues or pull requests in quite a while, either. It would probably be prudent to pivot to PyJWT or JWCrypto, before CVEs start cropping up against the abandoned library."
+      "revision": "cb4e6780c55c234690299fa4ccef5ad33746c2c2"
+    },
+    {
+      "case_id": "gitpython-developers__GitPython-1636",
+      "category": "Security Vulnerability",
+      "query": "CVE-2023-40590: Untrusted search path on Windows systems leading to arbitrary code execution \nThis appeared in the CVE additional information here https://github.com/gitpython-developers/GitPython/security/advisories/GHSA-wfm5-v35h-vwf4.",
+      "repository": "gitpython-developers/GitPython",
+      "revision": "e19abe75bbd7d766d7f06171c6524431e4653545"
     },
     {
       "case_id": "huggingface__optimum-benchmark-266",
       "category": "Performance Issue",
+      "query": "Timeout with multiple AMD GPUs tensor parallelism in vLLM\n## Problem Description",
       "repository": "huggingface/optimum-benchmark",
-      "revision": "1992de306378f7d5848d36ddc73f15ba711c8d70",
-      "query": "Timeout with multiple AMD GPUs tensor parallelism in vLLM\n## Problem Description"
+      "revision": "1992de306378f7d5848d36ddc73f15ba711c8d70"
     },
     {
       "case_id": "JoinMarket-Org__joinmarket-clientserver-1180",
       "category": "Performance Issue",
+      "query": "yg-privacyenhanced.py: excessive CPU usage\nAt first startup of the Yield Generator, CPU usage seems acceptable, but as it sits running for a few days, it starts using excessive amounts of CPU time. It seems to depend on how many CoinJoins it has participated in. Case in point: I have two instances of `yg-privacyenhanced.py` running (with separate JM wallets and separate Bitcoin Core wallets), one running with native SegWit and the other with transitional SegWit. Both were started at the same time, about 154 hours ago. One has used about 25 minutes of CPU time. The other has used about 75 hours of CPU time \u2014 i.e., nearly half of the wall-clock time that it has been running!",
       "repository": "JoinMarket-Org/joinmarket-clientserver",
-      "revision": "aabfd3f7c2ec33391b89369bd1fe354659f10f0f",
-      "query": "yg-privacyenhanced.py: excessive CPU usage\nAt first startup of the Yield Generator, CPU usage seems acceptable, but as it sits running for a few days, it starts using excessive amounts of CPU time. It seems to depend on how many CoinJoins it has participated in. Case in point: I have two instances of `yg-privacyenhanced.py` running (with separate JM wallets and separate Bitcoin Core wallets), one running with native SegWit and the other with transitional SegWit. Both were started at the same time, about 154 hours ago. One has used about 25 minutes of CPU time. The other has used about 75 hours of CPU time — i.e., nearly half of the wall-clock time that it has been running!"
+      "revision": "aabfd3f7c2ec33391b89369bd1fe354659f10f0f"
+    },
+    {
+      "case_id": "TagStudioDev__TagStudio-735",
+      "category": "Performance Issue",
+      "query": "[Bug]: Adding (or searching for) tags gets increasingly slower in the same session (running process)\n### Checklist",
+      "repository": "TagStudioDev/TagStudio",
+      "revision": "921a8875de22f7c136316edfb5d3038236414b57"
+    },
+    {
+      "case_id": "micropython__micropython-lib-947",
+      "category": "Security Vulnerability",
+      "query": "SECURITY: Requests module leaks passwords & usernames for HTTP Basic Auth\nWhile looking at the MicroPython `requests` module (on the git HEAD), I noticed this:",
+      "repository": "micropython/micropython-lib",
+      "revision": "e4cf09527bce7569f5db742cf6ae9db68d50c6a9"
+    },
+    {
+      "case_id": "fortra__impacket-1636",
+      "category": "Security Vulnerability",
+      "query": "SOCKS server listens on all interfaces by default\n### Configuration  \nimpacket version:  v0.10.1.dev1+20230207.182628.6cd68a05\nPython version:  3.9.2\nTarget OS:  NA\n \nBy default, the SOCKS server used by ntlmrelayx.py listens on all interfaces (0.0.0.0)1080, which is dangerous.",
+      "repository": "fortra/impacket",
+      "revision": "33058eb2fde6976ea62e04bc7d6b629d64d44712"
+    },
+    {
+      "case_id": "AzureAD__microsoft-authentication-library-for-python-454",
+      "category": "Performance Issue",
+      "query": "MSAL can consider using lazy import for `request`, `jwt`\n**Describe the bug**",
+      "repository": "AzureAD/microsoft-authentication-library-for-python",
+      "revision": "66a1c5a935e59c66281ccf73a3931681eeedee23"
+    },
+    {
+      "case_id": "Chainlit__chainlit-1441",
+      "category": "Security Vulnerability",
+      "query": "fix(security): add auth to /project/file get endpoint\nfixes https://github.com/Chainlit/chainlit/issues/1101",
+      "repository": "Chainlit/chainlit",
+      "revision": "beb44ca74f18b352fa078baf7038c2dc6b729e0c"
     },
     {
       "case_id": "django__django-18616",
       "category": "Feature Request",
+      "query": "Add 307 and 308 redirect response codes to django.shortcuts.redirect\nDescription\n\t \nOther than 301 and 302 response codes for redirects, there is also:\n\u200bhttps://developer.mozilla.org/en-US/docs/Web/HTTP/Status/307\n\u200bhttps://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308\nCurrently, Django is unaware of these.\nProposal:\nAdd two new HTTP response classes for 307 and 308.\nEnhance django.shortcuts.redirect with a new keyword argument preserve_method that, in combination with the existing permanent, decides which of the four redirect classes to use.\nAdd 307 and 308 redirect response codes to django.shortcuts.redirect\nDescription\n\t \nOther than 301 and 302 response codes for redirects, there is also:\n\u200bhttps://developer.mozilla.org/en-US/docs/Web/HTTP/Status/307\n\u200bhttps://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308\nCurrently, Django is unaware of these.\nProposal:\nAdd two new HTTP response classes for 307 and 308.\nEnhance django.shortcuts.redirect with a new keyword argument preserve_method that, in combination with the existing permanent, decides which of the four redirect classes to use.",
       "repository": "django/django",
-      "revision": "b9aa3239ab1328c915684d89b87a49459cabd30b",
-      "query": "Add 307 and 308 redirect response codes to django.shortcuts.redirect\nDescription\n\t \nOther than 301 and 302 response codes for redirects, there is also:\n​https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/307\n​https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308\nCurrently, Django is unaware of these.\nProposal:\nAdd two new HTTP response classes for 307 and 308.\nEnhance django.shortcuts.redirect with a new keyword argument preserve_method that, in combination with the existing permanent, decides which of the four redirect classes to use.\nAdd 307 and 308 redirect response codes to django.shortcuts.redirect\nDescription\n\t \nOther than 301 and 302 response codes for redirects, there is also:\n​https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/307\n​https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308\nCurrently, Django is unaware of these.\nProposal:\nAdd two new HTTP response classes for 307 and 308.\nEnhance django.shortcuts.redirect with a new keyword argument preserve_method that, in combination with the existing permanent, decides which of the four redirect classes to use."
+      "revision": "b9aa3239ab1328c915684d89b87a49459cabd30b"
+    },
+    {
+      "case_id": "Bears-R-Us__arkouda-1969",
+      "category": "Performance Issue",
+      "query": "Multi-column Parquet write inefficiencies\nPassing along a comment from another developer. \" I've noticed that Parquet output from Arkouoda is currently very slow. The Arkouda client library saves multi-column dataframes by sending a separate writeParquet request to the server for each column, adding them to the file one-by-one. The ccp_appendColumnToParquet function doesn't add the column to the file in-place, though; instead it loads the whole existing file into memory, adds the new column to the table object in memory, and overwrites the whole file with the new version. That means it's loading and re-saving the content of all the old columns each time it adds a new one, which adds a lot of overhead since this happens for every column.\"\nMulti-column Parquet write inefficiencies\nPassing along a comment from another developer. \" I've noticed that Parquet output from Arkouoda is currently very slow. The Arkouda client library saves multi-column dataframes by sending a separate writeParquet request to the server for each column, adding them to the file one-by-one. The ccp_appendColumnToParquet function doesn't add the column to the file in-place, though; instead it loads the whole existing file into memory, adds the new column to the table object in memory, and overwrites the whole file with the new version. That means it's loading and re-saving the content of all the old columns each time it adds a new one, which adds a lot of overhead since this happens for every column.\"",
+      "repository": "Bears-R-Us/arkouda",
+      "revision": "6e3da833ae55173cfc7488faa1e1951c8506a255"
     },
     {
       "case_id": "django__django-18435",
       "category": "Feature Request",
+      "query": "Add warning to runserver that it should not be used for production\nDescription\n\t \nAs per this discussion on the \u200bforum, I think adding a warning to the start of runserver would be valuable to those new to Django and a healthy reminder to those coming back to Django. \nThe wording of the warning is:\nWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\nFor more information on production servers see the documentation: https://docs.djangoproject.com/en/5.0/howto/deployment/\nAdditionally a flag should be added to optionally hide the warning. --hide-unsuitable-for-production was a suggestion.\nFinally the following 2 pages of the documentation should have add some wording to highlight that a deployed project should not use runserver.\n\u200bhttps://docs.djangoproject.com/en/5.0/howto/deployment/ (Add a warning or paragraph that mentions switching)\n\u200bhttps://docs.djangoproject.com/en/5.0/howto/deployment/checklist/ (Add a section to switch away from runserver)\nAdd warning to runserver that it should not be used for production\nDescription\n\t \nAs per this discussion on the \u200bforum, I think adding a warning to the start of runserver would be valuable to those new to Django and a healthy reminder to those coming back to Django. \nThe wording of the warning is:\nWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\nFor more information on production servers see the documentation: https://docs.djangoproject.com/en/5.0/howto/deployment/\nAdditionally a flag should be added to optionally hide the warning. --hide-unsuitable-for-production was a suggestion.\nFinally the following 2 pages of the documentation should have add some wording to highlight that a deployed project should not use runserver.\n\u200bhttps://docs.djangoproject.com/en/5.0/howto/deployment/ (Add a warning or paragraph that mentions switching)\n\u200bhttps://docs.djangoproject.com/en/5.0/howto/deployment/checklist/ (Add a section to switch away from runserver)",
       "repository": "django/django",
-      "revision": "95827452571eb976c4f0d5e9ac46843948dd5fe6",
-      "query": "Add warning to runserver that it should not be used for production\nDescription\n\t \nAs per this discussion on the ​forum, I think adding a warning to the start of runserver would be valuable to those new to Django and a healthy reminder to those coming back to Django. \nThe wording of the warning is:\nWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\nFor more information on production servers see the documentation: https://docs.djangoproject.com/en/5.0/howto/deployment/\nAdditionally a flag should be added to optionally hide the warning. --hide-unsuitable-for-production was a suggestion.\nFinally the following 2 pages of the documentation should have add some wording to highlight that a deployed project should not use runserver.\n​https://docs.djangoproject.com/en/5.0/howto/deployment/ (Add a warning or paragraph that mentions switching)\n​https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/ (Add a section to switch away from runserver)\nAdd warning to runserver that it should not be used for production\nDescription\n\t \nAs per this discussion on the ​forum, I think adding a warning to the start of runserver would be valuable to those new to Django and a healthy reminder to those coming back to Django. \nThe wording of the warning is:\nWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\nFor more information on production servers see the documentation: https://docs.djangoproject.com/en/5.0/howto/deployment/\nAdditionally a flag should be added to optionally hide the warning. --hide-unsuitable-for-production was a suggestion.\nFinally the following 2 pages of the documentation should have add some wording to highlight that a deployed project should not use runserver.\n​https://docs.djangoproject.com/en/5.0/howto/deployment/ (Add a warning or paragraph that mentions switching)\n​https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/ (Add a section to switch away from runserver)"
+      "revision": "95827452571eb976c4f0d5e9ac46843948dd5fe6"
     },
     {
       "case_id": "sqlfluff__sqlfluff-6399",
       "category": "Feature Request",
+      "query": "replace deprecated appdirs dependency with platformdirs\n### Search before asking",
       "repository": "sqlfluff/sqlfluff",
-      "revision": "80f4fc2d3bbc7839e41a9018ae4918118c309656",
-      "query": "replace deprecated appdirs dependency with platformdirs\n### Search before asking"
+      "revision": "80f4fc2d3bbc7839e41a9018ae4918118c309656"
+    },
+    {
+      "case_id": "mathesar-foundation__mathesar-3117",
+      "category": "Security Vulnerability",
+      "query": "The requirement of superuser postgresql access is problematic\n## Problem\nMathesar needs a Postgres superuser to function correctly, from the docs at https://docs.mathesar.org/installation/build-from-source/",
+      "repository": "mathesar-foundation/mathesar",
+      "revision": "e7b175bc2f7db0ae6e69c723c6a054c6dc2152d8"
     },
     {
       "case_id": "huggingface__transformers-22498",
       "category": "Feature Request",
+      "query": "Implement safetensors checkpoint loading for Trainer\n### Feature request",
       "repository": "huggingface/transformers",
-      "revision": "6fc44656b43f1de939a1e62dd59c45d1fec9f1aa",
-      "query": "Implement safetensors checkpoint loading for Trainer\n### Feature request"
+      "revision": "6fc44656b43f1de939a1e62dd59c45d1fec9f1aa"
+    },
+    {
+      "case_id": "JackPlowman__repo_standards_validator-137",
+      "category": "Security Vulnerability",
+      "query": "Fix private vulnerability disclosure incorrect value",
+      "repository": "JackPlowman/repo_standards_validator",
+      "revision": "35962a9fbb5711ab436edca91026428aed1e2d1c"
+    },
+    {
+      "case_id": "pandas-dev__pandas-29944",
+      "category": "Feature Request",
+      "query": "ENH: Group some columns in subplots with DataFrame.plot\n`df.plot(subplots=True)`  will create one subplot per column. Is there a way to group multiple columns on the same subplot (and leave the rest of the column separated)?",
+      "repository": "pandas-dev/pandas",
+      "revision": "aae9234e816469391512910e8265552f215d6263"
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-16948",
+      "category": "Feature Request",
+      "query": "Online implementation of Non-negative Matrix Factorizarion (NMF)\n<!--\nIf your issue is a usage question, submit it here instead:\n- StackOverflow with the scikit-learn tag: https://stackoverflow.com/questions/tagged/scikit-learn\n- Mailing List: https://mail.python.org/mailman/listinfo/scikit-learn\nFor more information, see User Questions: http://scikit-learn.org/stable/support.html#user-questions\n-->",
+      "repository": "scikit-learn/scikit-learn",
+      "revision": "7d93ca87ea14ef8f16be43d75cff72d05f48f7ed"
+    },
+    {
+      "case_id": "jobatabs__textec-53",
+      "category": "Security Vulnerability",
+      "query": "Fix code scanning alert - SQL doesn't use :symbols\nTracking issue for:\n- [x] https://github.com/jobatabs/textec/security/code-scanning/3",
+      "repository": "adetabs/textec",
+      "revision": "951409c20a2cf9243690b9bda7f7a22bb7c999a7"
+    },
+    {
+      "case_id": "django__django-19009",
+      "category": "Performance Issue",
+      "query": "Refactoring SpatialRefSysMixin.srs for efficiency and better error handling\nDescription\n\t\t\n(last modified by Arnaldo Govene)\t\t\nThe srs property in the SpatialRefSysMixin class has several issues that can be addressed to improve code efficiency, maintainability, and adherence to best practices. The following points highlight the concerns:\n1. Recursive Calls:\nThe property uses return self.srs within the try blocks. This introduces recursion, which could lead to stack overflow in edge cases or unexpected behavior. \nCurrent Code:\ntry:\n\tself._srs = gdal.SpatialReference(self.wkt)\n\treturn self.srs # Recursive call\nexcept Exception as e:\n\tmsg = e\n2. Error Handling:\nThe msg variable is overwritten in the second try block without being utilized after the first block, making error reporting ambiguous. This results in the final error message only reflecting the second exception, losing context from the first one.\nCurrent Code:\ntry:\n\tself._srs = gdal.SpatialReference(self.wkt)\n\treturn self.srs\nexcept Exception as e:\n\tmsg = e # First exception caught\ntry:\n\tself._srs = gdal.SpatialReference(self.proj4text)\n\treturn self.srs\nexcept Exception as e:\n\tmsg = e # Second exception overwrites the first\nProposal:\n1. Improve Error Reporting:\nCapture and differentiate between errors raised during the initialization from WKT and PROJ.4. Ensure that both error messages are included in the final exception for better clarity and debugging.\n2. Raplace Manual Caching with @cached_propert and Remove Recursive Calls:\nTo further optimize the srs property, replace the manual caching mechanism with @cached_property. This simplifies the code while retaining the benefits of caching, which is particularly important given the computational cost of creating a gdal.SpatialReference object.\nRefactored Code:\nfrom django.utils.functional import cached_property\nclass SpatialRefSysMixin:\n\t@cached_property\n\tdef srs(self):\n\t\t\"\"\"\n\t\tReturn a GDAL SpatialReference object.\n\t\t\"\"\"\n\t\ttry:\n\t\t\treturn gdal.SpatialReference(self.wkt)\n\t\texcept Exception as e:\n\t\t\twkt_error = f\"Error initializing from WKT: {str(e)}\"\n\t\ttry:\n\t\t\treturn gdal.SpatialReference(self.proj4text)\n\t\texcept Exception as e:\n\t\t\tproj4_error = f\"Error initializing from PROJ.4: {str(e)}\"\n\t\traise Exception(f\"Could not get OSR SpatialReference. WKT Error: {wkt_error} | PROJ.4 Error: {proj4_error}\")\nRationale for Using cached_property:\nCaches the computationally expensive creation of gdal.SpatialReference, improving efficiency for repeated access.\nRemoves manual caching logic, making the code cleaner and easier to maintain.\nIdeal for mostly static spatial reference data, avoiding unnecessary recomputation.\nForum discussion: \u200bhttps://forum.djangoproject.com/t/caching-strategy-for-spatialrefsysmixin-srs/37634/3\nRefactoring SpatialRefSysMixin.srs for efficiency and better error handling\nDescription\n\t\t\n(last modified by Arnaldo Govene)\t\t\nThe srs property in the SpatialRefSysMixin class has several issues that can be addressed to improve code efficiency, maintainability, and adherence to best practices. The following points highlight the concerns:\n1. Recursive Calls:\nThe property uses return self.srs within the try blocks. This introduces recursion, which could lead to stack overflow in edge cases or unexpected behavior. \nCurrent Code:\ntry:\n\tself._srs = gdal.SpatialReference(self.wkt)\n\treturn self.srs # Recursive call\nexcept Exception as e:\n\tmsg = e\n2. Error Handling:\nThe msg variable is overwritten in the second try block without being utilized after the first block, making error reporting ambiguous. This results in the final error message only reflecting the second exception, losing context from the first one.\nCurrent Code:\ntry:\n\tself._srs = gdal.SpatialReference(self.wkt)\n\treturn self.srs\nexcept Exception as e:\n\tmsg = e # First exception caught\ntry:\n\tself._srs = gdal.SpatialReference(self.proj4text)\n\treturn self.srs\nexcept Exception as e:\n\tmsg = e # Second exception overwrites the first\nProposal:\n1. Improve Error Reporting:\nCapture and differentiate between errors raised during the initialization from WKT and PROJ.4. Ensure that both error messages are included in the final exception for better clarity and debugging.\n2. Raplace Manual Caching with @cached_propert and Remove Recursive Calls:\nTo further optimize the srs property, replace the manual caching mechanism with @cached_property. This simplifies the code while retaining the benefits of caching, which is particularly important given the computational cost of creating a gdal.SpatialReference object.\nRefactored Code:\nfrom django.utils.functional import cached_property\nclass SpatialRefSysMixin:\n\t@cached_property\n\tdef srs(self):\n\t\t\"\"\"\n\t\tReturn a GDAL SpatialReference object.\n\t\t\"\"\"\n\t\ttry:\n\t\t\treturn gdal.SpatialReference(self.wkt)\n\t\texcept Exception as e:\n\t\t\twkt_error = f\"Error initializing from WKT: {str(e)}\"\n\t\ttry:\n\t\t\treturn gdal.SpatialReference(self.proj4text)\n\t\texcept Exception as e:\n\t\t\tproj4_error = f\"Error initializing from PROJ.4: {str(e)}\"\n\t\traise Exception(f\"Could not get OSR SpatialReference. WKT Error: {wkt_error} | PROJ.4 Error: {proj4_error}\")\nRationale for Using cached_property:\nCaches the computationally expensive creation of gdal.SpatialReference, improving efficiency for repeated access.\nRemoves manual caching logic, making the code cleaner and easier to maintain.\nIdeal for mostly static spatial reference data, avoiding unnecessary recomputation.\nForum discussion: \u200bhttps://forum.djangoproject.com/t/caching-strategy-for-spatialrefsysmixin-srs/37634/3",
+      "repository": "django/django",
+      "revision": "5f30fd2358fd60a514bdba31594bfc8122f30167"
+    },
+    {
+      "case_id": "internetarchive__openlibrary-3196",
+      "category": "Security Vulnerability",
+      "query": "XSS issues on books page\n<!-- What problem are we solving? What does the experience look like today? What are the symptoms? -->\nXSS issues",
+      "repository": "internetarchive/openlibrary",
+      "revision": "061f07ec54cec6ffd169580641eb87144fe7ea14"
+    },
+    {
+      "case_id": "webcompat__webcompat.com-2731",
+      "category": "Performance Issue",
+      "query": "Removes unnecessary use of markdown-it\nThe Github API already [offers a markdown version](https://developer.github.com/v3/media/#html) for the requests we're making, so it's not necessary to use markdown-it to process our requests.",
+      "repository": "webcompat/webcompat.com",
+      "revision": "384c4feeef14a13655b8264dde9f10bfa5614134"
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-14012",
+      "category": "Feature Request",
+      "query": "Feature request: warm starting for histogram-based GBM\n#### Description\nThis is a feature request to add the warm start parameter, which exists for [gradient boosting](https://scikit-learn.org/dev/modules/generated/sklearn.ensemble.GradientBoostingClassifier.html#sklearn.ensemble.GradientBoostingClassifier), to the new [histogram-based gradient boosting](https://scikit-learn.org/dev/modules/generated/sklearn.ensemble.GradientBoostingClassifier.html#sklearn.ensemble.GradientBoostingClassifier).",
+      "repository": "scikit-learn/scikit-learn",
+      "revision": "15b54340ee7dc7cb870a418d1b5f6f553672f5dd"
+    },
+    {
+      "case_id": "airbnb__knowledge-repo-558",
+      "category": "Security Vulnerability",
+      "query": "XSS vulnerability\nAuto-reviewers: @NiharikaRay @matthewwardrop @earthmancash @danfrankj",
+      "repository": "airbnb/knowledge-repo",
+      "revision": "d1874d3e71994cd9bb769d60133c046b6d2b8bb5"
+    },
+    {
+      "case_id": "pulp__pulp_rpm-3224",
+      "category": "Performance Issue",
+      "query": "Switch to values() instead of select_related\n**Version**\nall\n**Describe the bug**\nSome queries use select_related, if we do not need the model instance, we could just use values() that will produce queryset dict results instead.",
+      "repository": "pulp/pulp_rpm",
+      "revision": "6b999b4d8a16d936927e3fc9dec74fe506c25226"
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-6116",
+      "category": "Feature Request",
+      "query": "GradientBoostingClassifier.fit accepts sparse X, but .predict does not\nI have a sparse dataset that is too large for main memory if I call `X.todense()`.  If I understand correctly, `GradientBoostingClassifier.fit` will accept my sparse `X`, but it is not currently possible to use `GradientBoostingClassifier.predict` on the results.  It would be great if that were not the case.",
+      "repository": "scikit-learn/scikit-learn",
+      "revision": "5e4f524f8408e5a0efb96f8128504f8ca747a95e"
+    },
+    {
+      "case_id": "duncanscanga__VDRS-Solutions-73",
+      "category": "Security Vulnerability",
+      "query": "Test SQL Injection: Register Function (name, email)",
+      "repository": "duncanscanga/VDRS-Solutions",
+      "revision": "c97e24d072fe1bffe3dc9e3b363d40b725a70be9"
+    },
+    {
+      "case_id": "scipy__scipy-5647",
+      "category": "Performance Issue",
+      "query": "Massive performance regression in cKDTree.query with L_inf distance in scipy 0.17\nHi,",
+      "repository": "scipy/scipy",
+      "revision": "ccb338fa0521070107200a9ebcab67905b286a7a"
+    },
+    {
+      "case_id": "plone__plone.restapi-859",
+      "category": "Security Vulnerability",
+      "query": "Privilege escalation in @sharing endpoint (PloneHotfix20200121)\n- https://github.com/plone/Products.CMFPlone/issues/3021\n- https://plone.org/security/hotfix/20200121/privilege-escalation-when-plone-restapi-is-installed",
+      "repository": "plone/plone.restapi",
+      "revision": "32a80ab4850252f1d5b9d1b3c847e9e32d3aa45e"
+    },
+    {
+      "case_id": "openwisp__openwisp-users-286",
+      "category": "Security Vulnerability",
+      "query": "[bug/security] Org managers can escalate themselves to superusers\n**Expected behavior:** org manager (non superuser) should not be able to edit permissions, nor flag themselves or others are superusers.",
+      "repository": "openwisp/openwisp-users",
+      "revision": "6c083027ed7bb467351f8f05ac201fa60d9bdc24"
+    },
+    {
+      "case_id": "rucio__rucio-4930",
+      "category": "Security Vulnerability",
+      "query": "Privilege escalation issue in the Rucio WebUI\nMotivation\n----------\nThe move to FLASK as a webui backend introduced a cookie leak in the auth_token workflows of the webui. This potentially leak the contents of cookies to other sessions. Impact is that Rucio authentication tokens are leaked to other users accessing the webui within a close timeframe, thus allowing users accessing the webui with the leaked authentication token. Privileges are therefore also escalated.",
+      "repository": "rucio/rucio",
+      "revision": "92474868cec7d64b83b46b451ecdc4a294ef2711"
+    },
+    {
+      "case_id": "home-assistant__core-15182",
+      "category": "Security Vulnerability",
+      "query": "Security issue, unauthorized trusted access by spoofing x-forwarded-for header\n**Home Assistant release with the issue:**\n0.68.1 but probably older versions too",
+      "repository": "home-assistant/core",
+      "revision": "4fbe3bb07062b81ac4562d4080550d92cbd47828"
+    },
+    {
+      "case_id": "jazzband__django-two-factor-auth-390",
+      "category": "Security Vulnerability",
+      "query": "DisableView doesn't require request user to be verified\n`DisableView` only checks that the request user *has* a valid, not that the user is verified.",
+      "repository": "jazzband/django-two-factor-auth",
+      "revision": "430ef08a2c6cec4e0ce6cfa4a08686d4e62f73b7"
+    },
+    {
+      "case_id": "zulip__zulip-14091",
+      "category": "Performance Issue",
+      "query": "Optimize rate_limiter performance for get_events queries\nSee https://chat.zulip.org/#narrow/stream/3-backend/topic/profiling.20get_events/near/816860 for profiling details, but basically, currently a get_events request spends 1.4ms/request talking to redis for our rate limiter, which is somewhere between 15% and 50% of the total request runtime (my measurement technique is susceptible to issues like the first request on a code path being extra expensive).  Since get_events is our most scalability-critical endpoint, this is a big deal.",
+      "repository": "zulip/zulip",
+      "revision": "cb85763c7870bd6c83e84e4e7bca0900810457e9"
+    },
+    {
+      "case_id": "jax-ml__jax-25114",
+      "category": "Feature Request",
+      "query": "Allow specifying `exec_time_optimization_effort` and `memory_fitting_effort` via CLI.\nNew compiler options (see title) have recently been [exposed](https://github.com/jax-ml/jax/issues/24625) in JAX.",
+      "repository": "jax-ml/jax",
+      "revision": "df6758f021167b1c0b85f5d6e4986f6f0d2a1169"
+    },
+    {
+      "case_id": "PlasmaPy__PlasmaPy-2542",
+      "category": "Performance Issue",
+      "query": "Reduce cognitive complexity of `gyroradius`\nRight now [`plasmapy.formulary.lengths.gyroradius`](https://github.com/PlasmaPy/PlasmaPy/blob/fc12bbd286ae9db82ab313d8c380808b814a462c/plasmapy/formulary/lengths.py#LL102C5-L102C15) has several nested conditionals.  As a consequence, the code for `gyroradius` has high [cognitive complexity](https://www.sonarsource.com/docs/CognitiveComplexity.pdf), which makes it hard to read and hard to change. Part of the reason is that we are enabling `gyroradius` to get the speed perpendicular to the magnetic field using a bunch of methods, while also making sure that `gyroradius` works with `Quantity` arrays and validating inputs.",
+      "repository": "PlasmaPy/PlasmaPy",
+      "revision": "db62754e6150dc841074afe2e155f21a806e7f1b"
+    },
+    {
+      "case_id": "kedro-org__kedro-4367",
+      "category": "Performance Issue",
+      "query": "Improve OmegaConfigLoader performance when global/variable interpolations are involved\n## Description",
+      "repository": "kedro-org/kedro",
+      "revision": "70734ce00ee46b58c85b4cf04afbe89d32c06758"
+    },
+    {
+      "case_id": "Deltares__imod-python-1159",
+      "category": "Performance Issue",
+      "query": "Bottlenecks writing HFBs LHM\nhttps://github.com/Deltares/imod-python/pull/1157 considerably improves the speed with which the LHM is written: From 34 minutes to 12.5 minutes. This is still slower than expected however. Based on profiling, I've identified 3 main bottlenecks:",
+      "repository": "Deltares/imod-python",
+      "revision": "4f3b71675708c5a832fb78e05f679bb89158f95d"
+    },
+    {
+      "case_id": "ivadomed__ivadomed-1081",
+      "category": "Performance Issue",
+      "query": "Time issue when running `--test` on large microscopy images\n**Disclaimer**\nThis issue is based on preliminary observations and does not contain a lot of details/examples at the moment.",
+      "repository": "ivadomed/ivadomed",
+      "revision": "dee79e6bd90b30095267a798da99c4033cc5991b"
+    },
+    {
+      "case_id": "zulip__zulip-31168",
+      "category": "Performance Issue",
+      "query": "Make creating streams faster in large organizations\nIn large organizations (like chat.zulip.org), creating a stream can be very slow (seconds to tens of seconds). We should fix this.",
+      "repository": "zulip/zulip",
+      "revision": "3d58a7ec0455ba609955c13470d31854687eff7a"
+    },
+    {
+      "case_id": "ckan__ckan-8226",
+      "category": "Performance Issue",
+      "query": "snippet performance issue\n**CKAN version**\nall",
+      "repository": "ckan/ckan",
+      "revision": "15f32e57e229db6436d10adddf73bcff84bdd453"
+    },
+    {
+      "case_id": "UXARRAY__uxarray-1144",
+      "category": "Performance Issue",
+      "query": "Slowdown in `__repr__` due to `n_nodes_per_face` construction triggering\nWhen printing a `Grid`, there is an unnecessary trigger to the `n_nodes_per_face` variable, which has a noticeable impact on performance for larger grids.",
+      "repository": "UXARRAY/uxarray",
+      "revision": "81ac5bd50ed2a2faca24008dc261029be30c37c4"
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-8478",
+      "category": "Feature Request",
+      "query": "MICE imputer\nProceeding from https://github.com/scikit-learn/scikit-learn/pull/4844#issuecomment-253043238 is a suggestion that MICE imputation be included in scikit-learn. @sergeyf has implemented it [here](https://github.com/hammerlab/fancyimpute/blob/master/fancyimpute/mice.py).",
+      "repository": "scikit-learn/scikit-learn",
+      "revision": "312f64053d7249a326a19a07fa635ef5b5c6ed99"
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-17443",
+      "category": "Feature Request",
+      "query": "Add calibration curve to plotting module\nI think it would be nice to have something like",
+      "repository": "scikit-learn/scikit-learn",
+      "revision": "c3db2cdbf5244229af2c5eb54f9216a69f77a146"
+    },
+    {
+      "case_id": "Qiskit__qiskit-13141",
+      "category": "Feature Request",
+      "query": "Port `UnitarySynthesis` to Rust\nThis issue tracks porting the `UnitarySynthesis` pass to rust as part of the #12208 epic. This pass in particular will still always require a fairly large python component, as the unitary synthesis plugin interface necessitates a Python execution mode. But when the a plugin is not specified we shouldn't need to use python at all. The other option is we can call Python from rust to pass a unitary array to the plugins and then operate exclusively from rust otherwise as well.",
+      "repository": "Qiskit/qiskit",
+      "revision": "90e92a46643c72a21c5852299243213907453c21"
+    },
+    {
+      "case_id": "numpy__numpy-17394",
+      "category": "Feature Request",
+      "query": "Suggestion: Sliding Window Function\nUsing `np.lib.stride_tricks.as_stride` one can very efficiently create a sliding window that segments an array as a preprocessing step for vectorized applications. For example a moving average of a window length `3`, stepsize `1`:",
+      "repository": "numpy/numpy",
+      "revision": "43683b3256a86659f230dcadbcde1f8020398bfa"
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-10280",
+      "category": "Feature Request",
+      "query": "[MRG] ENH: Added block_size parameter for lesser memory consumption\n#### Reference Issue\nFixes #7287",
+      "repository": "scikit-learn/scikit-learn",
+      "revision": "1557cb8a1910bce6dc33cd5cd3a08c380bdec566"
+    },
+    {
+      "case_id": "pandas-dev__pandas-22762",
+      "category": "Feature Request",
+      "query": "ENH: add reduce op (and groupby reduce) support to EA\nafter #21160 \nReductions for ExtensionArray\nCreeping up to this in https://github.com/pandas-dev/pandas/pull/22345",
+      "repository": "pandas-dev/pandas",
+      "revision": "c8ce3d01e9ffafc24c6f9dd568cd9eb7e42c610c"
+    },
+    {
+      "case_id": "numpy__numpy-8206",
+      "category": "Feature Request",
+      "query": "Add \"insert_zero\" option for np.diff\nI often find myself wanting the difference of an array along some axis, where the 0th element should just be the first entry of the array along that axis, so that the shape of the output matches that of the input.   This is a pretty common requirement for people working with finite differences in any way (eg all signal processing)",
+      "repository": "numpy/numpy",
+      "revision": "6feb18ce79bacdac09945cf2ca0ddf85f8294298"
+    },
+    {
+      "case_id": "scikit-learn__scikit-learn-30128",
+      "category": "Feature Request",
+      "query": "Reduce redundancy in floating type checks for Array API support\n### Describe the workflow you want to enable",
+      "repository": "scikit-learn/scikit-learn",
+      "revision": "6bf2061f76ba0977c1f7ffb9ddc48db794e5c7ec"
     },
     {
       "case_id": "PrefectHQ__prefect-16117",
       "category": "Bug Report",
+      "query": "flow.validate_parameters regression\n### Bug summary",
       "repository": "PrefectHQ/prefect",
-      "revision": "fb919c67427d230ecea03a5273dfdd6de59bd697",
-      "query": "flow.validate_parameters regression\n### Bug summary"
+      "revision": "fb919c67427d230ecea03a5273dfdd6de59bd697"
+    },
+    {
+      "case_id": "PrefectHQ__prefect-14693",
+      "category": "Feature Request",
+      "query": "Configure `ipc_mode` or `shm_size` on container creation\nFor some flows that utilize `multiprocessing` for ML workloads, I need to run containers with increased shared memory available under `/dev/shm` (`--shm_size`) or use the host's namespace (--ipc_mode='host').  Looking through the code, I believe this would expand `DockerWorkerJobConfiguration` to include these two settings, which are available in `Container.create`.",
+      "repository": "PrefectHQ/prefect",
+      "revision": "80181d73383659c27f4e16122328f6c383e852fe"
+    },
+    {
+      "case_id": "PrefectHQ__prefect-13259",
+      "category": "Feature Request",
+      "query": "`client/orchestration.py/update_deployment_schedule` should be update with `active` and `schedule` at once\n### First check",
+      "repository": "PrefectHQ/prefect",
+      "revision": "dbf132b346df079c4565abbe2cb31f61117b1b13"
     },
     {
       "case_id": "dask__dask-11541",
       "category": "Bug Report",
+      "query": "bug in dask.array.reshape_blockwise\n**Minimal Complete Verifiable Example**:",
       "repository": "dask/dask",
-      "revision": "5b115c4360fec6a4aa6e0edf8ad1d89a87c986dd",
-      "query": "bug in dask.array.reshape_blockwise\n**Minimal Complete Verifiable Example**:"
+      "revision": "5b115c4360fec6a4aa6e0edf8ad1d89a87c986dd"
     },
     {
       "case_id": "DS4SD__docling-330",
       "category": "Bug Report",
-      "repository": "DS4SD/docling",
-      "revision": "bf2a85f1d45bcff38ff5f9b6269dd1edf7cff0ae",
-      "query": "Identification of images in docx\nHello everyone,\nim working on docx document type with docling.\nMy first test was very poor.\nI have a docx file which is only a testfile and this contains one image.\nThe standard procedure doesnt even recognise the image in the file...\nStandard is this:"
+      "query": "Identification of images in docx\nHello everyone,\nim working on docx document type with docling.\nMy first test was very poor.\nI have a docx file which is only a testfile and this contains one image.\nThe standard procedure doesnt even recognise the image in the file...\nStandard is this:",
+      "repository": "docling-project/docling",
+      "revision": "bf2a85f1d45bcff38ff5f9b6269dd1edf7cff0ae"
     },
     {
       "case_id": "getmoto__moto-8342",
       "category": "Bug Report",
+      "query": "IoT Data Shadow Delta with complex datastructure exposes jsondiff symbol and raises TypeError\nI'm using Moto 5.0.21, and jsondiff 2.2.1.",
       "repository": "getmoto/moto",
-      "revision": "60328d54ee14c390f00d83167da94bf273a58a6b",
-      "query": "IoT Data Shadow Delta with complex datastructure exposes jsondiff symbol and raises TypeError\nI'm using Moto 5.0.21, and jsondiff 2.2.1."
+      "revision": "60328d54ee14c390f00d83167da94bf273a58a6b"
     },
     {
       "case_id": "getmoto__moto-8316",
       "category": "Bug Report",
+      "query": "moto/core/responses.py `_get_multi_param` bug",
       "repository": "getmoto/moto",
-      "revision": "c9536b117e39fef41b9ccb5e07463eecda15ba2a",
-      "query": "moto/core/responses.py `_get_multi_param` bug"
+      "revision": "c9536b117e39fef41b9ccb5e07463eecda15ba2a"
+    },
+    {
+      "case_id": "ray-project__ray-49236",
+      "category": "Bug Report",
+      "query": "[aDAG][Core] Feeding multiple inputs to aDAG and annotating with TorchTensor does not move tensors to GPU\n### What happened + What you expected to happen",
+      "repository": "ray-project/ray",
+      "revision": "b78a78037bb8730eaa480e09df2805da5712b0bf"
+    },
+    {
+      "case_id": "ray-project__ray-49221",
+      "category": "Bug Report",
+      "query": "[Data] Ray 2.40 `add_column` Erroneous Assertion\n### What happened + What you expected to happen",
+      "repository": "ray-project/ray",
+      "revision": "bc41605ee1c91e6666fa0f30a07bc90520c030f9"
+    },
+    {
+      "case_id": "bridgecrewio__checkov-6909",
+      "category": "Bug Report",
+      "query": "checkov (3.2.334) serverless check crashes with `TypeError: unhashable type: 'DictNode'`\n**Describe the issue**\nWe use the checkov serverless checks in our github actions ci/cd and as of yesterday (Monday Dec, 9 2024) it crashes trying to run when we use the latest release https://github.com/bridgecrewio/checkov/releases/tag/3.2.334",
+      "repository": "bridgecrewio/checkov",
+      "revision": "a657e60794302e971ff39b9566520067d67f1bf9"
+    },
+    {
+      "case_id": "bridgecrewio__checkov-6895",
+      "category": "Bug Report",
+      "query": "CKV_AZURE_136: False-Positive For Read Replicas In Azure Database For PostgreSQL - Flexible Server\n**Describe the issue**\nCKV_AZURE_136 fails for read replicas in Azure Database for PostgreSQL - Flexible Server.\nAccording to the [Microsoft documentation](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-read-replicas), geo-redundant backups are not supported for replicas.",
+      "repository": "bridgecrewio/checkov",
+      "revision": "a94c1682b275bbf755342c0164d2ac0c379c0c16"
+    },
+    {
+      "case_id": "keras-team__keras-20626",
+      "category": "Bug Report",
+      "query": "Normalization layer fails to broadcast scalar mean and variance\nNormalization layer errors out for scalar mean and variance arguments. The documentation states that these arguments will be broadcast to the necessary size and the examples include scalars, but instead the source code seems to only reshape them (see [here](https://github.com/keras-team/keras/blob/v3.7.0/keras/src/layers/preprocessing/normalization.py#L193)).",
+      "repository": "keras-team/keras",
+      "revision": "a0f586beb7842d86fce623cab5d3a7fdb2419e9b"
+    },
+    {
+      "case_id": "keras-team__keras-20550",
+      "category": "Bug Report",
+      "query": "Cloning of Sequential models w. input_tensors argument fails\nCloning a Sequential models layers fails if using the input_tensors argument.",
+      "repository": "keras-team/keras",
+      "revision": "553521ee92f72c993ddb3c40d0ced406a3a4b7db"
+    },
+    {
+      "case_id": "keras-team__keras-20443",
+      "category": "Bug Report",
+      "query": "UnicodeEncodeError when running keras.model.predict\nThe following problem occurs in keras version 3.1.1 (tensorflow version 2.16.1)\nUnicodeEncodeError: 'charmap' codec can't encode characters in position 19-38: character maps to <undefined>",
+      "repository": "keras-team/keras",
+      "revision": "f9ea1a013c29e24001dc6cb7b10d9f740545fe58"
+    },
+    {
+      "case_id": "python__mypy-18164",
+      "category": "Bug Report",
+      "query": "`arg-type` error duck typing a `TypedDict` with `NotRequired` field\n**Bug Report**",
+      "repository": "python/mypy",
+      "revision": "8ef21976cfd190d0b1974f438a7d30e8eaea5272"
+    },
+    {
+      "case_id": "python__mypy-18160",
+      "category": "Bug Report",
+      "query": "Change in inference of overloads involving `Hashable` and `slice` now that `slice` is generic\n**Bug Report**",
+      "repository": "python/mypy",
+      "revision": "8ef21976cfd190d0b1974f438a7d30e8eaea5272"
+    },
+    {
+      "case_id": "django__django-18906",
+      "category": "Bug Report",
+      "query": "ErrorDict always uses default renderer\nDescription\n\t \nWhen BaseForm.full_clean() instantiates ErrorDict, it doesn't pass it the renderer:\n\u200bhttps://github.com/django/django/blob/1860a1afc9ac20750f932e8e0a94b32d096f2848/django/forms/forms.py#L319\nDespite ErrorDict being ready to receive it and use it for rendering:\n\u200bhttps://github.com/django/django/blob/1860a1afc9ac20750f932e8e0a94b32d096f2848/django/forms/utils.py#L124\nPractically, this means customizations to the renderer are ignored when rendering the form errors using {{ errors }} in the template.\nBuilding on top of the example and fix from #35987, I have a custom renderer that swaps out some templates:\nfrom django import forms\nfrom django.forms.renderers import TemplatesSetting\nfrom django.forms.utils import ErrorList\nfrom django.template.exceptions import TemplateDoesNotExist\nclass CustomRenderer(TemplatesSetting):\n\tdef get_template(self, template_name):\n\t\tif template_name.startswith(\"django/forms/\"):\n\t\t\t# Load our custom version from \"custom/forms/\" if it exists\n\t\t\tour_template = f\"custom/{template_name.removeprefix('django/')}\"\n\t\t\ttry:\n\t\t\t\treturn super().get_template(our_template)\n\t\t\texcept TemplateDoesNotExist:\n\t\t\t\tpass\n\t\treturn super().get_template(template_name)\nclass CustomErrorList(ErrorList):\n\tdef copy(self):\n\t\t# Copying the fix from Django Ticket #35987\n\t\tcopy = super().copy()\n\t\tcopy.renderer = self.renderer\n\t\treturn copy\nclass MyForm(forms.Form):\n\tdefault_renderer = CustomRenderer()\n\tdef __init__(self, *args, error_class=CustomErrorList, **kwargs):\n\t\tsuper().__init__(*args, error_class=error_class, **kwargs)\nThe custom error list template uses some CSS utility classes from Tailwind, like text-red-600:\n{% if errors %}<ul class=\"text-red-600\">{% for field, error in errors %}<li>{{ field }}{{ error }}</li>{% endfor %}</ul>{% endif %}\nBut creating a form with a non-field error and rendering the error dict uses the default renderer and its template:\nIn [1]: from example.forms import MyForm\n ...:\n ...: form = MyForm({})\n ...: form.full_clean()\n ...: form.add_error(None, \"Test error\")\nIn [2]: form.errors.render()\nOut[2]: '<ul class=\"errorlist\"><li>__all__<ul class=\"text-red-600\"><li>Test error</li></ul></li></ul>'\nI need to override full_clean() to set the renderer:\nclass MyForm(forms.Form):\n\t...\n\t\n\tdef full_clean(self):\n\t\tsuper().full_clean()\n\t\t# Fix a bug in Django where self._errors = ErrorDict is not passed the\n\t\t# renderer argument when initialized.\n\t\tself._errors.renderer = self.renderer\nThen form errors use my custom template:\nIn [1]: from example.forms import MyForm\n ...:\n ...: form = MyForm({})\n ...: form.full_clean()\n ...: form.add_error(None, \"Test error\")\nIn [2]: form.errors.render()\nOut[2]: '<ul class=\"text-red-600\"><li>__all__<ul class=\"text-red-600\"><li>Test error</li></ul></li></ul>'\nI think this has probably been an issue ever since a custom renderer became possible in #31026. The argument was added to ErrorDict but missed in BaseForm.full_clean(), the only place where the class is instantiated.",
+      "repository": "django/django",
+      "revision": "1860a1afc9ac20750f932e8e0a94b32d096f2848"
+    },
+    {
+      "case_id": "django__django-18795",
+      "category": "Bug Report",
+      "query": "System check for default database values with expressions prohibits non-expressions\nDescription\n\t \nSince its introduction in Django 5.0, \u200bthe fields.E011 system check for database backends that have DatabaseFeatures.supports_expression_defaults = False \u200brequires literal defaults to be wrapped in Value.\nThere are a number of test models that have \u200bint, float and \u200bstring db_defaults that will raise a system check error if DatabaseFeatures.supports_expression_defaults = False\nsince these models don't have required_db_features = {\"supports_expression_defaults\"}.\nI'm working on MongoDB which doesn't support any database defaults, literal or expressions.",
+      "repository": "django/django",
+      "revision": "2bc43ccbdb28b9d87da172ef119ff3b48e6ff71a"
+    },
+    {
+      "case_id": "django__django-18785",
+      "category": "Bug Report",
+      "query": "Template system: escape() calls in get_exception_info() should be removed\nDescription\n\t \n\u200bHere there are some calls to escape()\nThey shouldn't be there: escaping happens in templates for non-safe strings anyway, so there's no need.\nAnd there _is_ a drawback: as an example, the Python Sentry SDK \u200bcopies this info, but because it gets sent over the wire (as a JSON string) the information that this has already been escaped is lost, and on the receiving end it is escaped again.\nThis means that on the server-side \u200bthe Error-tracking, in my case Bugsink will show doubly escaped html code snippets. This looks something like this:\n&lt;p class=&quot;relative text-slate-600 text-base md:text-xl mb-4 md:mb-5&quot;&gt; \nRemoving the calls to escape simply solves this. Which makes sense: calling escape is simply not the responsibility of this piece of code, it should just stay marked as unsafe and be escape at the edges (on rendering).",
+      "repository": "django/django",
+      "revision": "c12bc980e5b2bb25e447cd8dee550cad767f1ad2"
+    },
+    {
+      "case_id": "roboflow__supervision-1698",
+      "category": "Bug Report",
+      "query": "Crash when filtering empty detections: xyxy shape (0, 0, 4).\nReproduction code:",
+      "repository": "roboflow/supervision",
+      "revision": "6889e33da587ed6e161334d815274d520f2844c4"
+    },
+    {
+      "case_id": "huggingface__trl-2450",
+      "category": "Bug Report",
+      "query": "DataCollatorForChatML unexpected generation prompt\n### System Info",
+      "repository": "huggingface/trl",
+      "revision": "9c5388b69e0842f76edc46a2ff9d0b51e1db4337"
+    },
+    {
+      "case_id": "rq__rq-2138",
+      "category": "Bug Report",
+      "query": "Dangling job occurs when job_id contains the character \":\"\nHi,",
+      "repository": "rq/rq",
+      "revision": "bb7f34053730da924486f97baa0d34fee9b1918b"
     }
-  ]
+  ],
+  "dataset": {
+    "external_pin_sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
+    "parquet_sha256": "8df0833c2c1276c5837aab923d489ab97d7654529abe759d0f59242c4978a662",
+    "repository": "czlll/Loc-Bench_V1",
+    "revision": "c44cf3b74e07ca642cec841b471a9939907c12a7"
+  },
+  "schema_version": 1
 }

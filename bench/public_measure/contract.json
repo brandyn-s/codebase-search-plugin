@@ -1,17 +1,28 @@
 {
   "schema_version": 1,
-  "measurement_id": "public-locbench-balanced-n20-scale-v2",
+  "measurement_id": "public-locbench-balanced-n80-scale-v3",
   "purpose": "bounded public retrieval comparison plus real-repository scale and latency",
   "selection": {
     "source_pin": "bench/compare/pins/locbench-june-n200.external.json",
     "resolved_pin_sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
-    "rule": "first five recorded cases per category whose full LocBench function labels are corroborated by a merged GitHub PR at the same base revision",
-    "count": 20,
-    "per_category": 5,
+    "rule": "first twenty recorded cases per category whose full LocBench function labels are corroborated by immutable merged GitHub PR summary and files responses at the same base revision",
+    "count": 80,
+    "per_category": 20,
     "excluded_case_ids": [
-      "ray-project__ray-26818"
+      "ray-project__ray-26818",
+      "huggingface__transformers-35453",
+      "numba__numba-9757",
+      "django__django-13134",
+      "sancus-tee__sancus-compiler-36",
+      "Ouranosinc__xclim-477",
+      "pandas-dev__pandas-19074",
+      "yt-dlp__yt-dlp-11750",
+      "DS4SD__docling-528",
+      "DS4SD__docling-442",
+      "SYSTRAN__faster-whisper-1141",
+      "mlflow__mlflow-13390"
     ],
-    "exclusion_reason": "The live GitHub patch did not expose two LocBench-labeled function headers, so the case was excluded before retrieval rather than weakening the two-source oracle."
+    "exclusion_reason": "The immutable GitHub files response did not expose every LocBench-labeled terminal symbol on its declared changed path, so each case was excluded before retrieval rather than weakening the two-source oracle."
   },
   "query_rule": "normalize CRLF to LF, then take and strip the first blank-line-delimited paragraph",
   "top_k_files": 10,
@@ -30,9 +41,10 @@
   },
   "sourcegraph": {
     "endpoint": "https://sourcegraph.com/.api/search/stream",
+    "max_attempts": 3,
     "query_version": "V3",
     "requested_matches": 100,
-    "timeout_seconds": 60
+    "timeout_seconds": 45
   },
   "composition": {
     "method": "route_aware_cascade",
