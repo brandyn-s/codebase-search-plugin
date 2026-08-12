@@ -94,19 +94,19 @@ def timed_call(
     repetitions: int,
 ) -> tuple[dict, list[int], bool]:
     first: dict | None = None
-    first_bytes: bytes | None = None
+    first_results: bytes | None = None
     latencies: list[int] = []
     stable = True
     for _ in range(repetitions):
         started = time.perf_counter_ns()
         result = client.call_tool(tool, arguments)
         latencies.append(time.perf_counter_ns() - started)
-        encoded = canonical_json(result)
+        ranked_results = canonical_json(result.get("results", []))
         if first is None:
             first = result
-            first_bytes = encoded
+            first_results = ranked_results
         else:
-            stable = stable and encoded == first_bytes
+            stable = stable and ranked_results == first_results
     assert first is not None
     return first, latencies, stable
 
@@ -170,7 +170,7 @@ def search_observation(
         if resolved not in project_order:
             project_order.append(resolved)
         if Path(raw_root).resolve() == expected_root:
-            relative = normalize_file(row.get("file_path"))
+            relative = normalize_file(row.get("file") or row.get("file_path"))
             if relative:
                 expected_project_files.append(relative)
     expected_root_text = str(expected_root)
