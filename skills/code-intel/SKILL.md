@@ -40,6 +40,10 @@ security-surface enumeration.
 Do not substitute graph text search for a required code-search semantic or
 keyword FIND step. Keep semantic and lexical work within the selected route;
 graph corroboration belongs only in graph, mixed, or security work.
+Do not auto-chain a complete conceptual result into code-graph. Preserve the
+selected route's ordering and add the other engine only when the requested
+answer needs it; never use symmetric rank fusion that can demote correct
+primary evidence.
 
 ## FIND
 

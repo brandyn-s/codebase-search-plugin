@@ -11,6 +11,7 @@ from bench.public_measure.run import (
     CATEGORIES,
     parse_sse,
     query_anchors,
+    route_aware_compose,
     rrf,
     score_ranking,
     validate_inputs,
@@ -91,6 +92,25 @@ class PublicMeasurementTests(unittest.TestCase):
         self.assertFalse(score["file_acc_at_1"])
         self.assertTrue(score["file_acc_at_3"])
         self.assertAlmostEqual(score["file_mrr_at_10"], 1 / 3)
+
+    def test_route_aware_composition_preserves_the_selected_primary(self):
+        conceptual, conceptual_method = route_aware_compose(
+            "Where is request validation implemented?",
+            ["search.py", "shared.py"],
+            ["graph.py", "shared.py"],
+            10,
+        )
+        structural, structural_method = route_aware_compose(
+            "What calls validate_request?",
+            ["search.py", "shared.py"],
+            ["graph.py", "shared.py"],
+            10,
+        )
+
+        self.assertEqual(conceptual[:3], ["search.py", "shared.py", "graph.py"])
+        self.assertEqual(conceptual_method["primary"], "code-search")
+        self.assertEqual(structural[:3], ["graph.py", "shared.py", "search.py"])
+        self.assertEqual(structural_method["primary"], "code-graph")
 
     @unittest.skipUnless(
         EXTERNAL_PIN.is_file(),

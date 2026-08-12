@@ -3,7 +3,7 @@ name: code-explore
 description: >
   Find code by meaning, understand how something works, or explore code
   needing both semantic search and structural analysis. Routes to code-search
-  for conceptual queries and auto-chains with code-graph for context.
+  for conceptual queries and adds code-graph only for requested relationships.
   Trigger phrases: "find code", "where is", "how does", "show me the",
   "find the implementation", "understand this codebase", "what calls".
   Do NOT use for file reading (use Read), simple grep (use Grep), or
@@ -13,7 +13,7 @@ argument-hint: "[natural language code query]"
 
 # Code Explore
 
-Route code exploration queries to the right tool and chain results automatically.
+Route code exploration queries to the narrowest tool that can answer them.
 
 ## Tool Inventory
 
@@ -45,9 +45,9 @@ Route code exploration queries to the right tool and chain results automatically
 | `mcp__code-graph__query_security_surfaces` | Enumerate security-tagged surfaces by `role` (`auth_boundary`, `input_entry_point`, `sensitive_sink`, `crypto_operation`, `privilege_escalation`, `session_management`, `audit_logging`, `sanitizer`). Pass `mode="tainted_paths"` to return source→sink taint paths instead of a flat surface list |
 | `mcp__code-graph__trace_data_flow` | Trace propagation from a `source` function through the graph (env-var aware) — "where does this sensitive data end up?" |
 | `mcp__code-graph__query_stig_evidence` | Map a STIG/NIST `control_id` to the code that provides evidence for it |
-The pinned code-graph release does not expose `rank_by_query` or
-`code_localize`. Use code-search's `code_localize` for natural-language
-localization; do not call tools that are absent from the tested component BOM.
+Use code-search's `code_localize` for natural-language issue localization.
+Code-graph's structural localizer remains available for explicitly structural
+localization, but it does not replace hybrid semantic/lexical retrieval.
 
 ## Pre-flight Check
 
@@ -130,14 +130,21 @@ every named relationship endpoint before asserting the edge. Cite the direct
 call site as edge evidence and minimal source evidence for every candidate-named
 endpoint. One location may satisfy both the edge and endpoint roles.
 
-### Step 3: Auto-chain if the answer needs the other tool
+### Step 3: Chain only when the question needs the other tool
+
+Do not auto-chain a complete conceptual result into code-graph. Add the other
+engine only when the question explicitly asks for a relationship, caller,
+callee, dependency, impact, architecture, or source-to-sink path, or when the
+primary engine cannot resolve the target needed for that requested operation.
+Keep the selected route first and append secondary context; do not use symmetric
+rank fusion that can demote a correct primary result.
 
 | After this result... | Follow up with... |
 |---------------------|-------------------|
-| code-search found a function | Graph: `trace_call_path` to see who calls it |
-| code-search found a function | Graph: `get_code_snippet` with include_neighbors=true |
+| User asked who calls a function found by code-search | Graph: one inbound `trace_call_path` |
+| User asked what a function calls | Graph: one outbound `trace_call_path` |
 | code-search result is truncated | Graph: `get_code_snippet` by qualified name |
-| Graph found callers/callees | code-search: `search_code` to understand what they do |
+| Graph found callers/callees and explanation was requested | code-search: semantic/default evidence retrieval |
 | Graph found a node | Read tool with file:line for exact implementation |
 | "How does X work?" partially answered | code-search: `find_similar_code` with chunk_id |
 
@@ -177,8 +184,8 @@ Detailed Cypher patterns and pitfalls are in `references/graph-queries.md`.
 
 **"Where's the rate limiting code?"**
 1. Conceptual -> code-search: `search_code("rate limiting code")`
-2. Chain -> graph: trace callers of the found function
-3. Answer with file path, line number, and caller context
+2. Answer with the backend-issued source evidence. Do not add a graph query
+   unless the user also asks for callers, dependencies, or impact.
 
 **"What calls processOrder?"**
 1. Structural -> graph: `trace_call_path(function_name="processOrder", direction="inbound")`
@@ -200,5 +207,5 @@ Detailed Cypher patterns and pitfalls are in `references/graph-queries.md`.
 
 - Query routed to the correct tool (code-search for conceptual, code-graph for structural)
 - Results include file paths and line numbers for navigation
-- Auto-chaining applied when the primary result needs context from the other tool
+- Cross-engine chaining applied only when the requested answer needs it
 - Active project verified before any search

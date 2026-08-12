@@ -29,6 +29,10 @@ class CodeIntelSkillContractTests(unittest.TestCase):
             "graph corroboration belongs only in graph, mixed, or security work",
             normalized,
         )
+        self.assertIn(
+            "Do not auto-chain a complete conceptual result", normalized
+        )
+        self.assertIn("never use symmetric rank fusion", normalized)
 
 
 if __name__ == "__main__":

@@ -76,6 +76,17 @@ class CodeExploreSkillContractTests(unittest.TestCase):
         self.assertIn("not cross-engine coherent", preflight)
         self.assertIn("Do not combine evidence", preflight)
 
+    def test_conceptual_results_are_not_automatically_diluted_by_graph_results(self):
+        text = SKILL.read_text(encoding="utf-8")
+        normalized = " ".join(text.split())
+
+        self.assertIn("Do not auto-chain a complete conceptual result", normalized)
+        self.assertIn("only when the question explicitly asks for", normalized)
+        self.assertNotIn(
+            "code-search found a function | Graph: `trace_call_path`",
+            text,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

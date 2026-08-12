@@ -18,7 +18,7 @@
   },
   "search": {
     "tool": "search_code_evidence",
-    "search_mode": "semantic",
+    "search_mode": "hybrid",
     "requested_chunks": 50,
     "include_context": false,
     "auto_reindex": false
@@ -30,8 +30,7 @@
     "timeout_seconds": 60
   },
   "composition": {
-    "method": "reciprocal_rank_fusion",
-    "rrf_k": 60,
+    "method": "route_aware_cascade",
     "inputs": [
       "code-search",
       "code-graph"

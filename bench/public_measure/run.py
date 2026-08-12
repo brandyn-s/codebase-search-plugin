@@ -714,6 +714,36 @@ def rrf(rankings: list[list[str]], k: int, limit: int) -> list[str]:
     ]
 
 
+_GRAPH_ROUTE = re.compile(
+    r"\b(?:callers?|callees?|calls?|call\s+graph|depends?\s+on|"
+    r"dependenc(?:y|ies)|imports?|trace|source\s*(?:to|→)\s*sink|"
+    r"blast\s+radius|change\s+impact|reachable|reachability)\b",
+    flags=re.IGNORECASE,
+)
+
+
+def route_aware_compose(
+    query: str,
+    search_files: list[str],
+    graph_files: list[str],
+    limit: int,
+) -> tuple[list[str], dict]:
+    """Preserve the selected route instead of allowing RRF to dilute it."""
+
+    graph_primary = bool(_GRAPH_ROUTE.search(normalize_query(query)))
+    primary_name = "code-graph" if graph_primary else "code-search"
+    secondary_name = "code-search" if graph_primary else "code-graph"
+    primary = graph_files if graph_primary else search_files
+    secondary = search_files if graph_primary else graph_files
+    combined = list(dict.fromkeys([*primary, *secondary]))[:limit]
+    return combined, {
+        "method": "route_aware_cascade",
+        "primary": primary_name,
+        "secondary": secondary_name,
+        "inputs": ["code-search", "code-graph"],
+    }
+
+
 def score_ranking(files: list[str], expected: set[str]) -> dict:
     rank = next((index for index, path in enumerate(files[:10], 1) if path in expected), None)
     return {
@@ -1029,9 +1059,10 @@ def run_measurement(args: argparse.Namespace) -> dict:
                     graph_latencies.append(elapsed)
                     graph_stable = graph_stable and repeated_graph == graph_files
 
-            composed_files = rrf(
-                [search_files, graph_files],
-                contract["composition"]["rrf_k"],
+            composed_files, composition_method = route_aware_compose(
+                case["query"],
+                search_files,
+                graph_files,
                 contract["top_k_files"],
             )
             if case_id == contract["incremental_case_id"]:
@@ -1095,7 +1126,7 @@ def run_measurement(args: argparse.Namespace) -> dict:
                     search_latencies[index] + graph_latencies[index]
                     for index in range(min(len(search_latencies), len(graph_latencies)))
                 ],
-                "method": contract["composition"],
+                "method": composition_method,
             },
         }
         for payload in arm_payloads.values():
