@@ -29,3 +29,10 @@ gap is statistically stronger public retrieval evidence, broader relationship
 oracles, very-large-monorepo and multi-repository operation, and resource
 efficiency—not more canaries or proof-harness layers. See
 [`CAPABILITY_STATE.md`](CAPABILITY_STATE.md).
+
+The next development slice stays inside that boundary. It adds an explicit
+capability lattice, canonical CodeQL-path ingestion, and an opt-in pinned Go
+SCIP preparation path. Compiler assurance is edge-scoped and requires the
+exact ingested artifact digest; graph-wide tier labels or legacy SCIP
+provenance are insufficient. These are consolidation changes, not another
+holdout layer or an organization-wide indexing service.

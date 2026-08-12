@@ -116,7 +116,7 @@ def require_environment() -> tuple[str, Path]:
     if not runner_temp.is_dir():
         raise RealInstallError(f"RUNNER_TEMP is not a directory: {runner_temp}")
 
-    for executable in ("gh", "git"):
+    for executable in ("curl", "gh", "git"):
         if shutil.which(executable) is None:
             raise RealInstallError(f"required executable is unavailable: {executable}")
     return token, runner_temp
@@ -211,6 +211,8 @@ def load_bom(path: Path) -> dict:
         components = bom["components"]
         search = components["code-search"]["install"]
         graph = components["code-graph"]["install"]
+        generator = bom["precision_generators"]["go-scip"]
+        typescript_generator = bom["precision_generators"]["typescript-scip"]
     except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
         raise RealInstallError(f"{path}: component BOM is malformed: {exc}") from exc
 
@@ -219,6 +221,12 @@ def load_bom(path: Path) -> dict:
         validate_install_descriptor_shape("code-graph", graph)
     except DescriptorError as exc:
         raise RealInstallError(f"{path}: {exc}") from exc
+    if not isinstance(generator, dict):
+        raise RealInstallError(f"{path}: component BOM is malformed: go-scip")
+    if not isinstance(typescript_generator, dict):
+        raise RealInstallError(
+            f"{path}: component BOM is malformed: typescript-scip"
+        )
     return bom
 
 
@@ -789,6 +797,285 @@ def linux_asset(install: dict) -> tuple[str, str]:
     return name, sha256
 
 
+def linux_go_scip_asset(generator: dict) -> tuple[str, str, str]:
+    """Return the exact Linux scip-go archive and binary digests."""
+    if platform.system().lower() != "linux":
+        raise RealInstallError("trusted Go SCIP validation supports Linux only")
+    architecture = platform.machine().lower()
+    normalized = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64"}.get(
+        architecture
+    )
+    if normalized is None:
+        raise RealInstallError(f"unsupported Linux architecture: {architecture}")
+    platform_key = f"linux-{normalized}"
+    assets = generator.get("assets")
+    asset = assets.get(platform_key) if isinstance(assets, dict) else None
+    if not isinstance(asset, dict):
+        raise RealInstallError(f"go-scip BOM lacks asset for {platform_key}")
+    name = asset.get("name")
+    archive_sha256 = asset.get("archive_sha256")
+    binary_sha256 = asset.get("binary_sha256")
+    if name != f"scip-go-{platform_key}.tar.gz":
+        raise RealInstallError(f"go-scip BOM asset name is invalid for {platform_key}")
+    for label, digest in (
+        ("archive", archive_sha256),
+        ("binary", binary_sha256),
+    ):
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise RealInstallError(
+                f"go-scip BOM {label} SHA-256 is invalid for {platform_key}"
+            )
+    return name, archive_sha256, binary_sha256
+
+
+def install_go_scip(
+    generator: dict,
+    bom_path: Path,
+    destination: Path,
+    fetch_env: dict[str, str],
+    runtime_env: dict[str, str],
+) -> Path:
+    """Install and verify the optional compiler indexer used by auto precision."""
+    fetch_env = allowlisted_fetch_environment(fetch_env)
+    runtime_env = allowlisted_runtime_environment(runtime_env)
+    repository = generator.get("repository")
+    tag = generator.get("tag")
+    source_revision = generator.get("source_revision")
+    version = generator.get("version_output")
+    if (
+        generator.get("kind") != "github-release"
+        or repository != "scip-code/scip-go"
+        or not isinstance(tag, str)
+        or re.fullmatch(r"v[0-9][0-9A-Za-z._+-]*", tag) is None
+        or re.fullmatch(r"[0-9a-f]{40}", source_revision or "") is None
+        or not isinstance(version, str)
+        or not version
+    ):
+        raise RealInstallError("go-scip release BOM metadata is invalid")
+
+    archive_name, archive_sha256, binary_sha256 = linux_go_scip_asset(generator)
+    resolved_revision = resolve_release_tag_commit(repository, tag, fetch_env)
+    if resolved_revision != source_revision:
+        raise RealInstallError(
+            "go-scip tag source revision mismatch: "
+            f"expected {source_revision}, got {resolved_revision}"
+        )
+
+    downloads = destination / "go-scip-download"
+    downloads.mkdir()
+    run(
+        [
+            "gh",
+            "release",
+            "download",
+            tag,
+            "--repo",
+            repository,
+            "--pattern",
+            archive_name,
+            "--dir",
+            str(downloads),
+            "--clobber",
+        ],
+        env=fetch_env,
+    )
+    archive_path = downloads / archive_name
+    verify_sha256(archive_path, archive_sha256)
+
+    extracted = destination / "go-scip-extracted"
+    extracted.mkdir()
+    with tarfile.open(archive_path, "r:gz") as bundle:
+        if any(
+            member.issym() or member.islnk() or member.isdev()
+            for member in bundle.getmembers()
+        ):
+            raise RealInstallError("go-scip archive contains an unsafe member")
+        bundle.extractall(extracted, filter="data")
+    matches = [
+        path
+        for path in extracted.rglob("scip-go")
+        if path.is_file() and not path.is_symlink()
+    ]
+    if len(matches) != 1:
+        raise RealInstallError(f"expected one scip-go binary, found {len(matches)}")
+    executable = matches[0]
+    verify_sha256(executable, binary_sha256)
+    executable.chmod(executable.stat().st_mode | 0o111)
+    run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "prepare_scip_index.py"),
+            "verify",
+            "--generator",
+            str(executable),
+            "--component-bom",
+            str(bom_path),
+        ],
+        env=runtime_env,
+    )
+    return executable
+
+
+def linux_typescript_scip_asset(generator: dict) -> tuple[str, str, str]:
+    """Return the exact Linux Node archive and binary digests."""
+    if platform.system().lower() != "linux":
+        raise RealInstallError("trusted TypeScript SCIP validation supports Linux only")
+    architecture = platform.machine().lower()
+    normalized = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64"}.get(
+        architecture
+    )
+    if normalized is None:
+        raise RealInstallError(f"unsupported Linux architecture: {architecture}")
+    platform_key = f"linux-{normalized}"
+    runtime = generator.get("node_runtime")
+    assets = runtime.get("assets") if isinstance(runtime, dict) else None
+    asset = assets.get(platform_key) if isinstance(assets, dict) else None
+    if not isinstance(asset, dict):
+        raise RealInstallError(
+            f"typescript-scip BOM lacks Node asset for {platform_key}"
+        )
+    version = runtime.get("version")
+    node_arch = "x64" if normalized == "amd64" else "arm64"
+    expected_name = f"node-{version}-linux-{node_arch}.tar.xz"
+    name = asset.get("name")
+    archive_sha256 = asset.get("archive_sha256")
+    binary_sha256 = asset.get("binary_sha256")
+    if name != expected_name:
+        raise RealInstallError(
+            f"typescript-scip Node asset name is invalid for {platform_key}"
+        )
+    for label, digest in (
+        ("archive", archive_sha256),
+        ("binary", binary_sha256),
+    ):
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise RealInstallError(
+                f"typescript-scip Node {label} SHA-256 is invalid for {platform_key}"
+            )
+    return name, archive_sha256, binary_sha256
+
+
+def install_typescript_scip(
+    generator: dict,
+    bom_path: Path,
+    destination: Path,
+    runtime_env: dict[str, str],
+) -> tuple[Path, Path]:
+    """Install the pinned Node runtime and lockfile-bound TypeScript indexer."""
+    runtime_env = allowlisted_runtime_environment(runtime_env)
+    node_runtime = generator.get("node_runtime")
+    package_manifest = generator.get("package_manifest")
+    lockfile = generator.get("lockfile")
+    entrypoint_relative = generator.get("entrypoint")
+    if (
+        generator.get("kind") != "npm-lockfile"
+        or generator.get("package") != "@sourcegraph/scip-typescript"
+        or generator.get("source_repository") != "sourcegraph/scip-typescript"
+        or generator.get("version_output") != "0.4.0"
+        or re.fullmatch(r"[0-9a-f]{40}", generator.get("source_revision") or "")
+        is None
+        or not isinstance(generator.get("package_integrity"), str)
+        or not generator["package_integrity"].startswith("sha512-")
+        or not isinstance(node_runtime, dict)
+        or not isinstance(node_runtime.get("version"), str)
+        or re.fullmatch(r"v22\.[0-9]+\.[0-9]+", node_runtime["version"]) is None
+        or node_runtime.get("base_url")
+        != f"https://nodejs.org/download/release/{node_runtime.get('version')}"
+        or package_manifest != "compatibility/scip-typescript-package.json"
+        or lockfile != "compatibility/scip-typescript-package-lock.json"
+        or entrypoint_relative
+        != "node_modules/@sourcegraph/scip-typescript/dist/src/main.js"
+    ):
+        raise RealInstallError("typescript-scip BOM metadata is invalid")
+
+    manifest_path = ROOT / package_manifest
+    lockfile_path = ROOT / lockfile
+    if not manifest_path.is_file() or not lockfile_path.is_file():
+        raise RealInstallError("typescript-scip package inputs are missing")
+    verify_sha256(lockfile_path, generator.get("lockfile_sha256"))
+    archive_name, archive_sha256, binary_sha256 = linux_typescript_scip_asset(
+        generator
+    )
+    archive_path = destination / archive_name
+    run(
+        [
+            "curl",
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            f"{node_runtime['base_url']}/{archive_name}",
+            "--output",
+            str(archive_path),
+        ],
+        env=runtime_env,
+    )
+    verify_sha256(archive_path, archive_sha256)
+
+    extracted = destination / "typescript-node-extracted"
+    extracted.mkdir()
+    with tarfile.open(archive_path, "r:xz") as bundle:
+        if any(
+            member.issym() or member.islnk() or member.isdev()
+            for member in bundle.getmembers()
+        ):
+            raise RealInstallError("Node archive contains an unsafe member")
+        bundle.extractall(extracted, filter="data")
+    node_matches = [
+        path
+        for path in extracted.glob("node-*/bin/node")
+        if path.is_file() and not path.is_symlink()
+    ]
+    npm_matches = [
+        path
+        for path in extracted.glob("node-*/lib/node_modules/npm/bin/npm-cli.js")
+        if path.is_file() and not path.is_symlink()
+    ]
+    if len(node_matches) != 1 or len(npm_matches) != 1:
+        raise RealInstallError("Node archive omitted the exact runtime or npm CLI")
+    node = node_matches[0]
+    npm_cli = npm_matches[0]
+    verify_sha256(node, binary_sha256)
+    node.chmod(node.stat().st_mode | 0o111)
+
+    package_root = destination / "typescript-scip-package"
+    package_root.mkdir()
+    shutil.copyfile(manifest_path, package_root / "package.json")
+    shutil.copyfile(lockfile_path, package_root / "package-lock.json")
+    run(
+        [
+            str(node),
+            str(npm_cli),
+            "ci",
+            "--prefix",
+            str(package_root),
+            "--ignore-scripts",
+            "--no-audit",
+            "--no-fund",
+        ],
+        env=runtime_env,
+    )
+    entrypoint = package_root / entrypoint_relative
+    verify_sha256(entrypoint, generator.get("entrypoint_sha256"))
+    run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "prepare_scip_index.py"),
+            "verify",
+            "--language",
+            "typescript",
+            "--runtime",
+            str(node),
+            "--generator",
+            str(entrypoint),
+            "--component-bom",
+            str(bom_path),
+        ],
+        env=runtime_env,
+    )
+    return node, entrypoint
+
+
 def install_code_graph(
     install: dict,
     destination: Path,
@@ -949,6 +1236,19 @@ def main(argv: list[str] | None = None) -> int:
                 bom["components"]["code-graph"]["install"],
                 destination,
                 fetch_env,
+                runtime_env,
+            )
+            install_go_scip(
+                bom["precision_generators"]["go-scip"],
+                bom_path,
+                destination,
+                fetch_env,
+                runtime_env,
+            )
+            install_typescript_scip(
+                bom["precision_generators"]["typescript-scip"],
+                bom_path,
+                destination,
                 runtime_env,
             )
             run(

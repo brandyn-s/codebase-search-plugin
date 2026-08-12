@@ -9,6 +9,55 @@ SKILL = ROOT / "skills" / "index-repo" / "SKILL.md"
 
 
 class IndexRepoSkillContractTests(unittest.TestCase):
+    def test_auto_scip_is_explicit_pinned_and_never_silently_compiler_grade(self):
+        text = SKILL.read_text(encoding="utf-8")
+        normalized = " ".join(text.split())
+
+        for contract in (
+            "--graph-precision heuristic|scip|auto",
+            "--scip-policy preferred|required",
+            "scripts/prepare_scip_index.py",
+            "component-bom.json",
+            "scip-go",
+            "go.mod",
+            "scip-typescript",
+            "tsconfig.json",
+            "node_modules",
+            "index_generation",
+        ):
+            self.assertIn(contract, text)
+
+        self.assertIn(
+            "Automatic SCIP generation is explicit opt-in",
+            normalized,
+        )
+        self.assertIn(
+            "required` policy stops before code-graph",
+            normalized,
+        )
+        self.assertIn(
+            "preferred` policy may continue only as requested/effective "
+            "`heuristic`",
+            normalized,
+        )
+        self.assertIn(
+            "Never describe that fallback as compiler-grade",
+            text,
+        )
+        self.assertIn(
+            "scip_status.index_sha256` to equal the preparation receipt's",
+            normalized,
+        )
+        self.assertIn("nonzero SCIP insertions", normalized)
+        self.assertIn(
+            "Nonzero `drifted_documents` is coverage telemetry, not a "
+            "global failure",
+            normalized,
+        )
+        self.assertIn("resolution_artifact_sha256", text)
+        self.assertIn("`compiler_resolution` lattice capability", normalized)
+        self.assertIn("never installs dependencies in the target", normalized)
+
     def test_waits_for_semantic_completion_before_graph_and_verifies_identity(self):
         text = SKILL.read_text(encoding="utf-8")
 
@@ -51,7 +100,7 @@ class IndexRepoSkillContractTests(unittest.TestCase):
         self.assertIn("skip_report=true", text)
         self.assertIn("Before starting either index", text)
         self.assertIn("do not start code-search", text.lower())
-        self.assertIn("v0.8.0-redacted.4", compatibility)
+        self.assertIn("v0.8.0-redacted.5", compatibility)
         self.assertIn(
             "integrated readiness status is `ready`",
             compatibility.lower(),

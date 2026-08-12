@@ -14,14 +14,16 @@ Index a repository for both code-search (semantic embeddings) and code-graph (AS
 
 ## Usage
 
-`/index-repo /path/to/my-repo [--graph-precision heuristic|scip] [--scip-index /path/to/index.scip]`
+`/index-repo /path/to/my-repo [--graph-precision heuristic|scip|auto] [--scip-policy preferred|required] [--scip-index /path/to/index.scip]`
 
 If no path is provided, ask the user which repo to index.
 
-Default `<graph-precision>` to `heuristic`. Select `scip` only when the user
-requests it or supplies a SCIP index; do not treat the mere presence of an
-`index.scip` file as consent. Resolve a supplied SCIP path to an absolute
-regular file. `--scip-index` is invalid with the heuristic tier.
+Default `<graph-precision>` to `heuristic` and `<scip-policy>` to `preferred`.
+Automatic SCIP generation is explicit opt-in: select `auto` only when the user
+requests it. Select `scip` only when the user supplies an index. Do not treat
+the mere presence of an `index.scip` file as consent. Resolve a supplied SCIP
+path to an absolute regular file. `--scip-index` is invalid with the heuristic
+or auto tier, and `--scip-policy` has no effect outside auto mode.
 
 ## Steps
 
@@ -125,6 +127,52 @@ regular file. `--scip-index` is invalid with the heuristic tier.
    `switch_project` unless the bound semantic job satisfied every
    completed-result gate above.
 
+4a. For requested `auto`, prepare a trusted Go or TypeScript SCIP index only
+    after semantic completion and before code-graph starts. Select the generator
+    from the canonical root: root `go.mod` uses `scip-go`; root `tsconfig.json`
+    uses the isolated `scip-typescript` runtime. If both exist, require the user
+    to select `--language` rather than guessing.
+
+    Go:
+    ```
+    python "${CLAUDE_PLUGIN_ROOT}/scripts/prepare_scip_index.py" prepare \
+      <resolved-root> \
+      --generator "${CLAUDE_PLUGIN_ROOT}/bin/scip-go" \
+      --component-bom "${CLAUDE_PLUGIN_ROOT}/component-bom.json" \
+      --cache-root "$HOME/.cache/redacted-code-intel/scip"
+    ```
+
+    TypeScript:
+
+    ```
+    python "${CLAUDE_PLUGIN_ROOT}/scripts/prepare_scip_index.py" prepare \
+      <resolved-root> \
+      --language typescript \
+      --runtime "${CLAUDE_PLUGIN_ROOT}/bin/scip-typescript-runtime/node/bin/node" \
+      --generator "${CLAUDE_PLUGIN_ROOT}/bin/scip-typescript-runtime/package/node_modules/@sourcegraph/scip-typescript/dist/src/main.js" \
+      --component-bom "${CLAUDE_PLUGIN_ROOT}/component-bom.json" \
+      --cache-root "$HOME/.cache/redacted-code-intel/scip"
+    ```
+
+    On Windows, use the corresponding `node/node.exe` runtime path. The helper
+    requires a clean Git checkout and the exact BOM-pinned generator/runtime
+    digests. Go requires a root `go.mod`. TypeScript requires a root
+    `tsconfig.json` and an already-present `node_modules`; it never installs
+    dependencies in the target. Both write only to an out-of-tree cache bound
+    to `index_generation`, verify that the checkout is unchanged, and emit a
+    receipt with the absolute index path and digest.
+
+    - On `status == "ready"`, set `<graph-precision>` to `scip` and
+      `<absolute-scip-path-if-supplied>` to the receipt's index path.
+    - Any unsupported language/layout, missing generator, digest/version
+      mismatch, generator failure, empty output, timeout, or checkout mutation
+      is an automatic-precision failure. A `required` policy stops before
+      code-graph. A `preferred` policy may continue only as requested/effective
+      `heuristic`, with the preparation failure reported verbatim.
+    - Never describe that fallback as compiler-grade. Never install or upgrade
+      a generator during indexing; installation is a separate BOM-governed
+      release action.
+
 5. Run **code-graph** indexing without mutating the checkout:
    ```
    mcp__code-graph__index_repository(
@@ -165,17 +213,26 @@ regular file. `--scip-index` is invalid with the heuristic tier.
    `index_generation`, and `captured_at`.
 
    Both graph completion and status responses must also contain
-   `graph_precision` with `requested_tier == <graph-precision>` and an
+   `graph_precision` with `requested_tier == <graph-precision>` after any auto
+   preparation and an
    `effective_tier` of `heuristic` or `scip`:
 
    - For requested `heuristic`, require effective `heuristic`.
    - For requested `scip`, require effective `scip`, status `ready`, the
-     expected SCIP path/digest, nonzero covered documents/functions, and zero
-     drift unless the user explicitly accepts partial coverage. Missing,
-     invalid, or drifted SCIP is a visible **partial index**, even when the
-     heuristic graph remains usable.
+     expected SCIP path/digest, nonzero covered documents/functions, and
+     nonzero SCIP insertions. In auto mode, require
+     `scip_status.index_sha256` to equal the preparation receipt's
+     `index.sha256` in both graph completion and final status. A missing or
+     invalid SCIP artifact, zero compiler coverage, or zero compiler edge
+     insertion is a visible **partial index**, even when the heuristic graph
+     remains usable. Nonzero `drifted_documents` is coverage telemetry, not a
+     global failure: those documents remain heuristic and cannot satisfy
+     compiler assurance.
    - Preserve coverage, drift, heuristic replacements, and SCIP insertions in
-     the final report. Never call a degraded heuristic fallback compiler-grade.
+     the final report. Never call the whole graph compiler-grade. Only a
+     relationship evidence reference carrying `resolution_source=scip-ingest`
+     and the exact `resolution_artifact_sha256` may satisfy the
+     `compiler_resolution` lattice capability.
 
    First compare the graph completion identity with the final graph identity.
    `repository_id`, `checkout_id`, `source_revision`, `dirty_fingerprint`, and `index_generation`
@@ -255,6 +312,10 @@ Runs incremental indexing on both tools. Only changed files are reprocessed.
 - Installed code-graph schema supports `skip_report`, and graph indexing used `skip_report=true`
 - Installed code-graph schema supports explicit persistent graph precision;
   requested/effective tier and SCIP coverage/drift were verified
+- Auto precision used only the pinned Go generator, preserved checkout
+  identity, matched the preparation/indexed artifact digests, and either
+  produced verified SCIP or reported an explicit
+  heuristic fallback under `preferred`
 - `get_indexing_progress` explicitly returned `completed` before graph indexing began
 - Both code-search and code-graph indexes verified without errors
 - Both engines reported the same complete `index_identity` envelope

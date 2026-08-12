@@ -24,6 +24,29 @@
       },
       "additionalProperties": false
     },
+    "assurance_requirement": {
+      "type": "object",
+      "required": ["required_capabilities"],
+      "properties": {
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "source_coordinates",
+              "semantic_retrieval",
+              "lexical_retrieval",
+              "structural_relationship",
+              "compiler_resolution",
+              "runtime_observation",
+              "variable_level_taint"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "observations": {
       "type": "array",
       "items": {"$ref": "#/$defs/observation"}

@@ -48,6 +48,10 @@ def _one_line(value: object) -> str:
     return html.escape(" ".join(str(value).split()))
 
 
+def _inline_values(values: list[str]) -> str:
+    return ", ".join(values) if values else "none"
+
+
 def _markdown(bundle: dict[str, Any], result: dict[str, Any]) -> str:
     confidence = result["confidence"]
     coverage = result["coverage"]
@@ -92,6 +96,28 @@ def _markdown(bundle: dict[str, Any], result: dict[str, Any]) -> str:
         *(f"Confidence: {_one_line(item)}" for item in confidence["rationale"]),
     ]
     lines.extend(f"- {item}" for item in notes or ["No blockers or caveats."])
+    lattice = result.get("assurance_lattice")
+    if lattice and lattice["required_capabilities"]:
+        lines.extend(
+            [
+                "",
+                "## Assurance lattice",
+                "",
+                (
+                    "- Required capabilities: `"
+                    f"{_inline_values(lattice['required_capabilities'])}`"
+                ),
+                (
+                    "- Observed supporting capabilities: `"
+                    f"{_inline_values(lattice['supporting_capabilities'])}`"
+                ),
+                (
+                    "- Missing for support: `"
+                    f"{_inline_values(lattice['missing_supporting_capabilities'])}`"
+                ),
+                f"- Satisfied by: `{lattice['satisfied_by'] or 'none'}`",
+            ]
+        )
     lines.extend(
         [
             "",

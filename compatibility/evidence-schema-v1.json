@@ -25,7 +25,8 @@
     "end_line": {"type": "integer", "minimum": 0},
     "evidence_type": {"type": "string", "minLength": 1},
     "symbol_ref": {"$ref": "#/$defs/symbolRef"},
-    "relationship_ref": {"$ref": "#/$defs/relationshipRef"}
+    "relationship_ref": {"$ref": "#/$defs/relationshipRef"},
+    "analysis_ref": {"$ref": "#/$defs/analysisRef"}
   },
   "$defs": {
     "symbolRef": {
@@ -80,12 +81,100 @@
         "source_symbol_ref": {"$ref": "#/$defs/symbolRef"},
         "target_symbol_ref": {"$ref": "#/$defs/symbolRef"},
         "resolution_source": {"type": "string", "minLength": 1},
+        "resolution_artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
         "confidence_band": {
           "type": "string",
           "enum": ["high", "medium", "low", "speculative", "unknown"]
         },
         "runtime_observed": {"type": "boolean"},
         "observation_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "analysisRef": {
+      "type": "object",
+      "required": [
+        "id",
+        "schema_version",
+        "repository_id",
+        "source_revision",
+        "index_generation",
+        "analysis_kind",
+        "analyzer",
+        "analyzer_version",
+        "extractor_version",
+        "language",
+        "database_manifest_sha256",
+        "database_content_sha256",
+        "database_quality",
+        "query_pack_manifest_sha256",
+        "sarif_sha256",
+        "query_id",
+        "result_index",
+        "code_flow_index",
+        "thread_flow_index",
+        "path_steps"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^analysis:v1:[0-9a-f]{64}$"},
+        "schema_version": {"const": 1},
+        "repository_id": {"type": "string", "minLength": 1},
+        "source_revision": {"type": "string", "minLength": 1},
+        "index_generation": {"type": "string", "minLength": 1},
+        "analysis_kind": {"const": "variable_level_taint"},
+        "analyzer": {"const": "codeql"},
+        "analyzer_version": {"type": "string", "minLength": 1},
+        "extractor_version": {"type": "string", "minLength": 1},
+        "language": {"type": "string", "minLength": 1},
+        "database_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "database_content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "database_quality": {
+          "type": "object",
+          "required": ["status", "source_files", "baseline_lines", "extractor_errors"],
+          "properties": {
+            "status": {"const": "pass"},
+            "source_files": {"type": "integer", "minimum": 1},
+            "baseline_lines": {"type": "integer", "minimum": 1},
+            "extractor_errors": {"type": "integer", "minimum": 0}
+          },
+          "additionalProperties": false
+        },
+        "query_pack_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "sarif_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "query_id": {"type": "string", "minLength": 1},
+        "result_index": {"type": "integer", "minimum": 0},
+        "code_flow_index": {"type": "integer", "minimum": 0},
+        "thread_flow_index": {"type": "integer", "minimum": 0},
+        "path_steps": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"$ref": "#/$defs/analysisPathStep"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "analysisPathStep": {
+      "type": "object",
+      "required": [
+        "position",
+        "role",
+        "relative_path",
+        "start_line",
+        "start_column",
+        "end_line",
+        "end_column"
+      ],
+      "properties": {
+        "position": {"type": "integer", "minimum": 0},
+        "role": {"enum": ["source", "intermediate", "sink"]},
+        "relative_path": {"type": "string", "minLength": 1},
+        "start_line": {"type": "integer", "minimum": 1},
+        "start_column": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1},
+        "end_column": {"type": "integer", "minimum": 1}
       },
       "additionalProperties": false
     }

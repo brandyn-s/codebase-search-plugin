@@ -5,29 +5,29 @@
         "assets": {
           "darwin-amd64": {
             "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-            "sha256": "fd7939b1c3e3dcfcaefa5b601d0ea5e392186fa8128f0d613dae59165e1d5613"
+            "sha256": "244f3c06fee5ac5547498b86b21d372aa8b5a752e4001212ca2dde11dd651b26"
           },
           "darwin-arm64": {
             "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-            "sha256": "32db58488031b090d8c541c90a1e52cec34b01a7433168f4153c7dd56c20797f"
+            "sha256": "4cb89dad885772ad470f4c9a18cc0761b55222fce2b86452ac3b2ab4f65f160d"
           },
           "linux-amd64": {
             "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-            "sha256": "2c3cb4a49998dbe02474d203e3fb3f9e4311d796ad9d32fde72b39df31fe9967"
+            "sha256": "d73495fe99af7bca5abe10302176edabdd022a2f26db4ef76a0b9a0e781f5cc8"
           },
           "linux-arm64": {
             "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-            "sha256": "efe37e2c609ec2f74260b54af5a3aea872fe4da9cecb6b72f7745403b35b9831"
+            "sha256": "44bfad82020b7f6ca90de1791faefa486882e8d19aecb949c4083e129a4b5703"
           },
           "windows-amd64": {
             "name": "codebase-memory-mcp-windows-amd64.zip",
-            "sha256": "a304f3aa64d2a8a776af98422c160fe65f74fdaa52bba7e0604e121d9b67f8e2"
+            "sha256": "5a3de79e3cb615adb5ad8f9fcc835072516d52feaf9783157d87b151cf5d13f1"
           }
         },
         "attestation": {
           "bundle": {
-            "path": "compatibility/attestations/code-graph-v0.8.0-redacted.4-provenance.jsonl",
-            "sha256": "39b1fa1ba8ee5a6348f60a17213e60ab0c7c6fd2fcbbcc339bf3491b9fbd77f9"
+            "path": "compatibility/attestations/code-graph-v0.8.0-redacted.5-provenance.jsonl",
+            "sha256": "2bc978557c2d08b43b3c9a58bf3b7a48eb2aa4d351c5510bae19fa6ae52e43f5"
           },
           "deny_self_hosted_runners": true,
           "signer_workflow": "redacted-org/code-graph/.github/workflows/release.yml",
@@ -35,12 +35,12 @@
         },
         "checksums": {
           "name": "checksums.txt",
-          "sha256": "fd3c78b8fc49ae2450cbdbaafae39eda6c94a408578e588ccf9cca29e4a47509"
+          "sha256": "b66cd88e07506b43ad53aeb93abfcaa086dd1d827e3a460609a45950015775ee"
         },
         "kind": "github-release",
         "repository": "redacted-org/code-graph",
-        "source_revision": "a22795fe62774a8ab68a9c33a1ebdcd62b28fdfa",
-        "tag": "v0.8.0-redacted.4"
+        "source_revision": "41b8400951aa7a4da478e9d79486e47f7e4ae075",
+        "tag": "v0.8.0-redacted.5"
       },
       "schema_snapshot": "compatibility/code-graph-tools.json",
       "tested_capabilities": {
@@ -110,7 +110,7 @@
   },
   "integrated_readiness": {
     "evidence": "compatibility/readiness-evidence.json",
-    "reason": "The committed promotion-candidate record satisfies static evidence-shape, version, and exact backend-issued atomic evidence checks; trusted post-merge CI must install the pinned components and generate a fresh ready-validation artifact before accepting this revision as runtime-validated.",
+    "reason": "The committed promotion-candidate record satisfies static evidence-shape, version, exact backend-issued atomic evidence, and checkout-identity checks; trusted post-merge CI must install the pinned components and generate a fresh ready-validation artifact before accepting this revision as runtime-validated.",
     "requires": {
       "code-graph": {
         "index_repository.skip_report": true,
@@ -147,6 +147,79 @@
       }
     },
     "status": "ready"
+  },
+  "precision_generators": {
+    "go-scip": {
+      "assets": {
+        "darwin-arm64": {
+          "archive_sha256": "f21b505452a8dbb270c18ec66690e583801f9e96cff1d72e84c004b7374ec672",
+          "binary_sha256": "dedb659aa95faa2bd45c4dd1f0dddba0e6277545a6cdbe9078a76ce38ea37cb3",
+          "name": "scip-go-darwin-arm64.tar.gz"
+        },
+        "linux-amd64": {
+          "archive_sha256": "5bfe39016ca04f5b3b1cce41d1b63ea120a7d7e93b55407bfb17a6b02d18135a",
+          "binary_sha256": "fed9c4825132c13e8f4337da097536e3f6dfd90cb12c9f92691a97e59b73d1c3",
+          "name": "scip-go-linux-amd64.tar.gz"
+        },
+        "linux-arm64": {
+          "archive_sha256": "6b93476c7578c5aeb5acacb41f8234c20130168271adea0db8d8ae63d1355acb",
+          "binary_sha256": "f8564bb80c87da37aee811be43c8f97e20a5857c3f63427f03121fe51125be2c",
+          "name": "scip-go-linux-arm64.tar.gz"
+        }
+      },
+      "kind": "github-release",
+      "repository": "scip-code/scip-go",
+      "source_revision": "2e9ff3c2603a85daabe125c9f20075ec52df0731",
+      "tag": "v0.2.7",
+      "version_output": "0.2.7"
+    },
+    "typescript-scip": {
+      "entrypoint": "node_modules/@sourcegraph/scip-typescript/dist/src/main.js",
+      "entrypoint_sha256": "22104bf4323e7667ff0d6f38606937c467af2d6e1fda171203c2065d9b757979",
+      "kind": "npm-lockfile",
+      "lockfile": "compatibility/scip-typescript-package-lock.json",
+      "lockfile_sha256": "94d305e33014b9bd32e3fc4dfadd100168469a66521d217cee5b5211c86e1333",
+      "node_runtime": {
+        "assets": {
+          "darwin-amd64": {
+            "archive_sha256": "58e99022c2ff89395576cc7fd4d98cea24bb68081475d5f88b801ee8729fb026",
+            "binary_sha256": "0b4f059915f3bf3c6cbb02422f4a529bfb21cbbec2d29851c9a5d833f78a04f6",
+            "name": "node-v22.23.2-darwin-x64.tar.gz"
+          },
+          "darwin-arm64": {
+            "archive_sha256": "61130f394c1630d211dd50aecc4353d379480f36d3ac913cd85dbba1aed585c6",
+            "binary_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572",
+            "name": "node-v22.23.2-darwin-arm64.tar.gz"
+          },
+          "linux-amd64": {
+            "archive_sha256": "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307",
+            "binary_sha256": "3517c2df0b2f8cd7f422b4b8450ef81c6889f08eb03e281d6de9079b15e6a327",
+            "name": "node-v22.23.2-linux-x64.tar.xz"
+          },
+          "linux-arm64": {
+            "archive_sha256": "fff4078c5def658577f92c88db7db3bc0072924bfb93fe52c1e744a54e94abb8",
+            "binary_sha256": "1a638b0fe2b68da0489276aca95526c5122fc61ba54d6a2d0d00c1c92ab7b876",
+            "name": "node-v22.23.2-linux-arm64.tar.xz"
+          },
+          "windows-amd64": {
+            "archive_sha256": "1177b4137ba5adaa56354ae40f1080c7450e8ae09cecb47da459d1c52ac99f97",
+            "binary_sha256": "0d0f5e39f9f3d9587bc19f73eab3c2c9c4903fd02d6dbf9c853dd81b3d95fad4",
+            "name": "node-v22.23.2-win-x64.zip"
+          }
+        },
+        "base_url": "https://nodejs.org/download/release/v22.23.2",
+        "version": "v22.23.2"
+      },
+      "package": "@sourcegraph/scip-typescript",
+      "package_integrity": "sha512-k+AtsrqmS41Sd5qjkZlHcmvoSQIvBOonRj4jpgp0KNFM6aqvMGpdSuPUqrUcg8ENTKjUbfaUVszgQwq3bCOvwA==",
+      "package_manifest": "compatibility/scip-typescript-package.json",
+      "source_repository": "sourcegraph/scip-typescript",
+      "source_revision": "1962a68386220dd669c3839b69d64fb5ce34f2a6",
+      "supported_node_majors": [
+        22
+      ],
+      "version_output": "0.4.0"
+    }
   },
   "schema_version": 1,
   "tested_at": "2026-08-12"

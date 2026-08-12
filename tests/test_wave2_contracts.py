@@ -33,6 +33,53 @@ def test_proof_schema_references_pinned_evidence_schema():
     assert "coverage" in proof_schema["required"]
 
 
+def test_proof_schema_exposes_the_optional_assurance_lattice_requirement():
+    proof_schema = json.loads(
+        (ROOT / "compatibility" / "proof-schema-v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    requirement = proof_schema["properties"]["assurance_requirement"]
+    capabilities = requirement["properties"]["required_capabilities"]
+
+    assert "assurance_requirement" not in proof_schema["required"]
+    assert capabilities["minItems"] == 1
+    assert capabilities["uniqueItems"] is True
+    assert set(capabilities["items"]["enum"]) == {
+        "source_coordinates",
+        "semantic_retrieval",
+        "lexical_retrieval",
+        "structural_relationship",
+        "compiler_resolution",
+        "runtime_observation",
+        "variable_level_taint",
+    }
+
+
+def test_evidence_schema_carries_canonical_external_analysis_provenance():
+    evidence_schema = json.loads(
+        (ROOT / "compatibility" / "evidence-schema-v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    analysis = evidence_schema["$defs"]["analysisRef"]
+
+    assert evidence_schema["properties"]["analysis_ref"]["$ref"] == "#/$defs/analysisRef"
+    assert analysis["properties"]["analysis_kind"]["const"] == "variable_level_taint"
+    assert analysis["properties"]["analyzer"]["const"] == "codeql"
+    assert analysis["properties"]["path_steps"]["minItems"] == 2
+    assert {
+        "database_manifest_sha256",
+        "database_content_sha256",
+        "database_quality",
+        "query_pack_manifest_sha256",
+        "sarif_sha256",
+        "query_id",
+    }.issubset(analysis["required"])
+
+
 def test_checked_in_invariant_examples_have_expected_fail_closed_results():
     evaluator = _load_module(
         "invariant_evaluator_contract",
@@ -66,6 +113,9 @@ def test_code_intel_skill_requires_deterministic_proof_gate():
     assert "scripts/proof_evaluator.py" in skill
     assert "contradiction pass is mandatory" in skill
     assert 'verdict="verified"' in skill
+    assert "assurance_requirement" in skill
+    assert "scripts/codeql_evidence.py" in skill
+    assert "required capability" in skill
 
 
 def test_code_intel_skill_routes_callers_to_the_supported_trace_tool():

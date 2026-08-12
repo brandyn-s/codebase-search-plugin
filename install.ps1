@@ -104,6 +104,12 @@ $GraphAttestationBundlePath = Join-Path `
     $GraphAttestationBundleRelativePath
 $ReadinessStatus = $Bom.integrated_readiness.status
 $ReadinessReason = $Bom.integrated_readiness.reason
+$GoScip = $Bom.precision_generators.'go-scip'
+$GoScipSupported = $null -ne $GoScip.assets.PSObject.Properties[$AssetKey]
+$TypeScriptScip = $Bom.precision_generators.'typescript-scip'
+$TypeScriptNodeAssetProperty = `
+    $TypeScriptScip.node_runtime.assets.PSObject.Properties[$AssetKey]
+$TypeScriptScipSupported = $null -ne $TypeScriptNodeAssetProperty
 $AssetProperty = $Bom.components.'code-graph'.install.assets.PSObject.Properties[$AssetKey]
 if (-not $AssetProperty) {
     Write-Host "Error: BOM release asset is missing for $AssetKey." -ForegroundColor Red
@@ -606,6 +612,174 @@ Remove-Item -LiteralPath `
 Remove-Item -LiteralPath $GraphDownloadDir -ErrorAction SilentlyContinue
 
 Write-Host "  code-graph installed."
+Write-Host ""
+
+# Installing optional Go SCIP precision generator. Automatic use remains an
+# explicit /index-repo choice and verifies this binary again before execution.
+Write-Host "Installing optional Go SCIP precision generator..." -ForegroundColor Yellow
+if ($GoScipSupported) {
+    $GoScipAsset = $GoScip.assets.PSObject.Properties[$AssetKey].Value
+    $ResolvedGoScipRevision = Resolve-ReleaseTagCommit `
+        -Repository $GoScip.repository `
+        -Tag $GoScip.tag
+    if ($ResolvedGoScipRevision -ne $GoScip.source_revision) {
+        throw "go-scip tag source revision mismatch"
+    }
+    $GoScipDownloadDir = Join-Path $BinDir ".go-scip-download"
+    New-Item -ItemType Directory -Path $GoScipDownloadDir | Out-Null
+    & gh release download $GoScip.tag `
+        --repo $GoScip.repository `
+        --pattern $GoScipAsset.name `
+        --dir $GoScipDownloadDir `
+        --clobber
+    if ($LASTEXITCODE -ne 0) {
+        throw "go-scip release download failed"
+    }
+    $GoScipArchive = Join-Path $GoScipDownloadDir $GoScipAsset.name
+    Assert-Sha256 `
+        -Path $GoScipArchive `
+        -Expected $GoScipAsset.archive_sha256 `
+        -Label $GoScipAsset.name
+    tar xzf $GoScipArchive -C $GoScipDownloadDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "go-scip archive extraction failed"
+    }
+    $ExtractedGoScip = Join-Path $GoScipDownloadDir "scip-go"
+    Assert-Sha256 `
+        -Path $ExtractedGoScip `
+        -Expected $GoScipAsset.binary_sha256 `
+        -Label "scip-go binary"
+    $InstalledGoScip = Join-Path $BinDir "scip-go"
+    Move-Item -LiteralPath $ExtractedGoScip -Destination $InstalledGoScip
+    Remove-Item -LiteralPath $GoScipArchive -Force
+    $GoScipLicense = Join-Path $GoScipDownloadDir "LICENSE"
+    if (Test-Path -LiteralPath $GoScipLicense) {
+        Remove-Item -LiteralPath $GoScipLicense -Force
+    }
+    Remove-Item -LiteralPath $GoScipDownloadDir -Force
+    Invoke-WithAllowedEnvironment {
+        & $Python `
+            (Join-Path $PluginDir "scripts\prepare_scip_index.py") `
+            verify `
+            --generator $InstalledGoScip `
+            --component-bom $BomPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "installed go-scip verification failed"
+        }
+    }
+    Write-Host "  scip-go $($GoScip.version_output) installed and verified."
+} else {
+    Write-Host (
+        "  Auto SCIP precision unavailable for $AssetKey; " +
+        "heuristic and supplied SCIP modes remain available."
+    )
+}
+Write-Host ""
+
+# Install TypeScript SCIP into an isolated plugin runtime. Target checkouts
+# must already have dependencies; this installer never runs npm in a target.
+Write-Host "Installing optional TypeScript SCIP precision generator..." -ForegroundColor Yellow
+if ($TypeScriptScipSupported) {
+    $TypeScriptNodeAsset = $TypeScriptNodeAssetProperty.Value
+    $TypeScriptScipRuntime = Join-Path $BinDir "scip-typescript-runtime"
+    $TypeScriptScipDownload = Join-Path $BinDir ".typescript-scip-download"
+    New-Item -ItemType Directory -Path $TypeScriptScipDownload | Out-Null
+    $TypeScriptNodeArchive = Join-Path `
+        $TypeScriptScipDownload `
+        $TypeScriptNodeAsset.name
+    $TypeScriptNodeUri = (
+        $TypeScriptScip.node_runtime.base_url.TrimEnd("/") +
+        "/" +
+        $TypeScriptNodeAsset.name
+    )
+    & curl.exe `
+        --fail `
+        --location `
+        --silent `
+        --show-error `
+        $TypeScriptNodeUri `
+        --output $TypeScriptNodeArchive
+    if ($LASTEXITCODE -ne 0) {
+        throw "pinned Node runtime download failed"
+    }
+    Assert-Sha256 `
+        -Path $TypeScriptNodeArchive `
+        -Expected $TypeScriptNodeAsset.archive_sha256 `
+        -Label $TypeScriptNodeAsset.name
+    Expand-Archive `
+        -Path $TypeScriptNodeArchive `
+        -DestinationPath $TypeScriptScipDownload `
+        -Force
+    $TypeScriptNodeDirectoryName = `
+        [IO.Path]::GetFileNameWithoutExtension($TypeScriptNodeAsset.name)
+    $ExtractedTypeScriptNode = Join-Path `
+        $TypeScriptScipDownload `
+        $TypeScriptNodeDirectoryName
+    New-Item -ItemType Directory -Path $TypeScriptScipRuntime | Out-Null
+    Move-Item `
+        -LiteralPath $ExtractedTypeScriptNode `
+        -Destination (Join-Path $TypeScriptScipRuntime "node")
+    Remove-Item -LiteralPath $TypeScriptNodeArchive -Force
+    Remove-Item -LiteralPath $TypeScriptScipDownload -Force
+    $TypeScriptNodeBinary = Join-Path `
+        $TypeScriptScipRuntime `
+        "node\node.exe"
+    $TypeScriptNpmCli = Join-Path `
+        $TypeScriptScipRuntime `
+        "node\node_modules\npm\bin\npm-cli.js"
+    Assert-Sha256 `
+        -Path $TypeScriptNodeBinary `
+        -Expected $TypeScriptNodeAsset.binary_sha256 `
+        -Label "Node runtime binary"
+    $TypeScriptPackageRoot = Join-Path $TypeScriptScipRuntime "package"
+    New-Item -ItemType Directory -Path $TypeScriptPackageRoot | Out-Null
+    $TypeScriptLockfile = Join-Path $PluginDir $TypeScriptScip.lockfile
+    Assert-Sha256 `
+        -Path $TypeScriptLockfile `
+        -Expected $TypeScriptScip.lockfile_sha256 `
+        -Label $TypeScriptScip.lockfile
+    Copy-Item `
+        -LiteralPath (Join-Path $PluginDir $TypeScriptScip.package_manifest) `
+        -Destination (Join-Path $TypeScriptPackageRoot "package.json")
+    Copy-Item `
+        -LiteralPath $TypeScriptLockfile `
+        -Destination (Join-Path $TypeScriptPackageRoot "package-lock.json")
+    Invoke-WithAllowedEnvironment {
+        & $TypeScriptNodeBinary $TypeScriptNpmCli ci `
+            --prefix $TypeScriptPackageRoot `
+            --ignore-scripts `
+            --no-audit `
+            --no-fund
+        if ($LASTEXITCODE -ne 0) {
+            throw "TypeScript SCIP npm ci failed"
+        }
+    }
+    $TypeScriptScipGenerator = Join-Path `
+        $TypeScriptPackageRoot `
+        ($TypeScriptScip.entrypoint -replace '/', '\')
+    Assert-Sha256 `
+        -Path $TypeScriptScipGenerator `
+        -Expected $TypeScriptScip.entrypoint_sha256 `
+        -Label "$($TypeScriptScip.package) entrypoint"
+    Invoke-WithAllowedEnvironment {
+        & $Python `
+            (Join-Path $PluginDir "scripts\prepare_scip_index.py") `
+            verify `
+            --language typescript `
+            --runtime $TypeScriptNodeBinary `
+            --generator $TypeScriptScipGenerator `
+            --component-bom $BomPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "installed TypeScript SCIP verification failed"
+        }
+    }
+    Write-Host (
+        "  $($TypeScriptScip.package) $($TypeScriptScip.version_output) " +
+        "installed with Node $($TypeScriptScip.node_runtime.version) and verified."
+    )
+} else {
+    Write-Host "  Automatic TypeScript SCIP precision unavailable for $AssetKey."
+}
 Write-Host ""
 
 # ------------------------------------------------------------------

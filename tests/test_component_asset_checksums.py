@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -17,23 +18,23 @@ HELPER = ROOT / "scripts" / "validate_real_installed.py"
 EXPECTED_ASSETS = {
     "darwin-amd64": {
         "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-        "sha256": "fd7939b1c3e3dcfcaefa5b601d0ea5e392186fa8128f0d613dae59165e1d5613",
+        "sha256": "244f3c06fee5ac5547498b86b21d372aa8b5a752e4001212ca2dde11dd651b26",
     },
     "darwin-arm64": {
         "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-        "sha256": "32db58488031b090d8c541c90a1e52cec34b01a7433168f4153c7dd56c20797f",
+        "sha256": "4cb89dad885772ad470f4c9a18cc0761b55222fce2b86452ac3b2ab4f65f160d",
     },
     "linux-amd64": {
         "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-        "sha256": "2c3cb4a49998dbe02474d203e3fb3f9e4311d796ad9d32fde72b39df31fe9967",
+        "sha256": "d73495fe99af7bca5abe10302176edabdd022a2f26db4ef76a0b9a0e781f5cc8",
     },
     "linux-arm64": {
         "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-        "sha256": "efe37e2c609ec2f74260b54af5a3aea872fe4da9cecb6b72f7745403b35b9831",
+        "sha256": "44bfad82020b7f6ca90de1791faefa486882e8d19aecb949c4083e129a4b5703",
     },
     "windows-amd64": {
         "name": "codebase-memory-mcp-windows-amd64.zip",
-        "sha256": "a304f3aa64d2a8a776af98422c160fe65f74fdaa52bba7e0604e121d9b67f8e2",
+        "sha256": "5a3de79e3cb615adb5ad8f9fcc835072516d52feaf9783157d87b151cf5d13f1",
     },
 }
 
@@ -43,10 +44,10 @@ EXPECTED_GRAPH_INSTALL = {
         "bundle": {
             "path": (
                 "compatibility/attestations/"
-                "code-graph-v0.8.0-redacted.4-provenance.jsonl"
+                "code-graph-v0.8.0-redacted.5-provenance.jsonl"
             ),
             "sha256": (
-                "39b1fa1ba8ee5a6348f60a17213e60ab0c7c6fd2fcbbcc339bf3491b9fbd77f9"
+                "2bc978557c2d08b43b3c9a58bf3b7a48eb2aa4d351c5510bae19fa6ae52e43f5"
             ),
         },
         "deny_self_hosted_runners": True,
@@ -58,13 +59,13 @@ EXPECTED_GRAPH_INSTALL = {
     "checksums": {
         "name": "checksums.txt",
         "sha256": (
-            "fd3c78b8fc49ae2450cbdbaafae39eda6c94a408578e588ccf9cca29e4a47509"
+            "b66cd88e07506b43ad53aeb93abfcaa086dd1d827e3a460609a45950015775ee"
         ),
     },
     "kind": "github-release",
     "repository": "redacted-org/code-graph",
-    "source_revision": "a22795fe62774a8ab68a9c33a1ebdcd62b28fdfa",
-    "tag": "v0.8.0-redacted.4",
+    "source_revision": "41b8400951aa7a4da478e9d79486e47f7e4ae075",
+    "tag": "v0.8.0-redacted.5",
 }
 
 EXPECTED_SEARCH_INSTALL = {
@@ -101,11 +102,19 @@ EXPECTED_SEARCH_INSTALL = {
 
 
 def load_helper():
+    scripts = str(HELPER.parent)
+    added = scripts not in sys.path
+    if added:
+        sys.path.insert(0, scripts)
     spec = importlib.util.spec_from_file_location("validate_real_installed", HELPER)
     if spec is None or spec.loader is None:
         raise AssertionError("could not load real-install helper")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if added:
+            sys.path.remove(scripts)
     return module
 
 

@@ -1,4 +1,5 @@
 import importlib.util
+from copy import deepcopy
 from pathlib import Path
 import unittest
 
@@ -90,6 +91,7 @@ def _relationship_observation(
     relationship_generation: str = INDEX_GENERATION,
     evidence_generation: str = INDEX_GENERATION,
     resolution_source: str = "go_lsp_cross_file+runtime_trace",
+    resolution_artifact_sha256: str | None = None,
     confidence_band: str = "high",
     runtime_observed: bool = True,
     observation_count: int = 17,
@@ -116,6 +118,10 @@ def _relationship_observation(
         "runtime_observed": runtime_observed,
         "observation_count": observation_count,
     }
+    if resolution_artifact_sha256 is not None:
+        relationship_payload["resolution_artifact_sha256"] = (
+            resolution_artifact_sha256
+        )
     relationship = {
         "id": module._stable_id("rel", relationship_payload),
         **relationship_payload,
@@ -216,6 +222,11 @@ class ProofEvaluatorTests(unittest.TestCase):
                 "resolution_sources": [],
             },
         )
+
+    def test_legacy_bundle_validation_omits_the_optional_assurance_requirement(self):
+        validated = module.validate_bundle(_bundle())
+
+        self.assertNotIn("assurance_requirement", validated)
 
     def test_runtime_confirmed_relationship_can_corroborate_one_engine(self):
         bundle = _bundle()
@@ -390,6 +401,169 @@ class ProofEvaluatorTests(unittest.TestCase):
             "supporting_evidence_not_trustworthy",
             result["caveats"],
         )
+
+    def test_required_compiler_capability_rejects_heuristic_support(self):
+        bundle = _bundle()
+        bundle["assurance_requirement"] = {
+            "required_capabilities": ["compiler_resolution"],
+        }
+        bundle["observations"] = [
+            _relationship_observation(
+                resolution_source="heuristic_static_resolution",
+                confidence_band="high",
+                runtime_observed=False,
+                observation_count=0,
+            )
+        ]
+
+        result = module.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "unresolved")
+        self.assertIn(
+            "required_assurance_not_satisfied",
+            result["caveats"],
+        )
+        self.assertEqual(
+            result["assurance_lattice"],
+            {
+                "required_capabilities": ["compiler_resolution"],
+                "supporting_capabilities": [
+                    "source_coordinates",
+                    "structural_relationship",
+                ],
+                "contradicting_capabilities": [],
+                "missing_supporting_capabilities": ["compiler_resolution"],
+                "missing_contradicting_capabilities": ["compiler_resolution"],
+                "satisfied_by": None,
+            },
+        )
+
+    def test_required_compiler_capability_accepts_scip_support(self):
+        bundle = _bundle()
+        bundle["assurance_requirement"] = {
+            "required_capabilities": [
+                "source_coordinates",
+                "structural_relationship",
+                "compiler_resolution",
+            ],
+        }
+        bundle["observations"] = [
+            _relationship_observation(
+                resolution_source="scip-ingest",
+                resolution_artifact_sha256="a" * 64,
+                confidence_band="high",
+                runtime_observed=False,
+                observation_count=0,
+            )
+        ]
+
+        result = module.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "verified")
+        self.assertEqual(
+            result["proof_id"],
+            "proof:v1:6a0310be2366d2696dc6645546cc137bd32dc5d490e504c983c3d71c01c04bd1",
+        )
+        self.assertEqual(result["assurance_lattice"]["satisfied_by"], "support")
+        self.assertEqual(
+            result["assurance_lattice"]["missing_supporting_capabilities"],
+            [],
+        )
+        without_requirement = deepcopy(bundle)
+        del without_requirement["assurance_requirement"]
+        self.assertNotEqual(
+            result["proof_id"],
+            module.evaluate(without_requirement)["proof_id"],
+        )
+
+    def test_required_compiler_capability_rejects_unbound_legacy_scip_support(self):
+        bundle = _bundle()
+        bundle["assurance_requirement"] = {
+            "required_capabilities": ["compiler_resolution"],
+        }
+        bundle["observations"] = [
+            _relationship_observation(
+                resolution_source="scip-ingest",
+                confidence_band="high",
+                runtime_observed=False,
+                observation_count=0,
+            )
+        ]
+
+        result = module.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "unresolved")
+        self.assertEqual(
+            result["assurance_lattice"]["missing_supporting_capabilities"],
+            ["compiler_resolution"],
+        )
+
+    def test_resolution_artifact_requires_canonical_scip_digest(self):
+        for digest, expected in (
+            ("A" * 64, "64 lowercase hex characters"),
+            ("a" * 63, "64 lowercase hex characters"),
+        ):
+            with self.subTest(digest=digest):
+                bundle = _bundle()
+                bundle["observations"] = [
+                    _relationship_observation(
+                        resolution_source="scip-ingest",
+                        resolution_artifact_sha256=digest,
+                        runtime_observed=False,
+                        observation_count=0,
+                    )
+                ]
+                with self.assertRaisesRegex(module.ProofInputError, expected):
+                    module.evaluate(bundle)
+
+        bundle = _bundle()
+        bundle["observations"] = [
+            _relationship_observation(
+                resolution_source="go_lsp_cross_file",
+                resolution_artifact_sha256="a" * 64,
+                runtime_observed=False,
+                observation_count=0,
+            )
+        ]
+        with self.assertRaisesRegex(
+            module.ProofInputError,
+            "requires scip-ingest provenance",
+        ):
+            module.evaluate(bundle)
+
+    def test_required_runtime_capability_rejects_unobserved_relationship(self):
+        bundle = _bundle()
+        bundle["assurance_requirement"] = {
+            "required_capabilities": ["runtime_observation"],
+        }
+        bundle["observations"] = [
+            _relationship_observation(
+                resolution_source="scip-ingest",
+                confidence_band="high",
+                runtime_observed=False,
+                observation_count=0,
+            )
+        ]
+
+        result = module.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "unresolved")
+        self.assertEqual(
+            result["assurance_lattice"]["missing_supporting_capabilities"],
+            ["runtime_observation"],
+        )
+
+    def test_unknown_assurance_capability_is_rejected(self):
+        bundle = _bundle()
+        bundle["assurance_requirement"] = {
+            "required_capabilities": ["plausible_model_reasoning"],
+        }
+
+        with self.assertRaisesRegex(
+            module.ProofInputError,
+            "unsupported capabilities",
+        ):
+            module.evaluate(bundle)
 
     def test_forged_reference_id_is_rejected(self):
         bundle = _bundle()

@@ -127,6 +127,73 @@ READINESS_STATUS=$("$PYTHON" -c \
 READINESS_REASON=$("$PYTHON" -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["integrated_readiness"]["reason"])' \
     "$BOM_FILE")
+GO_SCIP_REPOSITORY=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["go-scip"]["repository"])' \
+    "$BOM_FILE")
+GO_SCIP_TAG=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["go-scip"]["tag"])' \
+    "$BOM_FILE")
+GO_SCIP_SOURCE_REVISION=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["go-scip"]["source_revision"])' \
+    "$BOM_FILE")
+GO_SCIP_VERSION=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["go-scip"]["version_output"])' \
+    "$BOM_FILE")
+GO_SCIP_SUPPORTED=$("$PYTHON" -c \
+    'import json,sys; print("yes" if sys.argv[2] in json.load(open(sys.argv[1]))["precision_generators"]["go-scip"]["assets"] else "no")' \
+    "$BOM_FILE" "$ASSET_KEY")
+if [ "$GO_SCIP_SUPPORTED" = "yes" ]; then
+    GO_SCIP_ASSET=$("$PYTHON" -c \
+        'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["go-scip"]["assets"][sys.argv[2]]["name"])' \
+        "$BOM_FILE" "$ASSET_KEY")
+    GO_SCIP_ARCHIVE_SHA256=$("$PYTHON" -c \
+        'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["go-scip"]["assets"][sys.argv[2]]["archive_sha256"])' \
+        "$BOM_FILE" "$ASSET_KEY")
+    GO_SCIP_BINARY_SHA256=$("$PYTHON" -c \
+        'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["go-scip"]["assets"][sys.argv[2]]["binary_sha256"])' \
+        "$BOM_FILE" "$ASSET_KEY")
+fi
+TYPESCRIPT_SCIP_PACKAGE=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["package"])' \
+    "$BOM_FILE")
+TYPESCRIPT_SCIP_VERSION=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["version_output"])' \
+    "$BOM_FILE")
+TYPESCRIPT_SCIP_LOCKFILE=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["lockfile"])' \
+    "$BOM_FILE")
+TYPESCRIPT_SCIP_PACKAGE_MANIFEST=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["package_manifest"])' \
+    "$BOM_FILE")
+TYPESCRIPT_SCIP_LOCKFILE_SHA256=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["lockfile_sha256"])' \
+    "$BOM_FILE")
+TYPESCRIPT_SCIP_ENTRYPOINT=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["entrypoint"])' \
+    "$BOM_FILE")
+TYPESCRIPT_SCIP_ENTRYPOINT_SHA256=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["entrypoint_sha256"])' \
+    "$BOM_FILE")
+TYPESCRIPT_NODE_BASE_URL=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["node_runtime"]["base_url"])' \
+    "$BOM_FILE")
+TYPESCRIPT_NODE_VERSION=$($PYTHON -c \
+    'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["node_runtime"]["version"])' \
+    "$BOM_FILE")
+TYPESCRIPT_SCIP_SUPPORTED=$($PYTHON -c \
+    'import json,sys; print("yes" if sys.argv[2] in json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["node_runtime"]["assets"] else "no")' \
+    "$BOM_FILE" "$ASSET_KEY")
+if [ "$TYPESCRIPT_SCIP_SUPPORTED" = "yes" ]; then
+    TYPESCRIPT_NODE_ASSET=$($PYTHON -c \
+        'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["node_runtime"]["assets"][sys.argv[2]]["name"])' \
+        "$BOM_FILE" "$ASSET_KEY")
+    TYPESCRIPT_NODE_ARCHIVE_SHA256=$($PYTHON -c \
+        'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["node_runtime"]["assets"][sys.argv[2]]["archive_sha256"])' \
+        "$BOM_FILE" "$ASSET_KEY")
+    TYPESCRIPT_NODE_BINARY_SHA256=$($PYTHON -c \
+        'import json,sys; print(json.load(open(sys.argv[1]))["precision_generators"]["typescript-scip"]["node_runtime"]["assets"][sys.argv[2]]["binary_sha256"])' \
+        "$BOM_FILE" "$ASSET_KEY")
+fi
 
 if [[ ! "$EXPECTED_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
     echo "Error: BOM SHA-256 is missing or invalid for $ASSET_KEY." >&2
@@ -555,6 +622,142 @@ rmdir "$GRAPH_DOWNLOAD_DIR" 2>/dev/null || true
 chmod +x "$BIN_DIR/$GRAPH_BINARY" 2>/dev/null || true
 
 echo "  code-graph installed."
+echo ""
+
+# Installing optional Go SCIP precision generator. This remains outside the
+# MCP server: /index-repo opts in explicitly and validates the binary again.
+echo "Installing optional Go SCIP precision generator..."
+if [ "$GO_SCIP_SUPPORTED" = "yes" ]; then
+    GO_SCIP_DOWNLOAD_DIR="$BIN_DIR/.go-scip-download"
+    mkdir -p "$GO_SCIP_DOWNLOAD_DIR"
+    require_authenticated_gh
+    RESOLVED_GO_SCIP_REVISION=$(resolve_release_tag_commit \
+        "$GO_SCIP_REPOSITORY" \
+        "$GO_SCIP_TAG")
+    if [ "$RESOLVED_GO_SCIP_REVISION" != "$GO_SCIP_SOURCE_REVISION" ]; then
+        echo "Error: go-scip tag source revision mismatch." >&2
+        exit 1
+    fi
+    gh release download "$GO_SCIP_TAG" \
+        --repo "$GO_SCIP_REPOSITORY" \
+        --pattern "$GO_SCIP_ASSET" \
+        --dir "$GO_SCIP_DOWNLOAD_DIR" \
+        --clobber
+    verify_sha256 \
+        "$GO_SCIP_DOWNLOAD_DIR/$GO_SCIP_ASSET" \
+        "$GO_SCIP_ARCHIVE_SHA256" \
+        "$GO_SCIP_ASSET"
+    run_with_allowed_environment tar xzf \
+        "$GO_SCIP_DOWNLOAD_DIR/$GO_SCIP_ASSET" -C "$GO_SCIP_DOWNLOAD_DIR"
+    verify_sha256 \
+        "$GO_SCIP_DOWNLOAD_DIR/scip-go" \
+        "$GO_SCIP_BINARY_SHA256" \
+        "scip-go binary"
+    mv "$GO_SCIP_DOWNLOAD_DIR/scip-go" "$BIN_DIR/scip-go"
+    chmod +x "$BIN_DIR/scip-go"
+    rm -f "$GO_SCIP_DOWNLOAD_DIR/$GO_SCIP_ASSET" \
+        "$GO_SCIP_DOWNLOAD_DIR/LICENSE"
+    rmdir "$GO_SCIP_DOWNLOAD_DIR"
+    run_with_allowed_environment \
+        "$PYTHON" "$PLUGIN_DIR/scripts/prepare_scip_index.py" verify \
+        --generator "$BIN_DIR/scip-go" \
+        --component-bom "$BOM_FILE"
+    echo "  scip-go $GO_SCIP_VERSION installed and verified."
+else
+    echo "  Auto SCIP precision unavailable for $ASSET_KEY; heuristic and supplied SCIP modes remain available."
+fi
+echo ""
+
+# Install the TypeScript compiler indexer into an isolated plugin runtime.
+# Target repositories supply their own already-installed dependency trees;
+# this installer never runs npm in a target checkout.
+echo "Installing optional TypeScript SCIP precision generator..."
+if [ "$TYPESCRIPT_SCIP_SUPPORTED" = "yes" ]; then
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "Error: curl is required to install the pinned Node runtime." >&2
+        exit 1
+    fi
+    TYPESCRIPT_SCIP_RUNTIME="$BIN_DIR/scip-typescript-runtime"
+    TYPESCRIPT_SCIP_DOWNLOAD="$BIN_DIR/.typescript-scip-download"
+    mkdir -p "$TYPESCRIPT_SCIP_DOWNLOAD"
+    run_with_allowed_environment curl --fail --location --silent --show-error \
+        "$TYPESCRIPT_NODE_BASE_URL/$TYPESCRIPT_NODE_ASSET" \
+        --output "$TYPESCRIPT_SCIP_DOWNLOAD/$TYPESCRIPT_NODE_ASSET"
+    verify_sha256 \
+        "$TYPESCRIPT_SCIP_DOWNLOAD/$TYPESCRIPT_NODE_ASSET" \
+        "$TYPESCRIPT_NODE_ARCHIVE_SHA256" \
+        "$TYPESCRIPT_NODE_ASSET"
+    case "$TYPESCRIPT_NODE_ASSET" in
+        *.tar.gz)
+            run_with_allowed_environment tar xzf \
+                "$TYPESCRIPT_SCIP_DOWNLOAD/$TYPESCRIPT_NODE_ASSET" \
+                -C "$TYPESCRIPT_SCIP_DOWNLOAD"
+            TYPESCRIPT_NODE_DIRECTORY=${TYPESCRIPT_NODE_ASSET%.tar.gz}
+            ;;
+        *.tar.xz)
+            run_with_allowed_environment tar xJf \
+                "$TYPESCRIPT_SCIP_DOWNLOAD/$TYPESCRIPT_NODE_ASSET" \
+                -C "$TYPESCRIPT_SCIP_DOWNLOAD"
+            TYPESCRIPT_NODE_DIRECTORY=${TYPESCRIPT_NODE_ASSET%.tar.xz}
+            ;;
+        *.zip)
+            run_with_allowed_environment unzip -qo \
+                "$TYPESCRIPT_SCIP_DOWNLOAD/$TYPESCRIPT_NODE_ASSET" \
+                -d "$TYPESCRIPT_SCIP_DOWNLOAD"
+            TYPESCRIPT_NODE_DIRECTORY=${TYPESCRIPT_NODE_ASSET%.zip}
+            ;;
+        *)
+            echo "Error: unsupported Node runtime archive." >&2
+            exit 1
+            ;;
+    esac
+    mkdir -p "$TYPESCRIPT_SCIP_RUNTIME"
+    mv \
+        "$TYPESCRIPT_SCIP_DOWNLOAD/$TYPESCRIPT_NODE_DIRECTORY" \
+        "$TYPESCRIPT_SCIP_RUNTIME/node"
+    rm -f "$TYPESCRIPT_SCIP_DOWNLOAD/$TYPESCRIPT_NODE_ASSET"
+    rmdir "$TYPESCRIPT_SCIP_DOWNLOAD"
+    if [ -f "$TYPESCRIPT_SCIP_RUNTIME/node/bin/node" ]; then
+        TYPESCRIPT_NODE_BINARY="$TYPESCRIPT_SCIP_RUNTIME/node/bin/node"
+        TYPESCRIPT_NPM_CLI="$TYPESCRIPT_SCIP_RUNTIME/node/lib/node_modules/npm/bin/npm-cli.js"
+    else
+        TYPESCRIPT_NODE_BINARY="$TYPESCRIPT_SCIP_RUNTIME/node/node.exe"
+        TYPESCRIPT_NPM_CLI="$TYPESCRIPT_SCIP_RUNTIME/node/node_modules/npm/bin/npm-cli.js"
+    fi
+    verify_sha256 \
+        "$TYPESCRIPT_NODE_BINARY" \
+        "$TYPESCRIPT_NODE_BINARY_SHA256" \
+        "Node runtime binary"
+    mkdir -p "$TYPESCRIPT_SCIP_RUNTIME/package"
+    verify_sha256 \
+        "$PLUGIN_DIR/$TYPESCRIPT_SCIP_LOCKFILE" \
+        "$TYPESCRIPT_SCIP_LOCKFILE_SHA256" \
+        "$TYPESCRIPT_SCIP_LOCKFILE"
+    cp \
+        "$PLUGIN_DIR/$TYPESCRIPT_SCIP_PACKAGE_MANIFEST" \
+        "$TYPESCRIPT_SCIP_RUNTIME/package/package.json"
+    cp \
+        "$PLUGIN_DIR/$TYPESCRIPT_SCIP_LOCKFILE" \
+        "$TYPESCRIPT_SCIP_RUNTIME/package/package-lock.json"
+    run_with_allowed_environment \
+        "$TYPESCRIPT_NODE_BINARY" "$TYPESCRIPT_NPM_CLI" ci \
+        --prefix "$TYPESCRIPT_SCIP_RUNTIME/package" \
+        --ignore-scripts --no-audit --no-fund
+    TYPESCRIPT_SCIP_GENERATOR="$TYPESCRIPT_SCIP_RUNTIME/package/$TYPESCRIPT_SCIP_ENTRYPOINT"
+    verify_sha256 \
+        "$TYPESCRIPT_SCIP_GENERATOR" \
+        "$TYPESCRIPT_SCIP_ENTRYPOINT_SHA256" \
+        "$TYPESCRIPT_SCIP_PACKAGE entrypoint"
+    run_with_allowed_environment \
+        "$PYTHON" "$PLUGIN_DIR/scripts/prepare_scip_index.py" verify \
+        --language typescript \
+        --runtime "$TYPESCRIPT_NODE_BINARY" \
+        --generator "$TYPESCRIPT_SCIP_GENERATOR" \
+        --component-bom "$BOM_FILE"
+    echo "  $TYPESCRIPT_SCIP_PACKAGE $TYPESCRIPT_SCIP_VERSION installed with Node $TYPESCRIPT_NODE_VERSION and verified."
+else
+    echo "  Automatic TypeScript SCIP precision unavailable for $ASSET_KEY."
+fi
 echo ""
 
 # ------------------------------------------------------------------

@@ -121,6 +121,64 @@ class InstalledContractTests(unittest.TestCase):
             ),
         )
 
+    def test_installers_bind_the_optional_go_scip_generator_to_the_bom(self):
+        shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+        powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        generator = bom["precision_generators"]["go-scip"]
+
+        for installer in (shell, powershell):
+            for contract in (
+                "precision_generators",
+                "go-scip",
+                "version_output",
+                "binary_sha256",
+                "prepare_scip_index.py",
+                "Auto SCIP precision unavailable",
+            ):
+                self.assertIn(contract, installer)
+            self.assertNotIn(generator["tag"], installer)
+            self.assertNotIn(generator["source_revision"], installer)
+
+        scip_block = shell.split(
+            "Installing optional Go SCIP precision generator", 1
+        )[1].split("# ------------------------------------------------------------------", 1)[0]
+        for contract in (
+            "resolve_release_tag_commit",
+            "gh release download",
+            "verify_sha256",
+            "tar xzf",
+            "prepare_scip_index.py\" verify",
+        ):
+            self.assertIn(contract, scip_block)
+        self.assertLess(
+            scip_block.index("verify_sha256"),
+            scip_block.index("tar xzf"),
+        )
+
+    def test_installers_bind_typescript_scip_to_isolated_runtime_and_lockfile(self):
+        shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+        powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+
+        for installer in (shell, powershell):
+            for contract in (
+                "typescript-scip",
+                "node_runtime",
+                "lockfile_sha256",
+                "entrypoint_sha256",
+                "ignore-scripts",
+                "prepare_scip_index.py",
+                "--language typescript",
+            ):
+                self.assertIn(contract, installer)
+            self.assertIn("never runs npm in a target", installer)
+
+        block = shell.split(
+            "Installing optional TypeScript SCIP precision generator", 1
+        )[1].split("# ------------------------------------------------------------------", 1)[0]
+        self.assertLess(block.index("verify_sha256"), block.index("npm-cli.js"))
+        self.assertIn("$BIN_DIR/scip-typescript-runtime", block)
+
     def test_revision_verifier_accepts_only_the_exact_installed_commit(self):
         verifier = load_revision_verifier()
         expected = "a" * 40

@@ -46,6 +46,21 @@ GRAPH_ASSET_NAMES = {
     "linux-arm64": "codebase-memory-mcp-linux-arm64.tar.gz",
     "windows-amd64": "codebase-memory-mcp-windows-amd64.zip",
 }
+GO_SCIP_RELEASE_REPOSITORY = "scip-code/scip-go"
+GO_SCIP_ASSET_NAMES = {
+    "darwin-arm64": "scip-go-darwin-arm64.tar.gz",
+    "linux-amd64": "scip-go-linux-amd64.tar.gz",
+    "linux-arm64": "scip-go-linux-arm64.tar.gz",
+}
+TYPESCRIPT_SCIP_PACKAGE = "@sourcegraph/scip-typescript"
+TYPESCRIPT_SCIP_SOURCE_REPOSITORY = "sourcegraph/scip-typescript"
+NODE_RUNTIME_ASSET_NAMES = {
+    "darwin-amd64": "node-v22.23.2-darwin-x64.tar.gz",
+    "darwin-arm64": "node-v22.23.2-darwin-arm64.tar.gz",
+    "linux-amd64": "node-v22.23.2-linux-x64.tar.xz",
+    "linux-arm64": "node-v22.23.2-linux-arm64.tar.xz",
+    "windows-amd64": "node-v22.23.2-win-x64.zip",
+}
 CODE_SEARCH_GIT_REPOSITORY = (
     "https://github.com/redacted-org/code-search.git"
 )
@@ -381,6 +396,219 @@ def validate_code_graph_install(install: dict) -> None:
         )
 
 
+def validate_precision_generators(value: object) -> None:
+    if not isinstance(value, dict) or set(value) != {
+        "go-scip",
+        "typescript-scip",
+    }:
+        errors.append(
+            "component-bom.json: precision_generators must contain exactly "
+            "go-scip and typescript-scip"
+        )
+        return
+    generator = value["go-scip"]
+    if not isinstance(generator, dict):
+        errors.append("component-bom.json: go-scip must be an object")
+        return
+    expected_keys = {
+        "assets",
+        "kind",
+        "repository",
+        "source_revision",
+        "tag",
+        "version_output",
+    }
+    if set(generator) != expected_keys:
+        errors.append(
+            "component-bom.json: go-scip keys must be exactly "
+            + ", ".join(sorted(expected_keys))
+        )
+    if generator.get("kind") != "github-release":
+        errors.append("component-bom.json: go-scip.kind must be github-release")
+    if generator.get("repository") != GO_SCIP_RELEASE_REPOSITORY:
+        errors.append(
+            "component-bom.json: go-scip.repository must be "
+            + GO_SCIP_RELEASE_REPOSITORY
+        )
+    if not isinstance(generator.get("tag"), str) or re.fullmatch(
+        r"v[0-9][0-9A-Za-z._+-]*", generator.get("tag", "")
+    ) is None:
+        errors.append("component-bom.json: go-scip.tag must be a safe version tag")
+    if not isinstance(generator.get("source_revision"), str) or re.fullmatch(
+        r"[0-9a-f]{40}|[0-9a-f]{64}", generator.get("source_revision", "")
+    ) is None:
+        errors.append(
+            "component-bom.json: go-scip.source_revision must be a full object ID"
+        )
+    version = generator.get("version_output")
+    if not isinstance(version, str) or not version or version != version.strip():
+        errors.append(
+            "component-bom.json: go-scip.version_output must be non-empty"
+        )
+    assets = generator.get("assets")
+    if not isinstance(assets, dict) or set(assets) != set(GO_SCIP_ASSET_NAMES):
+        errors.append(
+            "component-bom.json: go-scip.assets must cover exactly "
+            + ", ".join(sorted(GO_SCIP_ASSET_NAMES))
+        )
+        return
+    for platform_key, expected_name in GO_SCIP_ASSET_NAMES.items():
+        asset = assets.get(platform_key)
+        if not isinstance(asset, dict):
+            errors.append(
+                f"component-bom.json: go-scip asset {platform_key} missing"
+            )
+            continue
+        expected_asset_keys = {"archive_sha256", "binary_sha256", "name"}
+        if set(asset) != expected_asset_keys:
+            errors.append(
+                f"component-bom.json: go-scip asset {platform_key} keys must be "
+                + ", ".join(sorted(expected_asset_keys))
+            )
+        if asset.get("name") != expected_name:
+            errors.append(
+                f"component-bom.json: go-scip asset {platform_key}.name must be "
+                + expected_name
+            )
+        for digest_name in ("archive_sha256", "binary_sha256"):
+            digest = asset.get(digest_name)
+            if not isinstance(digest, str) or re.fullmatch(
+                r"[0-9a-f]{64}", digest
+            ) is None:
+                errors.append(
+                    f"component-bom.json: go-scip asset {platform_key}."
+                    f"{digest_name} must be 64 lowercase hex characters"
+                )
+
+    typescript = value["typescript-scip"]
+    if not isinstance(typescript, dict):
+        errors.append("component-bom.json: typescript-scip must be an object")
+        return
+    expected_typescript_keys = {
+        "entrypoint",
+        "entrypoint_sha256",
+        "kind",
+        "lockfile",
+        "lockfile_sha256",
+        "node_runtime",
+        "package",
+        "package_integrity",
+        "package_manifest",
+        "source_repository",
+        "source_revision",
+        "supported_node_majors",
+        "version_output",
+    }
+    if set(typescript) != expected_typescript_keys:
+        errors.append(
+            "component-bom.json: typescript-scip keys must be exactly "
+            + ", ".join(sorted(expected_typescript_keys))
+        )
+    if typescript.get("kind") != "npm-lockfile":
+        errors.append("component-bom.json: typescript-scip.kind must be npm-lockfile")
+    if typescript.get("package") != TYPESCRIPT_SCIP_PACKAGE:
+        errors.append(
+            "component-bom.json: typescript-scip.package must be "
+            + TYPESCRIPT_SCIP_PACKAGE
+        )
+    if typescript.get("source_repository") != TYPESCRIPT_SCIP_SOURCE_REPOSITORY:
+        errors.append(
+            "component-bom.json: typescript-scip.source_repository must be "
+            + TYPESCRIPT_SCIP_SOURCE_REPOSITORY
+        )
+    if re.fullmatch(r"[0-9a-f]{40}", typescript.get("source_revision", "")) is None:
+        errors.append(
+            "component-bom.json: typescript-scip.source_revision must be a full Git SHA"
+        )
+    if typescript.get("version_output") != "0.4.0":
+        errors.append(
+            "component-bom.json: typescript-scip.version_output must be 0.4.0"
+        )
+    if not isinstance(typescript.get("package_integrity"), str) or not typescript[
+        "package_integrity"
+    ].startswith("sha512-"):
+        errors.append(
+            "component-bom.json: typescript-scip.package_integrity must be npm SHA-512 SRI"
+        )
+    expected_paths = {
+        "package_manifest": "compatibility/scip-typescript-package.json",
+        "lockfile": "compatibility/scip-typescript-package-lock.json",
+        "entrypoint": "node_modules/@sourcegraph/scip-typescript/dist/src/main.js",
+    }
+    for field, expected in expected_paths.items():
+        if typescript.get(field) != expected:
+            errors.append(
+                f"component-bom.json: typescript-scip.{field} must be {expected}"
+            )
+    for field in ("lockfile_sha256", "entrypoint_sha256"):
+        if re.fullmatch(r"[0-9a-f]{64}", typescript.get(field, "")) is None:
+            errors.append(
+                f"component-bom.json: typescript-scip.{field} must be a SHA-256 digest"
+            )
+    lockfile_path = ROOT / str(typescript.get("lockfile", ""))
+    if not lockfile_path.is_file():
+        errors.append("component-bom.json: TypeScript SCIP lockfile is missing")
+    elif hashlib.sha256(lockfile_path.read_bytes()).hexdigest() != typescript.get(
+        "lockfile_sha256"
+    ):
+        errors.append(
+            "component-bom.json: TypeScript SCIP lockfile digest does not match"
+        )
+    package_manifest_path = ROOT / str(typescript.get("package_manifest", ""))
+    if not package_manifest_path.is_file():
+        errors.append("component-bom.json: TypeScript SCIP package manifest is missing")
+    if typescript.get("supported_node_majors") != [22]:
+        errors.append(
+            "component-bom.json: typescript-scip.supported_node_majors must be [22]"
+        )
+    runtime = typescript.get("node_runtime")
+    if not isinstance(runtime, dict) or set(runtime) != {
+        "assets",
+        "base_url",
+        "version",
+    }:
+        errors.append(
+            "component-bom.json: typescript-scip.node_runtime shape is invalid"
+        )
+        return
+    if runtime.get("version") != "v22.23.2":
+        errors.append(
+            "component-bom.json: typescript-scip.node_runtime.version must be v22.23.2"
+        )
+    if runtime.get("base_url") != "https://nodejs.org/download/release/v22.23.2":
+        errors.append(
+            "component-bom.json: typescript-scip.node_runtime.base_url is invalid"
+        )
+    runtime_assets = runtime.get("assets")
+    if not isinstance(runtime_assets, dict) or set(runtime_assets) != set(
+        NODE_RUNTIME_ASSET_NAMES
+    ):
+        errors.append(
+            "component-bom.json: TypeScript Node runtime assets are incomplete"
+        )
+        return
+    for platform_key, expected_name in NODE_RUNTIME_ASSET_NAMES.items():
+        asset = runtime_assets.get(platform_key)
+        if not isinstance(asset, dict) or set(asset) != {
+            "archive_sha256",
+            "binary_sha256",
+            "name",
+        }:
+            errors.append(
+                f"component-bom.json: TypeScript Node asset {platform_key} shape is invalid"
+            )
+            continue
+        if asset.get("name") != expected_name:
+            errors.append(
+                f"component-bom.json: TypeScript Node asset {platform_key}.name is invalid"
+            )
+        for field in ("archive_sha256", "binary_sha256"):
+            if re.fullmatch(r"[0-9a-f]{64}", asset.get(field, "")) is None:
+                errors.append(
+                    f"component-bom.json: TypeScript Node asset {platform_key}.{field} is invalid"
+                )
+
+
 def load_json(rel: str, required_keys: tuple[str, ...]):
     path = ROOT / rel
     if not path.is_file():
@@ -439,6 +667,7 @@ if bom:
     ):
         errors.append("component-bom.json: schema_version must be 1")
     components = bom.get("components")
+    validate_precision_generators(bom.get("precision_generators"))
     if not isinstance(components, dict):
         errors.append("component-bom.json: components must be an object")
     else:

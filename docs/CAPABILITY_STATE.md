@@ -9,6 +9,17 @@ still verifiable code intelligence: useful retrieval and structural context
 whose checkout identity, precision tier, exact evidence, route, and terminal
 claims can be checked mechanically.
 
+The current development branches add the first explicit evidence-lattice
+vertical slice. Proofs may require named capabilities rather than accepting a
+single confidence band, and one CodeQL SARIF path can be ingested as canonical
+variable-level-taint evidence with database, query-pack, analyzer, revision,
+quality, and ordered-path provenance. Clean Go repositories can explicitly
+prepare a pinned `scip-go` artifact; code-graph binds that digest to each
+compiler-derived relationship, so the model selects immutable evidence rather
+than manufacturing a precision claim. These changes improve the product; they
+do **not** change the grade until released and exercised beyond the bounded
+development integration described below.
+
 This iteration improved the product, not merely the release proof. It made
 SCIP precision a persistent per-project contract, separated graph reachability
 from variable-level taint assurance, added isolated cross-project discovery
@@ -21,7 +32,7 @@ cases, and measured current relationship accuracy and million-line scale.
 |---|---:|---|
 | Verifiable code intelligence | A- | The sealed five-route/two-repetition Stage-4 successor completed 10/10 units with 1.0 evidence precision, recall, adjudication, routing, and routing-contract accuracy; zero unsupported claims, errors, or host canary violations. Backends issue typed immutable evidence IDs, and one host state machine owns route, evidence, trace, and terminal enforcement. This is a bounded holdout, not broad field evidence. |
 | General code localization | B | On the balanced public LocBench n=20 comparison, code-search reached Acc@1 0.40, Acc@10 0.85, and MRR@10 0.534. Sourcegraph reached 0.20/0.25/0.225, with three request failures counted as misses. The paired Acc@1 test favored code-search 4-0 with 16 ties, but p=0.125; superiority is not established. Cursor, Augment, and Greptile remain ungraded. |
-| Relationship graph | B+ | On a current pinned Go fixture, heuristic CALLS achieved scope-aligned precision 0.953, recall 1.000, and F1 0.976. Raw unscoped precision was 0.540, Go IMPORTS lacks a current oracle, and this does not generalize automatically to every language or relationship. SCIP can improve covered calls, but coverage and drift remain explicit. |
+| Relationship graph | B+ | On a current pinned Go fixture, heuristic CALLS achieved scope-aligned precision 0.953, recall 1.000, and F1 0.976. Raw unscoped precision was 0.540, Go IMPORTS lacks a current oracle, and this does not generalize automatically to every language or relationship. The development branch now automates a pinned Go SCIP path and binds compiler artifacts per edge, but no independent compiler-tier accuracy oracle has yet raised the grade. |
 | Graph-only conceptual localization | C | On the n=20 issue-localization comparison, graph-only Acc@1 was 0.10 and MRR@10 was 0.117. This route is not used as the conceptual-discovery primary; code-search remains primary and graph is invoked for explicit relationships, traces, dependencies, and proof. |
 | Operational scale | B+ | Direct measurement reached 2.39 million UTF-8 lines and 6,842 tracked files across separate single-repository cases. This establishes million-line operation, not a very large monorepo, unified multi-repository query plane, or distributed organizational fleet. |
 | Resource efficiency | B- | On the 2.39-million-line Moto checkout, indexes totaled 566 MB and warm p50 was 632 ms search / 737 ms graph. The largest persisted pair was 1.148 GB on Transformers, with 675 ms / 1.408 s warm p50 and 1.04 GB / 1.72 GB peak RSS. The immutable-generation plus writable-compatibility design deliberately duplicates persisted search artifacts; safely removing that cost requires a persistence redesign. |
@@ -67,7 +78,27 @@ document/function coverage, drift, heuristic replacements, inserted edges,
 and degradation. Missing or stale SCIP cannot silently present as
 compiler-grade success.
 
-SCIP remains an optional coverage layer, not an automatic organization-wide
+The development branch makes one bounded path operational: an explicit
+`--graph-precision auto` request on a clean Go root verifies the BOM-pinned
+`scip-go` binary, creates or reuses an out-of-tree generation-bound index, and
+requires the graph to report the identical artifact digest. A same-revision
+integration over the pinned code-graph repository generated a 12,801,845-byte
+index in about 26 seconds. Code-graph ingested 389 documents, covered 2,936 of
+5,928 graph functions, replaced 6,337 heuristic edges, and inserted 6,275 SCIP
+CALLS edges in about 3.6 seconds; 23 documents remained drifted under the
+existing alignment rule. One emitted SCIP relationship then satisfied
+`source_coordinates + structural_relationship + compiler_resolution` in the
+proof evaluator using the exact index digest. This is development evidence,
+not a released benchmark or an independent accuracy oracle.
+
+Drift is therefore a per-document coverage boundary, not a reason to discard
+all compiler-derived edges. The graph as a whole is never relabeled
+compiler-grade. Only a canonical relationship whose `resolution_source` is
+`scip-ingest` and whose `resolution_artifact_sha256` matches the ingested
+artifact satisfies compiler assurance; uncovered, drifted, legacy, or
+heuristic relationships do not.
+
+SCIP remains an optional Go coverage layer, not an automatic organization-wide
 compiler pipeline. The product does not yet operate a Sourcegraph-scale SCIP
 indexing fleet across languages and repositories.
 
@@ -77,6 +108,15 @@ semantics, or path feasibility. Requests declaring
 `required_assurance="variable_level_taint"` fail closed with a structured
 CodeQL handoff. CodeQL remains the appropriate tool for vulnerability-grade
 taint and path analysis.
+
+The evidence lattice makes that boundary executable. A proof bundle may
+request any subset of source coordinates, lexical or semantic retrieval,
+structural relationship, compiler resolution, runtime observation, and
+variable-level taint. The evaluator reports the capabilities present and
+missing on supporting and contradicting observations and returns unresolved
+when the requested tier is absent. The CodeQL adapter is intentionally
+ingest-only: database construction, query modeling, and database-quality
+assessment remain CodeQL responsibilities.
 
 ## Relationship accuracy
 
@@ -122,8 +162,16 @@ efficiency.
   pretending scores are globally comparable.
 - Code-graph persists a per-project heuristic/SCIP precision choice and makes
   coverage, drift, and effective tier observable.
+- Explicit Go auto precision verifies a pinned `scip-go` release, preserves a
+  clean checkout, caches by index generation, and binds the resulting artifact
+  digest through graph edges into the assurance lattice.
 - Code-graph distinguishes reachability from variable-level taint assurance
   and hands the latter to CodeQL.
+- Proof evaluation preserves an explicit assurance lattice instead of
+  flattening heuristic, compiler, runtime, and CodeQL evidence into one score.
+- Selected CodeQL SARIF paths can be converted into immutable external-analysis
+  evidence only when exact revision and passing database-quality receipts are
+  present.
 - Code-graph supports project-balanced cross-index localization and immutable
   file/declaration index comparison.
 - The public comparison expanded from 4 to 20 balanced cases and added Wilson
@@ -136,14 +184,16 @@ efficiency.
 
 Do not add another canary or proof layer. The next bounded work is:
 
-1. Expand the public comparison only when a preregistered sample is large
+1. Release and exercise the lattice and automatic Go SCIP slices on public
+   proof fixtures; then add a separately pinned TypeScript compiler path.
+2. Expand the public comparison only when a preregistered sample is large
    enough to narrow the Acc@1 interval and reduce live-comparator failures.
-2. Add one independent current oracle for a non-Go language and one additional
+3. Add one independent current oracle for a non-Go language and one additional
    relationship type; prioritize IMPORTS and dynamic-dispatch-heavy CALLS.
-3. Profile the immutable-generation/writable-mirror storage design and choose
+4. Profile the immutable-generation/writable-mirror storage design and choose
    a safe copy-on-write or direct-generation reader architecture before trying
    to remove duplication.
-4. Measure one genuinely large monorepo and one multi-repository workflow,
+5. Measure one genuinely large monorepo and one multi-repository workflow,
    including steady-state storage, repeated incremental updates, and failure
    recovery.
 

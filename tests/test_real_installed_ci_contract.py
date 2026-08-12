@@ -41,6 +41,19 @@ def load_helper():
 
 
 class RealInstalledCIContractTests(unittest.TestCase):
+    def test_load_bom_requires_the_optional_generator_contract(self):
+        helper = load_helper()
+        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        del bom["precision_generators"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "component-bom.json"
+            path.write_text(json.dumps(bom), encoding="utf-8")
+            with self.assertRaisesRegex(
+                helper.RealInstallError,
+                "component BOM is malformed",
+            ):
+                helper.load_bom(path)
+
     def test_validation_publishes_an_independently_verified_proof_packet(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         validate_job = workflow.split("  live-control-plane:", 1)[0]
@@ -980,6 +993,183 @@ class RealInstalledCIContractTests(unittest.TestCase):
             )
 
         run.assert_not_called()
+
+    def test_go_scip_release_is_hash_bound_and_verified_by_trusted_install(self):
+        helper = load_helper()
+        archive_buffer = io.BytesIO()
+        binary_bytes = b"verified scip-go binary"
+        with tarfile.open(fileobj=archive_buffer, mode="w:gz") as archive:
+            entry = tarfile.TarInfo("scip-go")
+            entry.mode = 0o755
+            entry.size = len(binary_bytes)
+            archive.addfile(entry, io.BytesIO(binary_bytes))
+        archive_bytes = archive_buffer.getvalue()
+        archive_name = "scip-go-linux-amd64.tar.gz"
+        generator = {
+            "kind": "github-release",
+            "repository": "scip-code/scip-go",
+            "tag": "v0.2.7",
+            "source_revision": "a" * 40,
+            "version_output": "0.2.7",
+            "assets": {
+                "linux-amd64": {
+                    "name": archive_name,
+                    "archive_sha256": hashlib.sha256(archive_bytes).hexdigest(),
+                    "binary_sha256": hashlib.sha256(binary_bytes).hexdigest(),
+                }
+            },
+        }
+        fetch_env = {"PATH": "/bin", "GH_TOKEN": "private-token"}
+        runtime_env = {"PATH": "/bin"}
+        events = []
+
+        def emulate(command, *, env, cwd=None):
+            if command[:3] == ["gh", "release", "download"]:
+                events.append("download")
+                download_dir = Path(command[command.index("--dir") + 1])
+                download_dir.mkdir(parents=True, exist_ok=True)
+                (download_dir / archive_name).write_bytes(archive_bytes)
+            elif str(ROOT / "scripts" / "prepare_scip_index.py") in command:
+                events.append("verify")
+
+        def resolve_tag(*_args, **_kwargs):
+            events.append("tag")
+            return "a" * 40
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp)
+            candidate_bom = destination / "component-bom.json"
+            candidate_bom.write_text("{}\n", encoding="utf-8")
+            with (
+                mock.patch.object(helper, "run", side_effect=emulate) as run,
+                mock.patch.object(
+                    helper,
+                    "resolve_release_tag_commit",
+                    side_effect=resolve_tag,
+                ) as resolve,
+                mock.patch.object(helper.platform, "system", return_value="Linux"),
+                mock.patch.object(helper.platform, "machine", return_value="x86_64"),
+            ):
+                executable = helper.install_go_scip(
+                    generator,
+                    candidate_bom,
+                    destination,
+                    fetch_env,
+                    runtime_env,
+                )
+
+            self.assertEqual(executable.read_bytes(), binary_bytes)
+
+        resolve.assert_called_once_with(
+            "scip-code/scip-go",
+            "v0.2.7",
+            fetch_env,
+        )
+        self.assertEqual(events, ["tag", "download", "verify"])
+        verify_command = run.call_args_list[-1].args[0]
+        self.assertIn("verify", verify_command)
+        self.assertIn("--generator", verify_command)
+        self.assertIn(str(candidate_bom), verify_command)
+
+        helper_source = HELPER.read_text(encoding="utf-8")
+        self.assertIn(
+            'bom["precision_generators"]["go-scip"]',
+            helper_source,
+        )
+
+    def test_typescript_scip_runtime_is_hash_bound_and_verified_by_trusted_install(self):
+        helper = load_helper()
+        node_bytes = b"verified pinned node runtime"
+        npm_cli_bytes = b"// npm cli fixture\n"
+        archive_buffer = io.BytesIO()
+        with tarfile.open(fileobj=archive_buffer, mode="w:xz") as archive:
+            for name, content, mode in (
+                ("node-v22.23.2-linux-x64/bin/node", node_bytes, 0o755),
+                (
+                    "node-v22.23.2-linux-x64/lib/node_modules/npm/bin/npm-cli.js",
+                    npm_cli_bytes,
+                    0o644,
+                ),
+            ):
+                entry = tarfile.TarInfo(name)
+                entry.mode = mode
+                entry.size = len(content)
+                archive.addfile(entry, io.BytesIO(content))
+        archive_bytes = archive_buffer.getvalue()
+        generator_bytes = b"// verified scip-typescript entrypoint\n"
+        asset_name = "node-v22.23.2-linux-x64.tar.xz"
+        lockfile = ROOT / "compatibility" / "scip-typescript-package-lock.json"
+        generator = {
+            "kind": "npm-lockfile",
+            "package": "@sourcegraph/scip-typescript",
+            "version_output": "0.4.0",
+            "source_repository": "sourcegraph/scip-typescript",
+            "source_revision": "1962a68386220dd669c3839b69d64fb5ce34f2a6",
+            "package_integrity": (
+                "sha512-k+AtsrqmS41Sd5qjkZlHcmvoSQIvBOonRj4jpgp0"
+                "KNFM6aqvMGpdSuPUqrUcg8ENTKjUbfaUVszgQwq3bCOvwA=="
+            ),
+            "package_manifest": "compatibility/scip-typescript-package.json",
+            "lockfile": "compatibility/scip-typescript-package-lock.json",
+            "lockfile_sha256": hashlib.sha256(lockfile.read_bytes()).hexdigest(),
+            "entrypoint": (
+                "node_modules/@sourcegraph/scip-typescript/dist/src/main.js"
+            ),
+            "entrypoint_sha256": hashlib.sha256(generator_bytes).hexdigest(),
+            "supported_node_majors": [22],
+            "node_runtime": {
+                "version": "v22.23.2",
+                "base_url": "https://nodejs.org/download/release/v22.23.2",
+                "assets": {
+                    "linux-amd64": {
+                        "name": asset_name,
+                        "archive_sha256": hashlib.sha256(archive_bytes).hexdigest(),
+                        "binary_sha256": hashlib.sha256(node_bytes).hexdigest(),
+                    }
+                },
+            },
+        }
+        events = []
+
+        def emulate(command, *, env, cwd=None):
+            if command[0] == "curl":
+                events.append("download")
+                output = Path(command[command.index("--output") + 1])
+                output.write_bytes(archive_bytes)
+            elif any("npm-cli.js" in argument for argument in command):
+                events.append("npm-ci")
+                package_root = Path(command[command.index("--prefix") + 1])
+                entrypoint = package_root / generator["entrypoint"]
+                entrypoint.parent.mkdir(parents=True, exist_ok=True)
+                entrypoint.write_bytes(generator_bytes)
+            elif str(ROOT / "scripts" / "prepare_scip_index.py") in command:
+                events.append("verify")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp)
+            candidate_bom = destination / "component-bom.json"
+            candidate_bom.write_text("{}\n", encoding="utf-8")
+            with (
+                mock.patch.object(helper, "run", side_effect=emulate),
+                mock.patch.object(helper.platform, "system", return_value="Linux"),
+                mock.patch.object(helper.platform, "machine", return_value="x86_64"),
+            ):
+                node, entrypoint = helper.install_typescript_scip(
+                    generator,
+                    candidate_bom,
+                    destination,
+                    {"PATH": "/bin"},
+                )
+
+            self.assertEqual(node.read_bytes(), node_bytes)
+            self.assertEqual(entrypoint.read_bytes(), generator_bytes)
+            self.assertEqual(events, ["download", "npm-ci", "verify"])
+
+        helper_source = HELPER.read_text(encoding="utf-8")
+        self.assertIn(
+            'bom["precision_generators"]["typescript-scip"]',
+            helper_source,
+        )
 
     def test_readiness_evidence_output_rejects_paths_outside_runner_temp(self):
         helper = load_helper()

@@ -30,6 +30,15 @@ COVERAGE_STATES = {"complete", "partial", "unknown"}
 INVARIANT_STATES = {"pass", "fail", "unresolved"}
 CONFIDENCE_BANDS = {"high", "medium", "low", "speculative", "unknown"}
 TRUSTED_SUPPORT_BANDS = {"high", "medium"}
+ASSURANCE_CAPABILITIES = {
+    "source_coordinates",
+    "semantic_retrieval",
+    "lexical_retrieval",
+    "structural_relationship",
+    "compiler_resolution",
+    "runtime_observation",
+    "variable_level_taint",
+}
 
 
 class ProofInputError(ValueError):
@@ -83,6 +92,32 @@ def _nonnegative_int(value: object, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ProofInputError(f"{field} must be a non-negative integer")
     return value
+
+
+def _optional_sha256(value: object, field: str) -> str | None:
+    if value is None:
+        return None
+    digest = _string(value, field)
+    if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise ProofInputError(f"{field} must be 64 lowercase hex characters")
+    return digest
+
+
+def _token_list(value: object, field: str) -> list[str]:
+    if not isinstance(value, list):
+        raise ProofInputError(f"{field} must be an array")
+    tokens = [
+        _canonical_token(_string(item, f"{field}[{position}]"))
+        for position, item in enumerate(value)
+    ]
+    if len(tokens) != len(set(tokens)):
+        raise ProofInputError(f"{field} must contain unique values")
+    unknown = sorted(set(tokens) - ASSURANCE_CAPABILITIES)
+    if unknown:
+        raise ProofInputError(
+            f"{field} contains unsupported capabilities: {', '.join(unknown)}"
+        )
+    return sorted(tokens)
 
 
 def _validate_symbol_ref(value: object, field: str) -> dict[str, Any]:
@@ -188,6 +223,24 @@ def _validate_relationship_ref(
             f"{field}.observation_count requires runtime_observed=true"
         )
 
+    resolution_source = _canonical_token(
+        _string(
+            relationship.get("resolution_source"),
+            f"{field}.resolution_source",
+        )
+    )
+    resolution_artifact_sha256 = _optional_sha256(
+        relationship.get("resolution_artifact_sha256"),
+        f"{field}.resolution_artifact_sha256",
+    )
+    if (
+        resolution_artifact_sha256 is not None
+        and "scip-ingest" not in resolution_source.split("+")
+    ):
+        raise ProofInputError(
+            f"{field}.resolution_artifact_sha256 requires scip-ingest provenance"
+        )
+
     payload = {
         "schema_version": SCHEMA_VERSION,
         "repository_id": repository_id,
@@ -201,18 +254,171 @@ def _validate_relationship_ref(
         ),
         "source_symbol_ref": source_symbol,
         "target_symbol_ref": target_symbol,
-        "resolution_source": _canonical_token(
-            _string(
-                relationship.get("resolution_source"),
-                f"{field}.resolution_source",
-            )
-        ),
+        "resolution_source": resolution_source,
         "confidence_band": confidence_band,
         "runtime_observed": runtime_observed,
         "observation_count": observation_count,
     }
+    if resolution_artifact_sha256 is not None:
+        payload["resolution_artifact_sha256"] = resolution_artifact_sha256
     expected_id = _stable_id("rel", payload)
     actual_id = _string(relationship.get("id"), f"{field}.id")
+    if actual_id != expected_id:
+        raise ProofInputError(f"{field}.id does not match canonical contents")
+    return {"id": expected_id, **payload}
+
+
+def _validate_analysis_ref(value: object, field: str) -> dict[str, Any]:
+    analysis = _object(value, field)
+    if analysis.get("schema_version") != SCHEMA_VERSION:
+        raise ProofInputError(f"{field}.schema_version must equal 1")
+    path_steps = analysis.get("path_steps")
+    if not isinstance(path_steps, list) or len(path_steps) < 2:
+        raise ProofInputError(f"{field}.path_steps must contain at least two steps")
+    normalized_steps: list[dict[str, Any]] = []
+    for position, item in enumerate(path_steps):
+        step_field = f"{field}.path_steps[{position}]"
+        step = _object(item, step_field)
+        role = _canonical_token(_string(step.get("role"), f"{step_field}.role"))
+        expected_role = "intermediate"
+        if position == 0:
+            expected_role = "source"
+        elif position == len(path_steps) - 1:
+            expected_role = "sink"
+        if role != expected_role:
+            raise ProofInputError(
+                f"{step_field}.role must be {expected_role}"
+            )
+        normalized_step = {
+            "position": _nonnegative_int(
+                step.get("position"), f"{step_field}.position"
+            ),
+            "role": role,
+            "relative_path": _canonical_path(
+                _string(step.get("relative_path"), f"{step_field}.relative_path")
+            ),
+            "start_line": _nonnegative_int(
+                step.get("start_line"), f"{step_field}.start_line"
+            ),
+            "start_column": _nonnegative_int(
+                step.get("start_column"), f"{step_field}.start_column"
+            ),
+            "end_line": _nonnegative_int(
+                step.get("end_line"), f"{step_field}.end_line"
+            ),
+            "end_column": _nonnegative_int(
+                step.get("end_column"), f"{step_field}.end_column"
+            ),
+        }
+        if normalized_step["position"] != position:
+            raise ProofInputError(f"{step_field}.position must equal {position}")
+        if (
+            normalized_step["end_line"],
+            normalized_step["end_column"],
+        ) < (
+            normalized_step["start_line"],
+            normalized_step["start_column"],
+        ):
+            raise ProofInputError(f"{step_field} end precedes start")
+        normalized_steps.append(normalized_step)
+
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "repository_id": _string(
+            analysis.get("repository_id"), f"{field}.repository_id"
+        ),
+        "source_revision": _string(
+            analysis.get("source_revision"), f"{field}.source_revision"
+        ),
+        "index_generation": _string(
+            analysis.get("index_generation"), f"{field}.index_generation"
+        ),
+        "analysis_kind": _canonical_token(
+            _string(analysis.get("analysis_kind"), f"{field}.analysis_kind")
+        ),
+        "analyzer": _canonical_token(
+            _string(analysis.get("analyzer"), f"{field}.analyzer")
+        ),
+        "analyzer_version": _string(
+            analysis.get("analyzer_version"), f"{field}.analyzer_version"
+        ),
+        "extractor_version": _string(
+            analysis.get("extractor_version"), f"{field}.extractor_version"
+        ),
+        "language": _canonical_token(
+            _string(analysis.get("language"), f"{field}.language")
+        ),
+        "database_manifest_sha256": _string(
+            analysis.get("database_manifest_sha256"),
+            f"{field}.database_manifest_sha256",
+        ),
+        "database_content_sha256": _string(
+            analysis.get("database_content_sha256"),
+            f"{field}.database_content_sha256",
+        ),
+        "database_quality": {
+            "status": _canonical_token(
+                _string(
+                    _object(
+                        analysis.get("database_quality"),
+                        f"{field}.database_quality",
+                    ).get("status"),
+                    f"{field}.database_quality.status",
+                )
+            ),
+            "source_files": _nonnegative_int(
+                _object(
+                    analysis.get("database_quality"),
+                    f"{field}.database_quality",
+                ).get("source_files"),
+                f"{field}.database_quality.source_files",
+            ),
+            "baseline_lines": _nonnegative_int(
+                _object(
+                    analysis.get("database_quality"),
+                    f"{field}.database_quality",
+                ).get("baseline_lines"),
+                f"{field}.database_quality.baseline_lines",
+            ),
+            "extractor_errors": _nonnegative_int(
+                _object(
+                    analysis.get("database_quality"),
+                    f"{field}.database_quality",
+                ).get("extractor_errors"),
+                f"{field}.database_quality.extractor_errors",
+            ),
+        },
+        "query_pack_manifest_sha256": _string(
+            analysis.get("query_pack_manifest_sha256"),
+            f"{field}.query_pack_manifest_sha256",
+        ),
+        "sarif_sha256": _string(
+            analysis.get("sarif_sha256"), f"{field}.sarif_sha256"
+        ),
+        "query_id": _string(analysis.get("query_id"), f"{field}.query_id"),
+        "result_index": _nonnegative_int(
+            analysis.get("result_index"), f"{field}.result_index"
+        ),
+        "code_flow_index": _nonnegative_int(
+            analysis.get("code_flow_index"), f"{field}.code_flow_index"
+        ),
+        "thread_flow_index": _nonnegative_int(
+            analysis.get("thread_flow_index"), f"{field}.thread_flow_index"
+        ),
+        "path_steps": normalized_steps,
+    }
+    if payload["analysis_kind"] != "variable_level_taint":
+        raise ProofInputError(f"{field}.analysis_kind must be variable_level_taint")
+    if payload["analyzer"] != "codeql":
+        raise ProofInputError(f"{field}.analyzer must be codeql")
+    if (
+        payload["database_quality"]["status"] != "pass"
+        or payload["database_quality"]["source_files"] == 0
+        or payload["database_quality"]["baseline_lines"] == 0
+    ):
+        raise ProofInputError(f"{field}.database_quality is not passing")
+    expected_id = _stable_id("analysis", payload)
+    actual_id = _string(analysis.get("id"), f"{field}.id")
     if actual_id != expected_id:
         raise ProofInputError(f"{field}.id does not match canonical contents")
     return {"id": expected_id, **payload}
@@ -304,6 +510,30 @@ def _validate_evidence_ref(value: object, field: str) -> dict[str, Any]:
                 f"{field}.relationship_ref source does not match symbol_ref"
             )
         payload["relationship_ref"] = relationship_ref
+
+    if evidence.get("analysis_ref") is not None:
+        analysis_ref = _validate_analysis_ref(
+            evidence.get("analysis_ref"), f"{field}.analysis_ref"
+        )
+        for key in ("repository_id", "source_revision", "index_generation"):
+            if analysis_ref[key] != payload[key]:
+                raise ProofInputError(
+                    f"{field}.analysis_ref has a different {key}"
+                )
+        source = analysis_ref["path_steps"][0]
+        if (
+            source["relative_path"] != payload["relative_path"]
+            or source["start_line"] != payload["start_line"]
+            or source["end_line"] != payload["end_line"]
+        ):
+            raise ProofInputError(
+                f"{field}.analysis_ref source does not match the evidence location"
+            )
+        if payload["evidence_type"] != "codeql_path":
+            raise ProofInputError(
+                f"{field}.analysis_ref requires evidence_type codeql_path"
+            )
+        payload["analysis_ref"] = analysis_ref
 
     expected_id = _stable_id("ev", payload)
     actual_id = _string(evidence.get("id"), f"{field}.id")
@@ -423,6 +653,24 @@ def validate_bundle(bundle: object) -> dict[str, Any]:
         "index_generation": index_generation,
     }
 
+    assurance_requirement = value.get("assurance_requirement")
+    normalized_assurance_requirement = None
+    if assurance_requirement is not None:
+        assurance_requirement = _object(
+            assurance_requirement,
+            "assurance_requirement",
+        )
+        normalized_assurance_requirement = {
+            "required_capabilities": _token_list(
+                assurance_requirement.get("required_capabilities"),
+                "assurance_requirement.required_capabilities",
+            )
+        }
+        if not normalized_assurance_requirement["required_capabilities"]:
+            raise ProofInputError(
+                "assurance_requirement.required_capabilities cannot be empty"
+            )
+
     observations = value.get("observations")
     if not isinstance(observations, list):
         raise ProofInputError("observations must be an array")
@@ -516,7 +764,7 @@ def validate_bundle(bundle: object) -> dict[str, Any]:
             "unresolved": invariant_unresolved,
         }
 
-    return {
+    normalized_bundle = {
         "schema_version": SCHEMA_VERSION,
         "claim": claim,
         "index_state": normalized_index_state,
@@ -525,11 +773,75 @@ def validate_bundle(bundle: object) -> dict[str, Any]:
         "coverage": normalized_coverage,
         "invariant": normalized_invariant,
     }
+    if normalized_assurance_requirement is not None:
+        normalized_bundle["assurance_requirement"] = normalized_assurance_requirement
+    return normalized_bundle
 
 
 def _runtime_confirmed(observation: dict[str, Any]) -> bool:
     relationship = observation["evidence_ref"].get("relationship_ref")
     return bool(relationship and relationship["runtime_observed"])
+
+
+def _observation_capabilities(observation: dict[str, Any]) -> set[str]:
+    evidence = observation["evidence_ref"]
+    capabilities = {"source_coordinates"}
+    evidence_type = evidence["evidence_type"]
+    if evidence_type in {"semantic_match", "hybrid_match"}:
+        capabilities.add("semantic_retrieval")
+    if evidence_type == "lexical_match":
+        capabilities.add("lexical_retrieval")
+
+    relationship = evidence.get("relationship_ref")
+    if relationship is not None:
+        capabilities.add("structural_relationship")
+        resolution_source = relationship["resolution_source"]
+        if (
+            "scip-ingest" in resolution_source.split("+")
+            and relationship.get("resolution_artifact_sha256") is not None
+        ):
+            capabilities.add("compiler_resolution")
+        if relationship["runtime_observed"]:
+            capabilities.add("runtime_observation")
+
+    if evidence_type in {"codeql_path", "variable_level_taint"}:
+        analysis = evidence.get("analysis_ref")
+        if (
+            analysis is not None
+            and analysis["analyzer"] == "codeql"
+            and analysis["analysis_kind"] == "variable_level_taint"
+        ):
+            capabilities.add("variable_level_taint")
+    return capabilities
+
+
+def _assurance_lattice(
+    required: list[str],
+    supporting: list[dict[str, Any]],
+    contradicting: list[dict[str, Any]],
+) -> dict[str, Any]:
+    supporting_capabilities = set().union(
+        *(_observation_capabilities(item) for item in supporting),
+    ) if supporting else set()
+    contradicting_capabilities = set().union(
+        *(_observation_capabilities(item) for item in contradicting),
+    ) if contradicting else set()
+    required_capabilities = set(required)
+    missing_supporting = required_capabilities - supporting_capabilities
+    missing_contradicting = required_capabilities - contradicting_capabilities
+    satisfied_by = None
+    if required_capabilities and not missing_contradicting and contradicting:
+        satisfied_by = "contradiction"
+    elif required_capabilities and not missing_supporting and supporting:
+        satisfied_by = "support"
+    return {
+        "required_capabilities": sorted(required_capabilities),
+        "supporting_capabilities": sorted(supporting_capabilities),
+        "contradicting_capabilities": sorted(contradicting_capabilities),
+        "missing_supporting_capabilities": sorted(missing_supporting),
+        "missing_contradicting_capabilities": sorted(missing_contradicting),
+        "satisfied_by": satisfied_by,
+    }
 
 
 def _relationship_summary(
@@ -611,11 +923,19 @@ def evaluate(bundle: object) -> dict[str, Any]:
     contradiction = value["contradiction_search"]
     coverage = value["coverage"]
     invariant = value.get("invariant")
+    assurance_requirement = value.get("assurance_requirement") or {
+        "required_capabilities": []
+    }
 
     supporting = [item for item in observations if item["stance"] == "support"]
     contradicting = [
         item for item in observations if item["stance"] == "contradict"
     ]
+    assurance_lattice = _assurance_lattice(
+        assurance_requirement["required_capabilities"],
+        supporting,
+        contradicting,
+    )
     blockers: list[str] = []
     caveats: list[str] = []
 
@@ -642,7 +962,14 @@ def evaluate(bundle: object) -> dict[str, Any]:
     if blockers:
         verdict = "blocked"
     elif contradicting or invariant_failed:
-        verdict = "contradicted"
+        if (
+            assurance_lattice["required_capabilities"]
+            and assurance_lattice["satisfied_by"] != "contradiction"
+        ):
+            caveats.append("required_assurance_not_satisfied")
+            verdict = "unresolved"
+        else:
+            verdict = "contradicted"
     else:
         if not contradiction["performed"]:
             caveats.append("contradiction_search_not_performed")
@@ -660,6 +987,11 @@ def evaluate(bundle: object) -> dict[str, Any]:
             for item in supporting
         ):
             caveats.append("supporting_evidence_not_trustworthy")
+        if (
+            assurance_lattice["required_capabilities"]
+            and assurance_lattice["satisfied_by"] != "support"
+        ):
+            caveats.append("required_assurance_not_satisfied")
         verdict = "unresolved" if caveats else "verified"
 
     if verdict not in VERDICTS:  # defensive guard for future edits
@@ -677,6 +1009,8 @@ def evaluate(bundle: object) -> dict[str, Any]:
         "blockers": sorted(blockers),
         "caveats": sorted(caveats),
     }
+    if assurance_lattice["required_capabilities"]:
+        proof_payload["assurance_lattice"] = assurance_lattice
     return {
         "proof_id": _stable_id("proof", proof_payload),
         **proof_payload,
@@ -685,6 +1019,7 @@ def evaluate(bundle: object) -> dict[str, Any]:
         "contradiction_search": contradiction,
         "invariant": invariant,
         "relationship_evidence": _relationship_summary(observations),
+        "assurance_lattice": assurance_lattice,
     }
 
 

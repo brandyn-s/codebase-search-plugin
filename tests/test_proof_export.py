@@ -136,6 +136,37 @@ class ProofExportTests(unittest.TestCase):
             self.assertEqual(verified.returncode, 0, verified.stderr)
             self.assertEqual(json.loads(verified.stdout)["status"], "verified")
 
+    def test_exported_markdown_renders_the_assurance_lattice(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bundle = _bundle()
+            bundle["assurance_requirement"] = {
+                "required_capabilities": ["runtime_observation"],
+            }
+            bundle_path = root / "proof-bundle.json"
+            bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
+            packet = root / "packet"
+
+            exported = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "export",
+                    str(bundle_path),
+                    "--output-dir",
+                    str(packet),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(exported.returncode, 0, exported.stderr)
+            markdown = (packet / "proof.md").read_text(encoding="utf-8")
+            self.assertIn("## Assurance lattice", markdown)
+            self.assertIn("Required capabilities: `runtime_observation`", markdown)
+            self.assertIn("Missing for support: `runtime_observation`", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()

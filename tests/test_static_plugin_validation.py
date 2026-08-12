@@ -69,6 +69,69 @@ class StaticPluginValidationTests(unittest.TestCase):
         )
         self.assertIn("candidate-bom.json", completed.stdout)
 
+    def test_validator_accepts_the_pinned_scip_generator_contracts(self):
+        completed = self._run_validator(ROOT)
+
+        self.assertEqual(
+            completed.returncode,
+            0,
+            completed.stdout + completed.stderr,
+        )
+        bom = json.loads(
+            (ROOT / "component-bom.json").read_text(encoding="utf-8")
+        )
+        generator = bom["precision_generators"]["go-scip"]
+        self.assertEqual(generator["repository"], "scip-code/scip-go")
+        self.assertEqual(generator["tag"], "v0.2.7")
+        self.assertEqual(generator["version_output"], "0.2.7")
+        self.assertEqual(
+            set(generator["assets"]),
+            {
+                "darwin-arm64",
+                "linux-amd64",
+                "linux-arm64",
+            },
+        )
+        for asset in generator["assets"].values():
+            self.assertRegex(asset["archive_sha256"], r"^[0-9a-f]{64}$")
+            self.assertRegex(asset["binary_sha256"], r"^[0-9a-f]{64}$")
+
+        typescript = bom["precision_generators"]["typescript-scip"]
+        self.assertEqual(
+            typescript["package"], "@sourcegraph/scip-typescript"
+        )
+        self.assertEqual(typescript["version_output"], "0.4.0")
+        self.assertEqual(typescript["supported_node_majors"], [22])
+        self.assertRegex(typescript["lockfile_sha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(typescript["entrypoint_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(
+            set(typescript["node_runtime"]["assets"]),
+            {
+                "darwin-amd64",
+                "darwin-arm64",
+                "linux-amd64",
+                "linux-arm64",
+                "windows-amd64",
+            },
+        )
+
+    def test_validator_rejects_unpinned_go_scip_binary_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            bom_path = checkout / "component-bom.json"
+            bom = json.loads(bom_path.read_text(encoding="utf-8"))
+            del bom["precision_generators"]["go-scip"]["assets"][
+                "darwin-arm64"
+            ]["binary_sha256"]
+            bom_path.write_text(json.dumps(bom), encoding="utf-8")
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("go-scip", completed.stdout)
+        self.assertIn("binary_sha256", completed.stdout)
+
     def _rebind_component_descriptor(
         self,
         checkout: Path,
@@ -214,7 +277,7 @@ class StaticPluginValidationTests(unittest.TestCase):
                 checkout
                 / "compatibility"
                 / "attestations"
-                / "code-graph-v0.8.0-redacted.4-provenance.jsonl"
+                / "code-graph-v0.8.0-redacted.5-provenance.jsonl"
             )
             bundle.unlink()
 
@@ -236,7 +299,7 @@ class StaticPluginValidationTests(unittest.TestCase):
                 checkout
                 / "compatibility"
                 / "attestations"
-                / "code-graph-v0.8.0-redacted.4-provenance.jsonl"
+                / "code-graph-v0.8.0-redacted.5-provenance.jsonl"
             )
             bundle.write_text('{"tampered":true}\n', encoding="utf-8")
 

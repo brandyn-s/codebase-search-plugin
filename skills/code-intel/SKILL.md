@@ -129,7 +129,10 @@ Read `index_status` before presenting a consequential relationship as
 verified. The default `heuristic` tier is tree-sitter plus static resolution,
 not compiler-grade. A requested `scip` tier strengthens only covered,
 non-drifted documents; preserve the effective tier, coverage, and drift in the
-answer. For cross-project structural discovery, use
+answer. Even on that tier, require the selected canonical relationship to
+carry `resolution_source=scip-ingest` and the exact nonempty
+`resolution_artifact_sha256` before it may satisfy `compiler_resolution`;
+never infer that capability from project status alone. For cross-project structural discovery, use
 `localize_across_projects` only to choose a project. Use
 `compare_project_indexes` for deterministic file-content and declaration
 deltas between immutable indexes; it is not semantic score federation.
@@ -143,12 +146,42 @@ satisfy a property.
 
 A PROVE answer is a deterministic proof workflow, not ordinary retrieval:
 
+Before gathering evidence, translate the requested assurance into an explicit
+`assurance_requirement.required_capabilities` list. The supported lattice
+capabilities are `source_coordinates`, `semantic_retrieval`,
+`lexical_retrieval`, `structural_relationship`, `compiler_resolution`,
+`runtime_observation`, and `variable_level_taint`. Evidence tiers are not
+interchangeable: heuristic graph support cannot satisfy `compiler_resolution`,
+and graph reachability cannot satisfy `variable_level_taint`. The evaluator
+returns `unresolved` when the evidence lacks any required capability.
+
 `trace_data_flow` proves only CALLS/READS/WRITES/USAGE connectivity. It does
 not model variables, value propagation, sanitizers, source-to-sink taint, or
 path feasibility. When the requested assurance is variable-level taint, call
 it with `required_assurance="variable_level_taint"` and follow the structured
 handoff with CodeQL. If the external analysis cannot be run or is incomplete,
 the proof remains `unresolved`; never relabel graph reachability as taint.
+
+When CodeQL has produced SARIF with an ordered code flow, project the selected
+path into a canonical observation before adding it to the proof bundle:
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/scripts/codeql_evidence.py" ingest \
+  <results.sarif> \
+  --database-manifest <codeql-database-manifest.json> \
+  --query-pack-manifest <query-pack-lock.json> \
+  --repository-id <repository-id> \
+  --source-revision <source-revision> \
+  --index-generation <index-generation> \
+  --output <observation.json>
+```
+
+The database manifest must bind the exact repository revision, database
+content identity, CodeQL CLI and extractor versions, and a passing extraction
+quality record with nonzero source files and baseline lines. The adapter also
+binds the query-pack manifest, SARIF bytes, query ID, selected result/code-flow
+indexes, and ordered source/intermediate/sink coordinates. A database build or
+SARIF file without those controls cannot satisfy the required capability.
 
 1. Pass the coherence gate below before gathering mixed evidence.
 2. Create one canonical claim record with a stable `claim:v1` identity.
@@ -166,8 +199,9 @@ the proof remains `unresolved`; never relabel graph reachability as taint.
      <invariant-bundle.json> --output <invariant-result.json>
    ```
 
-6. Assemble the claim, coherent index state, observations, contradiction-search
-   record, coverage, and optional invariant result into a proof bundle matching
+6. Assemble the claim, coherent index state, optional
+   `assurance_requirement`, observations, contradiction-search record,
+   coverage, and optional invariant result into a proof bundle matching
    `compatibility/proof-schema-v1.json`.
 7. Run:
 
@@ -191,6 +225,11 @@ the proof remains `unresolved`; never relabel graph reachability as taint.
    The packet binds the canonical bundle, deterministic evaluator result, and
    concise Markdown report with SHA-256. Verification rejects tampering and
    evaluator-result drift.
+
+The portable report includes the assurance lattice: requested capabilities,
+capabilities present on supporting and contradicting observations, missing
+capabilities, and the side that satisfied the requirement. Do not replace that
+mechanical result with a prose assertion about analysis strength.
 
 ### Contradiction rules
 

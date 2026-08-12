@@ -137,7 +137,10 @@ Graph precision is explicit. The normal tier is tree-sitter plus heuristic
 resolution, not compiler-grade. When a consequential answer depends on a
 CALLS edge, report the effective tier from `index_status`. A requested SCIP
 tier strengthens only covered, non-drifted documents. Do not describe an
-uncovered heuristic edge as SCIP-backed.
+uncovered heuristic edge as SCIP-backed. For compiler-grade proof, require the
+selected `relationship_ref` to carry `resolution_source=scip-ingest` and the
+exact nonempty `resolution_artifact_sha256`; project-level SCIP status alone is
+not evidence for a particular edge.
 
 `trace_data_flow` is graph reachability, not taint analysis. It does not model
 variables, values, sanitizers, path feasibility, or source-to-sink taint

@@ -41,6 +41,9 @@ claude plugin install codebase-search@redacted-code-intelligence --scope user
 # 5. Build and verify both indexes
 /index-repo /path/to/your/repo
 
+# Optional for a clean Go or TypeScript repository: require the pinned compiler indexer
+/index-repo /path/to/your/repo --graph-precision auto --scip-policy required
+
 # 6. Ask through the stable FIND / UNDERSTAND / PROVE facade
 /code-intel Find the request authentication entry points
 ```
@@ -55,6 +58,11 @@ The install script:
 - Creates a Python venv and installs the exact code-search source declared by
   the BOM: either a pinned Git commit or an attested GitHub Release wheel
 - Downloads the pre-built code-graph binary for your platform from GitHub releases
+- Installs the optional, BOM-pinned `scip-go` generator on supported macOS
+  arm64 and Linux amd64/arm64 hosts and an isolated, lockfile-pinned
+  `scip-typescript` plus Node runtime on supported macOS, Linux, and Windows
+  amd64 hosts; unsupported platforms retain heuristic and user-supplied SCIP
+  modes
 - Reads exact tested versions from `component-bom.json` instead of selecting a moving latest release
 - Starts both installed stdio MCPs and rejects missing or schema-drifted tools before reporting success
 - No manual cloning, building, or path configuration needed
@@ -117,9 +125,13 @@ iteration order.
 
 The default graph tier is tree-sitter plus heuristic static resolution. It is
 not compiler-grade. Projects that have a current SCIP index can explicitly
-select the persistent `scip` precision tier; index status reports effective
-tier, coverage, drift, replacements, and insertions. Uncovered or drifted
-files remain heuristic and are labeled accordingly.
+select the persistent `scip` precision tier; clean Go repositories can opt into
+the BOM-pinned generator with `--graph-precision auto`. Index status reports
+effective tier, artifact digest, coverage, drift, replacements, and insertions.
+Uncovered or drifted files remain heuristic and are labeled accordingly. A
+relationship satisfies compiler assurance only when its immutable evidence
+reference carries `resolution_source=scip-ingest` and the exact SCIP artifact
+digest; enabling the tier does not upgrade every edge.
 
 **When to use:**
 - "What calls processOrder?" — tracing call chains
@@ -271,7 +283,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.4`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.4).
+[`v0.8.0-redacted.5`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.5).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -325,8 +337,8 @@ release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
 code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
 and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.22 pins code-search v0.3.5 and
-code-graph v0.8.0-redacted.4 and adds persistent
+a search- or graph-primary cascade. Plugin 0.4.23 pins code-search v0.3.5 and
+code-graph v0.8.0-redacted.5 and adds persistent
 per-project SCIP precision, an explicit reachability-versus-taint contract,
 isolated cross-project discovery, and immutable graph-index comparison. These
 changes receive deterministic regression, exact installed-component readiness,
@@ -348,6 +360,33 @@ falsifiers, public-pin requirements, privacy boundaries, and the current
 fail-closed live-preflight status.
 
 ### Portable proof packets
+
+Proof bundles can declare an optional capability-level assurance requirement.
+The deterministic evaluator preserves an evidence lattice across source
+coordinates, lexical/semantic retrieval, structural relationships, compiler
+resolution, runtime observation, and variable-level taint. It does not flatten
+those sources into one confidence score: a claim remains unresolved when its
+support or counterexample does not carry every requested capability.
+
+The first external-analysis adapter projects one selected CodeQL SARIF code
+flow into canonical `analysis:v1`, `ev:v1`, and `obs:v1` references:
+
+```bash
+python3 scripts/codeql_evidence.py ingest results.sarif \
+  --database-manifest codeql-database-manifest.json \
+  --query-pack-manifest query-pack-lock.json \
+  --repository-id <repository-id> \
+  --source-revision <source-revision> \
+  --index-generation <index-generation> \
+  --output codeql-observation.json
+```
+
+The reference binds the exact repository revision and index generation;
+CodeQL CLI, extractor, and database-content identity; a passing extraction
+quality receipt; query-pack manifest and SARIF digests; query/result/path
+selection; and every ordered source/intermediate/sink coordinate. This is an
+ingest boundary, not an embedded CodeQL runner. Graph reachability remains
+discovery context and never becomes taint evidence.
 
 After `proof_evaluator.py` accepts a proof bundle, export a deterministic
 packet containing the canonical bundle, evaluator result, concise Markdown
@@ -372,8 +411,10 @@ component token. Trusted installation is isolated in
 `.github/workflows/trusted-component-promotion.yml`; its
 `validate-installed-components` job installs both private repositories from
 the exact descriptor path passed with `--component-bom` and validates their
-real `tools/list` responses. It runs only from a trusted `main` push or a
-manual default-branch dispatch, never on `pull_request`.
+real `tools/list` responses. The same job downloads the exact public
+`scip-go` release asset, verifies the pinned release commit plus archive and
+binary digests, and runs the generator verifier. It runs only from a trusted
+`main` push or a manual default-branch dispatch, never on `pull_request`.
 `CODE_INTEL_COMPONENT_TOKEN` is a required post-merge validation secret:
 configure a fine-grained token with read access to
 `redacted-org/code-search` and `redacted-org/code-graph`.
@@ -466,6 +507,25 @@ export VOYAGE_API_KEY="pa-..."  # Get a key at https://dash.voyageai.com
 The command indexes code-search first, verifies semantic completion, indexes
 code-graph with `skip_report=true`, and then requires both engines to report
 ready with matching complete v1 checkout identities.
+
+For a clean Git checkout with a root `go.mod` or `tsconfig.json`,
+compiler-backed CALLS precision can be generated explicitly:
+
+```
+/index-repo /path/to/go-repo --graph-precision auto --scip-policy required
+```
+
+The helper verifies the selected generator and runtime digests against the
+component BOM, runs it in the canonical checkout, rejects checkout mutation,
+and atomically caches the nonempty index outside the repository by index
+generation. TypeScript additionally requires an existing target
+`node_modules`; the plugin never installs dependencies in the target. The
+graph verifies that it ingested the same artifact digest. `preferred` may fall
+back visibly to heuristic indexing; `required` stops before graph indexing
+when compiler preparation fails. Generators invoke language toolchains and are
+not execution sandboxes. Automatic generation covers root Go and TypeScript
+projects on the documented platforms; it is not an organization-wide SCIP
+fleet or a claim that every edge is compiler-resolved.
 
 **Component timing reference** (3,000 chunks, typical single crate/package):
 
