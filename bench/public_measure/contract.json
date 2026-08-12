@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "measurement_id": "public-locbench-balanced-n4-scale-v1",
+  "purpose": "directional public retrieval comparison plus real-repository scale and latency",
+  "selection": {
+    "source_pin": "bench/compare/pins/locbench-june-n200.external.json",
+    "resolved_pin_sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
+    "rule": "first recorded case for each of Bug Report, Feature Request, Performance Issue, and Security Vulnerability",
+    "count": 4
+  },
+  "query_rule": "normalize CRLF to LF, then take and strip the first blank-line-delimited paragraph",
+  "top_k_files": 10,
+  "graph": {
+    "tool": "code_localize",
+    "seed_strategy": "substring",
+    "depth": 3,
+    "requested_entities": 50
+  },
+  "search": {
+    "tool": "search_code_evidence",
+    "search_mode": "semantic",
+    "requested_chunks": 50,
+    "include_context": false,
+    "auto_reindex": false
+  },
+  "sourcegraph": {
+    "endpoint": "https://sourcegraph.com/.api/search/stream",
+    "query_version": "V3",
+    "requested_matches": 100,
+    "timeout_seconds": 60
+  },
+  "composition": {
+    "method": "reciprocal_rank_fusion",
+    "rrf_k": 60,
+    "inputs": [
+      "code-search",
+      "code-graph"
+    ]
+  },
+  "metrics": [
+    "file_acc_at_1",
+    "file_acc_at_3",
+    "file_acc_at_10",
+    "file_mrr_at_10"
+  ],
+  "warm_query_repetitions": 5,
+  "incremental_case_id": "PrefectHQ__prefect-16117",
+  "local_embedding_model": {
+    "repository": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "model_safetensors_sha256": "53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db"
+  },
+  "failure_policy": "intent_to_treat_miss_no_fallback",
+  "language_model_calls": 0
+}

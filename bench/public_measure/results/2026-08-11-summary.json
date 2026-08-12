@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "measurement_id": "public-locbench-balanced-n4-scale-v1",
+  "measured_at": "2026-08-12T02:41:06.708936Z",
+  "scope": "directional balanced public pilot; no statistical superiority claim",
+  "language_model_calls": 0,
+  "cases": 4,
+  "categories": [
+    "Bug Report",
+    "Feature Request",
+    "Performance Issue",
+    "Security Vulnerability"
+  ],
+  "public_query_sources": {
+    "UXARRAY__uxarray-1117": "https://github.com/UXARRAY/uxarray/issues/1116",
+    "Chainlit__chainlit-1575": "https://github.com/Chainlit/chainlit/issues/1359",
+    "vllm-project__vllm-9390": "https://github.com/vllm-project/vllm/issues/3127",
+    "PrefectHQ__prefect-16117": "https://github.com/PrefectHQ/prefect/issues/16105"
+  },
+  "corrected_run": {
+    "file_sha256": "592fcb92283446fe4a60bf0f1c58d2aa9313f40d4c67a78689ba1c9f51d4e858",
+    "embedded_result_sha256": "f965544b1710cf3be6d76ce13cb432ebf2e3dfcbd413666a77ea3445010ac7c9",
+    "aggregate": {
+      "sourcegraph": {"file_acc_at_1": 0.75, "file_acc_at_3": 1.0, "file_acc_at_10": 1.0, "file_mrr_at_10": 0.875, "latency_p50_ms": 469.331042, "latency_p95_ms": 1284.617084},
+      "code-graph": {"file_acc_at_1": 0.5, "file_acc_at_3": 0.75, "file_acc_at_10": 1.0, "file_mrr_at_10": 0.6607142857142857, "latency_p50_ms": 73.347125, "latency_p95_ms": 549.713625},
+      "native": {"file_acc_at_1": 0.5, "file_acc_at_3": 0.5, "file_acc_at_10": 0.5, "file_mrr_at_10": 0.5, "latency_p50_ms": 52.725291, "latency_p95_ms": 131.357},
+      "composed": {"file_acc_at_1": 0.25, "file_acc_at_3": 0.5, "file_acc_at_10": 0.75, "file_mrr_at_10": 0.4375, "latency_p50_ms": 602.710959, "latency_p95_ms": 1100.430583},
+      "code-search": {"file_acc_at_1": 0.0, "file_acc_at_3": 0.25, "file_acc_at_10": 0.5, "file_mrr_at_10": 0.11904761904761904, "latency_p50_ms": 463.574625, "latency_p95_ms": 623.057625}
+    }
+  },
+  "fresh_build_variance": {
+    "first_run_file_sha256": "7641ee16cb0de0b5bfc962adac1ca95e4f376bd76dbdbcf756721d23e3742a83",
+    "first_run_embedded_result_sha256": "fdbe6ab06d67c6bda4ec8f1abc66ec6eb6bbc5af46b7daa42b288a4d122c73e4",
+    "code_graph_file_acc_at_10_range": [0.75, 1.0],
+    "code_graph_file_mrr_at_10_range": [0.625, 0.6607142857142857],
+    "changed_cases": 1,
+    "note": "rankings were stable across five warm calls within each build but differed across fresh builds"
+  },
+  "largest_repository": {
+    "repository": "PrefectHQ/prefect",
+    "revision": "fb919c67427d230ecea03a5273dfdd6de59bd697",
+    "tracked_files": 2351,
+    "utf8_text_lines": 664120,
+    "search_cold_seconds": 22.295121834,
+    "graph_cold_seconds": 22.057317959,
+    "search_peak_rss_bytes": 989560832,
+    "graph_peak_rss_bytes": 894042112,
+    "search_index_bytes": 308206649,
+    "graph_index_bytes": 340996200,
+    "search_warm_p50_ms": 536.603458,
+    "graph_warm_p50_ms": 536.534334
+  },
+  "incremental": {
+    "repository": "PrefectHQ/prefect",
+    "modified_files": 1,
+    "added_files": 0,
+    "search_seconds": 2.571495667,
+    "graph_seconds": 5.827627042,
+    "search_cold_speedup": 8.670099720792412,
+    "graph_cold_speedup": 3.7858149666898183,
+    "probe_found": true,
+    "fix_release": "code-search v0.3.3"
+  },
+  "provenance": {
+    "locbench_parquet_sha256": "8df0833c2c1276c5837aab923d489ab97d7654529abe759d0f59242c4978a662",
+    "selection_pin_sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
+    "contract_sha256": "7f677e716721066cd9f5e2d8c651c2c9ffa17e0289a5f169f1cd5ab777b26e6a",
+    "cases_sha256": "60491308ae85d0e6dc950846a03bfd463ce7e243381015462027552887148b18",
+    "oracle_sha256": "711cbfd0b9f2e61999f660aafb9fe127ec7985c999312a91ceb63e13c01435a2",
+    "code_graph_source_revision": "9cfa8d322bc14d1a1cfab37fb4c1145653b3c601",
+    "code_search_release": "v0.3.3",
+    "code_search_release_source_revision": "e4a95fd10bfaa529e6f859517175f59a4c585156",
+    "local_model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "unavailable_competitors": ["Cursor", "Augment", "Greptile"]
+}

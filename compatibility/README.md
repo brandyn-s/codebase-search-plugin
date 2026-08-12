@@ -46,7 +46,7 @@ server for a blocked BOM unless a reviewer explicitly supplies
 ## Code-search release promotion
 
 The production BOM pins code-search release
-[`v0.3.2`](https://github.com/redacted-org/code-search/releases/tag/v0.3.2),
+[`v0.3.3`](https://github.com/redacted-org/code-search/releases/tag/v0.3.3),
 its exact source commit, wheel, and offline attestation bundle. Contract
 capture and validation support future GitHub Release wheel candidates without
 weakening readiness: capture preserves the complete release descriptor,

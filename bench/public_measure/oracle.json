@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "policy": "LocBench edit_functions must agree with a merged GitHub PR at the same base revision, changed path, and diff hunk function header",
+  "cases": [
+    {
+      "case_id": "UXARRAY__uxarray-1117",
+      "expected_files": [
+        "uxarray/grid/connectivity.py",
+        "uxarray/grid/coordinates.py"
+      ],
+      "expected_functions": [
+        "uxarray/grid/connectivity.py:_build_n_nodes_per_face",
+        "uxarray/grid/coordinates.py:_construct_face_centroids"
+      ],
+      "github_pr": {
+        "number": 1117,
+        "merged_at": "2025-02-05T17:04:58Z",
+        "base_revision": "fe4cae1311db7fb21187b505e06018334a015c48",
+        "head_revision": "5a2ef875f4ae4ebced7124728ad24a08a51cc140",
+        "hunk_functions": [
+          "uxarray/grid/connectivity.py:_build_n_nodes_per_face",
+          "uxarray/grid/coordinates.py:_construct_face_centroids"
+        ]
+      }
+    },
+    {
+      "case_id": "Chainlit__chainlit-1575",
+      "expected_files": [
+        "backend/chainlit/server.py",
+        "backend/chainlit/socket.py"
+      ],
+      "expected_functions": [
+        "backend/chainlit/server.py:get_html_template",
+        "backend/chainlit/socket.py:build_anon_user_identifier",
+        "backend/chainlit/socket.py:connect",
+        "backend/chainlit/socket.py:connection_successful",
+        "backend/chainlit/socket.py:window_message"
+      ],
+      "github_pr": {
+        "number": 1575,
+        "merged_at": "2024-12-12T11:21:58Z",
+        "base_revision": "8b2d4bacfd4fa2c8af72e2d140d527d20125b07b",
+        "head_revision": "827201202fa3588d249f79ba59566d20e7265efd",
+        "hunk_functions": [
+          "backend/chainlit/server.py:get_html_template",
+          "backend/chainlit/socket.py:build_anon_user_identifier",
+          "backend/chainlit/socket.py:connect",
+          "backend/chainlit/socket.py:connection_successful",
+          "backend/chainlit/socket.py:window_message"
+        ]
+      }
+    },
+    {
+      "case_id": "vllm-project__vllm-9390",
+      "expected_files": [
+        "benchmarks/benchmark_serving.py"
+      ],
+      "expected_functions": [
+        "benchmarks/benchmark_serving.py:benchmark",
+        "benchmarks/benchmark_serving.py:main"
+      ],
+      "github_pr": {
+        "number": 9390,
+        "merged_at": "2024-10-18T18:15:28Z",
+        "base_revision": "83450458339b07765b0e72a822e5fe93eeaf5258",
+        "head_revision": "a37c18f37eb40dc8c3ec759147e277bc5cb17547",
+        "hunk_functions": [
+          "benchmarks/benchmark_serving.py:benchmark",
+          "benchmarks/benchmark_serving.py:main"
+        ]
+      }
+    },
+    {
+      "case_id": "PrefectHQ__prefect-16117",
+      "expected_files": [
+        "src/prefect/flows.py"
+      ],
+      "expected_functions": [
+        "src/prefect/flows.py:Flow.validate_parameters",
+        "src/prefect/flows.py:select_flow"
+      ],
+      "github_pr": {
+        "number": 16117,
+        "merged_at": "2024-11-26T15:22:06Z",
+        "base_revision": "fb919c67427d230ecea03a5273dfdd6de59bd697",
+        "head_revision": "754cec72a50427efa07596569d78c4cbb7f34d15",
+        "hunk_functions": [
+          "src/prefect/flows.py:Flow.validate_parameters",
+          "src/prefect/flows.py:select_flow"
+        ]
+      }
+    }
+  ]
+}

@@ -77,13 +77,20 @@ The v3 file binds the primary run and its failure mass. Its composed-only result
 is a post-primary remediation confirmation, not a replacement primary run or a
 superiority claim.
 
-Wave 4.2 remains failed under that registered bar. For the prospective Wave 4.3
-decision, first verify fresh coherent dual indexes and export/verify a new
-portable proof packet, then run exactly one confirmation with
-`pilot/preregistration-v4.json`. The v4 runner writes `outcome-gates.json` and
-binds it in the manifest. It gates on evidence, adjudication, unsupported
-assertions, exact directed-trace contracts, errors, and canaries; generic route
-labels and efficiency remain nonblocking observations.
+Wave 4.2 and the intervening successor failures are retained historical
+results. They exposed model-authored ranges, incomplete route enforcement,
+manifest-discovery conventions, budget exhaustion, and backend/runner evidence
+registry mismatches. The current consolidated contract uses backend-issued
+typed evidence IDs, a unified host state machine, explicit artifact roles, and
+canonical case bindings.
+
+The latest sealed Stage-4 successor completed 10/10 units and passed every
+fixed gate: evidence precision 1.0, recall 1.0, adjudication 1.0, routing and
+routing-contract accuracy 1.0, unsupported asserted-claim rate 0.0, errors 0,
+and host canary violations 0. Its retained manifest SHA-256 is
+`92d290ef23811c00dd80b6545030a2896f54ff897c1b4f27b2db66f6b73121ac`.
+The raw operator output remains external and sealed; it is not committed here.
+See [`../../docs/CAPABILITY_STATE.md`](../../docs/CAPABILITY_STATE.md).
 
 ## Run it
 
@@ -113,9 +120,10 @@ changing any target file invalidates live provenance.
 
 ## Live recording workflow
 
-No live benchmark result is bundled. With the current readiness-approved BOM,
-a trusted host runner can execute every case against `target-repo/` and must
-save all of these artifacts in one isolated recording directory:
+No raw live benchmark result is bundled. The latest external sealed Stage-4
+result is summarized above. With the current readiness-approved BOM, a trusted
+host runner can execute every case against `target-repo/` and must save all of
+these artifacts in one isolated recording directory:
 
 - the exact cases, thresholds, and readiness-approved component BOM;
 - version-matched component evidence with equal ready index identities;

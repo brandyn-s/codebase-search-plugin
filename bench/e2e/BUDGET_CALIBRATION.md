@@ -43,3 +43,11 @@ holdout accuracy evidence and are not included in deployment scoring.
 The higher dollar ceiling prevents a valid final tool round trip from being
 cut off, while the independent turn and time limits continue to bound work.
 Historical preregistrations remain immutable at their original ceilings.
+
+## Observed outcome
+
+The $2.50 policy removed the recurring $1.00 terminal-budget failure mode. The
+latest exactly-once five-route/two-repetition successor completed 10/10 units,
+cost $7.8254 in total, and passed all fixed outcome gates. The larger ceiling
+did not relax the eight-round-trip, 180-second, evidence, routing, error, or
+canary constraints.

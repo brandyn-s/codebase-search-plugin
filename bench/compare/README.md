@@ -17,6 +17,13 @@ intent-to-treat misses, mismatched identities fail closed, and interrupted
 runs resume without duplicate stable keys. It does not show that any arm is
 better.
 
+The current public result does not use this model-driven harness. The bounded
+zero-LLM comparison in [`../public_measure/`](../public_measure/) calls each
+retrieval backend directly and records the 2026-08-11 directional n=4 result
+plus real-repository scale. This five-arm harness remains available for a future
+agent-level study, but its disabled live executor is not a plugin release
+blocker.
+
 ## Frozen contract
 
 Every arm uses the same provider, exact model and Claude CLI versions, prompt,
@@ -202,7 +209,7 @@ merge-base, requires two independent reviewers, and the oracle remains hidden
 during retrieval. No live decision run is valid until that confirmatory pin and
 the published external `n=200` calibration address both verify.
 
-## Live preflight and current blocker
+## Dormant five-arm live path
 
 Live mode is intentionally fail-closed in this zero-cost build. A managed
 Claude.ai or keychain OAuth session does not satisfy `--bare`; compatible
@@ -234,6 +241,10 @@ The command exits two, records `status: not_evaluated` and
 observation, error, attempt journal, or model response artifact. Enabling model
 calls belongs to a separately authorized phase after every blocker is removed
 by reviewed production dependencies.
+
+These are blockers only for this future five-arm model experiment. They do not
+invalidate the direct public retrieval measurement, the deterministic CI suite,
+or the completed bounded Stage-4 release holdout.
 
 `CODE_INTEL_COMPONENT_TOKEN` is only a fetch credential for installing exact
 private release artifacts. It must never enter a child MCP or model process.

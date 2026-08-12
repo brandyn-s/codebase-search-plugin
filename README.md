@@ -66,6 +66,18 @@ The install script:
 > CI must reproduce readiness from the exact pins. See
 > `compatibility/README.md`.
 
+## Current measured state
+
+The current internal grade is **B+ overall** and **A- for verifiable code
+intelligence**. A sealed five-route Stage-4 successor passed 10/10 units with
+perfect evidence, adjudication, routing, unsupported-claim, error, and canary
+gates. A separate zero-LLM public LocBench n=4 pilot favored Sourcegraph for
+general file localization; code-graph was the strongest local arm, while the
+measured MiniLM semantic arm lagged. Real-repository indexing was measured
+through 2,351 files and 664,120 lines. These are bounded results, not a claim of
+market-wide superiority. See [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md)
+for the gradecard, exact measurements, limitations, and next work.
+
 ## How It Works
 
 The ready integrated design combines two different search technologies.
@@ -219,7 +231,7 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.3.2`](https://github.com/redacted-org/code-search/releases/tag/v0.3.2)
+[`v0.3.3`](https://github.com/redacted-org/code-search/releases/tag/v0.3.3)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
@@ -285,15 +297,22 @@ Pass it with `--preregistration`. The confirmation keeps the original cases,
 model, repetitions, scoring, thresholds, and component binaries; it cannot
 rewrite the primary result or establish a broad ranking.
 
-Wave 4.2 remains a failed historical confirmation under that preregistered
-bar. `preregistration-v4.json` prospectively binds one final 16-case Wave 4.3
-confirmation to a corrected response contract: the candidate under evaluation
-is always preserved exactly, while an asserted claim exists only for supported
-dispositions. Its activation gates cover evidence quality, adjudication,
-unsupported asserted claims, exact directed traces, errors, and canaries.
-Generic route labels, tool calls, latency, and cost remain reported operational
-observations. Fresh coherent indexes and a newly verified portable proof packet
-are separate required preconditions.
+Wave 4.2 and the intervening successor failures remain historical evidence of
+the defects that drove consolidation. The latest sealed Stage-4 successor for
+plugin 0.4.19 completed all ten five-route/two-repetition units and passed every
+fixed gate: 1.0 precision, recall, adjudication, routing, and routing-contract
+accuracy, with zero unsupported asserted claims, errors, or host canary
+violations. That single bounded result is sufficient for the current empirical
+release claim; it is not a statistical ranking. Plugin 0.4.20 changes the
+code-search incremental refresh path and receives deterministic regression plus
+exact installed-component readiness validation rather than another model
+holdout. See [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
+
+The direct public and scale instrument lives under `bench/public_measure/`.
+Its first directional n=4 result favored Sourcegraph for general localization,
+identified code-graph as the strongest local arm, and exposed the incremental
+refresh defect fixed in code-search v0.3.3. It made zero model calls and does not
+support a general superiority claim.
 
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture

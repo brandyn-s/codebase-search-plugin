@@ -69,16 +69,16 @@ EXPECTED_GRAPH_INSTALL = {
 
 EXPECTED_SEARCH_INSTALL = {
     "asset": {
-        "name": "redacted_code_search-0.3.2-py3-none-any.whl",
+        "name": "redacted_code_search-0.3.3-py3-none-any.whl",
         "sha256": (
-            "4b072f0fe9fb2a622adc7420a188338f7eabb296fcc18d1769267be1f98c4ab3"
+            "8bcce28319cb4d8ecf3043194a36595ab314913fe12bb0b9924617024a9572e0"
         ),
     },
     "attestation": {
         "bundle": {
-            "name": "redacted_code_search-0.3.2-provenance.jsonl",
+            "name": "redacted_code_search-0.3.3-provenance.jsonl",
             "sha256": (
-                "7e3d40ea4fb107188fc01085a06d1e011256921cde4beb3c3afc3a9e5810cc8e"
+                "7f48b0758c76211a694f88d3e7d5d21f8644b03117e78e634b68802b45a78dc4"
             ),
         },
         "deny_self_hosted_runners": True,
@@ -90,13 +90,13 @@ EXPECTED_SEARCH_INSTALL = {
     "checksums": {
         "name": "SHA256SUMS",
         "sha256": (
-            "7113b9aad62ea0887bfcc6f588aa00b077cece97dab314fab7a2fc73147fd56e"
+            "fc99f64b05904be542e50e9599d29bc1f85d7bd37774b02ddf1483ab1d0e4c94"
         ),
     },
     "kind": "github-release",
     "repository": "redacted-org/code-search",
-    "source_revision": "43dcb452c4309e8732f254c66d775067fe12d876",
-    "tag": "v0.3.2",
+    "source_revision": "e4a95fd10bfaa529e6f859517175f59a4c585156",
+    "tag": "v0.3.3",
 }
 
 
@@ -452,7 +452,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         self.assertIn("vendored", combined)
         self.assertIn("production BOM pins code-search release", readme)
         self.assertIn(
-            "code-search/releases/tag/v0.3.2",
+            "code-search/releases/tag/v0.3.3",
             readme,
         )
         self.assertIn("`install.kind: github-release`", readme)

@@ -11,3 +11,13 @@ This was the original Wave 2 slice boundary. Wave 3 subsequently added
 generation-bound relationship evidence with resolver provenance and optional
 runtime corroboration. Those signals strengthen a static relationship; they
 do not waive coherence, coverage, contradiction, or unresolved-subject rules.
+
+Wave 4 consolidated the verification boundary rather than adding another
+backend. Evidence-capable tools now issue immutable typed evidence IDs at exact
+source coordinates; a single host-owned state machine enforces route, trace,
+evidence, and terminal completion; and schema-v2 manifests bind canonical cases
+and artifact roles explicitly. The latest five-route/two-repetition Stage-4
+successor passed all fixed gates. The remaining grade gap is public retrieval
+breadth, graph-build reproducibility, and larger-repository performance—not
+more canaries or proof-harness layers. See
+[`CAPABILITY_STATE.md`](CAPABILITY_STATE.md).
