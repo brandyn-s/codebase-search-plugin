@@ -7,9 +7,9 @@
   },
   "schema_version": 1,
   "source": {
-    "install_descriptor_sha256": "a820827597a45bb5bdd4467126d573cbcd4a883804adcc4a29674aeb96d535b5",
+    "install_descriptor_sha256": "723fc014e0995f130ed818174cded87e03351717a640490df319c28dccc74310",
     "kind": "github-release",
-    "version": "v0.8.0-redacted.3"
+    "version": "v0.8.0-redacted.4"
   },
   "tested_capabilities": {
     "inputs": {
@@ -94,6 +94,30 @@
         "type": "object"
       },
       "input_schema_sha256": "8b6cfd6edc910d3c2241ff10f55453c960ab36bea49186477667d296d5fecab5"
+    },
+    "compare_project_indexes": {
+      "input_schema": {
+        "properties": {
+          "base_project": {
+            "description": "Canonical base project name from list_projects.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum returned entries per delta category, 1-500; default 100.",
+            "type": "integer"
+          },
+          "target_project": {
+            "description": "Canonical target project name from list_projects.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_project",
+          "target_project"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "1075908da1cae7e4d16cf875c92473536fa56720c7c01a5b446501aeab6d5c86"
     },
     "degree_filter": {
       "input_schema": {
@@ -631,8 +655,20 @@
             ],
             "type": "string"
           },
+          "precision_tier": {
+            "description": "Persistent per-project graph precision tier. 'heuristic' uses tree-sitter/static resolution. 'scip' replaces CALLS edges for compiler-index-covered functions using a SCIP index and reports exact coverage/drift telemetry. Omit to inherit the project's recorded choice; default heuristic.",
+            "enum": [
+              "heuristic",
+              "scip"
+            ],
+            "type": "string"
+          },
           "repo_path": {
             "description": "Absolute path to the repository to index. If omitted, uses the auto-detected session project root.",
+            "type": "string"
+          },
+          "scip_index_path": {
+            "description": "SCIP index path for precision_tier='scip'. Relative paths resolve under repo_path. Defaults to <repo>/index.scip.",
             "type": "string"
           },
           "skip_report": {
@@ -642,7 +678,7 @@
         },
         "type": "object"
       },
-      "input_schema_sha256": "1bac32d9a3b4a02ce32247bb549d856cb8eead5d6089b664bcd560c1654c47d3"
+      "input_schema_sha256": "4bf5ebf183ab92bac450ef9b98406c49610c0888e6243422cf25434428b63631"
     },
     "index_status": {
       "input_schema": {
@@ -682,6 +718,49 @@
         "type": "object"
       },
       "input_schema_sha256": "efddc7bd8bbcef73a14eb1ace1ffdaec81e518ef1e13c1e9271d0b8acb694a49"
+    },
+    "localize_across_projects": {
+      "input_schema": {
+        "properties": {
+          "depth": {
+            "description": "Graph expansion depth 0-5; default 2.",
+            "type": "integer"
+          },
+          "per_project_top_k": {
+            "description": "Candidates per project 1-20; default 5.",
+            "type": "integer"
+          },
+          "projects": {
+            "description": "Optional canonical project names. Omit to search up to 25 indexed projects.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "query": {
+            "description": "Symbol or focused relationship concept to localize.",
+            "type": "string"
+          },
+          "seed_strategy": {
+            "description": "Seed matching strategy; default hybrid.",
+            "enum": [
+              "substring",
+              "embedding",
+              "hybrid"
+            ],
+            "type": "string"
+          },
+          "top_k": {
+            "description": "Total project-balanced results 1-100; default 25.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "input_schema_sha256": "31a9b8b5fa87cafa06f7b9e80b2ca8a74273596baa8ab4c0f65f7820137dd111"
     },
     "manage_adr": {
       "input_schema": {
@@ -1125,6 +1204,14 @@
             "description": "Project to trace in. Defaults to session project.",
             "type": "string"
           },
+          "required_assurance": {
+            "description": "Required analysis assurance. graph_reachability (default) uses the code graph. variable_level_taint returns a structured CodeQL handoff and does not return graph connectivity as taint evidence.",
+            "enum": [
+              "graph_reachability",
+              "variable_level_taint"
+            ],
+            "type": "string"
+          },
           "source": {
             "description": "Function name to trace data flow from (e.g. 'handleRequest', 'parse_input'). Exact name or qualified name.",
             "type": "string"
@@ -1135,7 +1222,7 @@
         ],
         "type": "object"
       },
-      "input_schema_sha256": "14ca0e5ba61efb54e768a82462ad7d28fbf649c169a24a349331a11e6eaf3a37"
+      "input_schema_sha256": "7ba08758dcd3ffc06f5f63961906604c0891cbc78e715a2be5b9535e93359e82"
     },
     "visualize": {
       "input_schema": {

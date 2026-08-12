@@ -9,12 +9,14 @@ import unittest
 
 from bench.public_measure.run import (
     CATEGORIES,
+    exact_paired_binary_test,
     parse_sse,
     query_anchors,
     route_aware_compose,
     rrf,
     score_ranking,
     validate_inputs,
+    wilson_interval,
 )
 
 
@@ -24,6 +26,43 @@ EXTERNAL_PIN = Path(os.environ.get("CODE_INTEL_PUBLIC_SELECTION_PIN", ""))
 
 
 class PublicMeasurementTests(unittest.TestCase):
+    def test_balanced_n20_summary_preserves_claim_and_scale_boundaries(self):
+        summary = json.loads(
+            (
+                MEASURE / "results" / "2026-08-12-n20-summary.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(summary["cases"], 20)
+        self.assertEqual(summary["cases_per_category"], 5)
+        self.assertEqual(summary["language_model_calls"], 0)
+        self.assertFalse(
+            summary["interpretation"][
+                "general_platform_superiority_claim_allowed"
+            ]
+        )
+        self.assertFalse(
+            summary["result"]["paired_code_search_vs_sourcegraph_acc_at_1"]
+            ["significant_at_0_05"]
+        )
+        self.assertEqual(
+            summary["result"]["aggregate"]["code-search"]["file_acc_at_1"],
+            0.4,
+        )
+        self.assertGreaterEqual(
+            summary["scale"]["largest_line_count"]["utf8_text_lines"],
+            1_000_000,
+        )
+        self.assertFalse(
+            summary["interpretation"][
+                "very_large_monorepo_or_distributed_scale_demonstrated"
+            ]
+        )
+        self.assertEqual(
+            summary["unavailable_competitors"],
+            ["Cursor", "Augment", "Greptile"],
+        )
+
     def test_checked_in_summary_preserves_scope_and_result_bindings(self):
         summary = json.loads(
             (
@@ -97,6 +136,20 @@ class PublicMeasurementTests(unittest.TestCase):
         self.assertTrue(score["file_acc_at_3"])
         self.assertAlmostEqual(score["file_mrr_at_10"], 1 / 3)
 
+    def test_public_comparison_reports_bounded_statistical_uncertainty(self):
+        interval = wilson_interval(successes=15, total=20)
+        self.assertLess(interval["lower"], 0.75)
+        self.assertGreater(interval["upper"], 0.75)
+        self.assertEqual(interval["confidence"], 0.95)
+
+        comparison = exact_paired_binary_test(wins=10, losses=0, ties=10)
+        self.assertEqual(comparison["discordant_pairs"], 10)
+        self.assertAlmostEqual(comparison["two_sided_p_value"], 0.001953125)
+        self.assertTrue(comparison["significant_at_0_05"])
+
+        tied = exact_paired_binary_test(wins=0, losses=0, ties=20)
+        self.assertEqual(tied["two_sided_p_value"], 1.0)
+
     def test_route_aware_composition_preserves_the_selected_primary(self):
         conceptual, conceptual_method = route_aware_compose(
             "Where is request validation implemented?",
@@ -115,6 +168,64 @@ class PublicMeasurementTests(unittest.TestCase):
         self.assertEqual(conceptual_method["primary"], "code-search")
         self.assertEqual(structural[:3], ["graph.py", "shared.py", "search.py"])
         self.assertEqual(structural_method["primary"], "code-graph")
+
+    def test_selection_contract_supports_predocumented_oracle_exclusions(self):
+        categories = sorted(CATEGORIES)
+        selected_ids = [f"selected-{index}" for index in range(len(categories))]
+        excluded_id = "excluded-before-first-bug"
+        pin_cases = [
+            {"instance_id": excluded_id, "category": categories[0]},
+            *[
+                {"instance_id": case_id, "category": category}
+                for case_id, category in zip(selected_ids, categories)
+            ],
+        ]
+        cases = []
+        oracles = []
+        for index, (case_id, category) in enumerate(
+            zip(selected_ids, categories), start=1
+        ):
+            revision = f"{index:040x}"
+            cases.append(
+                {
+                    "case_id": case_id,
+                    "category": category,
+                    "repository": "example/repository",
+                    "revision": revision,
+                    "query": f"Query {index}",
+                }
+            )
+            label = f"src/file{index}.py:symbol{index}"
+            oracles.append(
+                {
+                    "case_id": case_id,
+                    "expected_files": [f"src/file{index}.py"],
+                    "expected_functions": [label],
+                    "github_pr": {
+                        "base_revision": revision,
+                        "hunk_functions": [label],
+                    },
+                }
+            )
+        contract = {
+            "schema_version": 1,
+            "language_model_calls": 0,
+            "selection": {
+                "count": 4,
+                "per_category": 1,
+                "excluded_case_ids": [excluded_id],
+            },
+        }
+
+        selected, by_id = validate_inputs(
+            contract,
+            {"cases": cases},
+            {"cases": oracles},
+            {"n": 200, "cases": pin_cases},
+        )
+
+        self.assertEqual([item["case_id"] for item in selected], selected_ids)
+        self.assertEqual(set(by_id), set(selected_ids))
 
     @unittest.skipUnless(
         EXTERNAL_PIN.is_file(),

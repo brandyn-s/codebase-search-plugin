@@ -51,6 +51,104 @@
       }
     },
     {
+      "case_id": "Open-MSS__MSS-1967",
+      "expected_files": [
+        "mslib/msui/mscolab.py",
+        "mslib/msui/socket_control.py",
+        "mslib/utils/airdata.py"
+      ],
+      "expected_functions": [
+        "mslib/msui/mscolab.py:MSUIMscolab.add_operation",
+        "mslib/msui/mscolab.py:MSUIMscolab.change_category_handler",
+        "mslib/msui/mscolab.py:MSUIMscolab.change_description_handler",
+        "mslib/msui/mscolab.py:MSUIMscolab.rename_operation_handler",
+        "mslib/msui/mscolab.py:MSUIMscolab.logout",
+        "mslib/msui/socket_control.py:ConnectionManager.disconnect",
+        "mslib/utils/airdata.py:get_airspaces"
+      ],
+      "github_pr": {
+        "number": 1967,
+        "merged_at": "2023-09-06T07:13:12Z",
+        "base_revision": "56e9528b552a9d8f2e267661473b8f0e724fd093",
+        "head_revision": "8cec3d8cf773ddddc6400a34be5d2f3c75fdd568",
+        "hunk_functions": [
+          "mslib/msui/mscolab.py:MSUIMscolab.add_operation",
+          "mslib/msui/mscolab.py:MSUIMscolab.change_category_handler",
+          "mslib/msui/mscolab.py:MSUIMscolab.change_description_handler",
+          "mslib/msui/mscolab.py:MSUIMscolab.rename_operation_handler",
+          "mslib/msui/mscolab.py:MSUIMscolab.logout",
+          "mslib/msui/socket_control.py:ConnectionManager.disconnect",
+          "mslib/utils/airdata.py:get_airspaces"
+        ]
+      }
+    },
+    {
+      "case_id": "sopel-irc__sopel-2285",
+      "expected_files": [
+        "sopel/builtins/url.py"
+      ],
+      "expected_functions": [
+        "sopel/builtins/url.py:configure",
+        "sopel/builtins/url.py:title_command",
+        "sopel/builtins/url.py:title_auto",
+        "sopel/builtins/url.py:process_urls",
+        "sopel/builtins/url.py:find_title",
+        "sopel/builtins/url.py:get_tinyurl"
+      ],
+      "github_pr": {
+        "number": 2285,
+        "merged_at": "2024-10-13T17:40:04Z",
+        "base_revision": "51300a1ab854d6ec82d90df1bc876188c03335ff",
+        "head_revision": "acff99a78cc6bb6980539ef7df7eefd421dee554",
+        "hunk_functions": [
+          "sopel/builtins/url.py:configure",
+          "sopel/builtins/url.py:title_command",
+          "sopel/builtins/url.py:title_auto",
+          "sopel/builtins/url.py:process_urls",
+          "sopel/builtins/url.py:find_title",
+          "sopel/builtins/url.py:get_tinyurl"
+        ]
+      }
+    },
+    {
+      "case_id": "mesonbuild__meson-11366",
+      "expected_files": [
+        "mesonbuild/minstall.py"
+      ],
+      "expected_functions": [
+        "mesonbuild/minstall.py:Installer.do_install",
+        "mesonbuild/minstall.py:rebuild_all"
+      ],
+      "github_pr": {
+        "number": 11366,
+        "merged_at": "2023-02-21T12:20:22Z",
+        "base_revision": "088727164de8496c4bada040c2f4690e42f66b69",
+        "head_revision": "616bf1f79d855c6d5494f71806ce42961d8ce85e",
+        "hunk_functions": [
+          "mesonbuild/minstall.py:Installer.do_install",
+          "mesonbuild/minstall.py:rebuild_all"
+        ]
+      }
+    },
+    {
+      "case_id": "pypa__pip-13085",
+      "expected_files": [
+        "src/pip/_internal/commands/install.py"
+      ],
+      "expected_functions": [
+        "src/pip/_internal/commands/install.py:InstallCommand.run"
+      ],
+      "github_pr": {
+        "number": 13085,
+        "merged_at": "2024-12-07T19:37:07Z",
+        "base_revision": "fe0925b3c00bf8956a0d33408df692ac364217d4",
+        "head_revision": "0f7bc6aa7ed84bbe6a25b6f331239ea03b0001b3",
+        "hunk_functions": [
+          "src/pip/_internal/commands/install.py:InstallCommand.run"
+        ]
+      }
+    },
+    {
       "case_id": "vllm-project__vllm-9390",
       "expected_files": [
         "benchmarks/benchmark_serving.py"
@@ -71,6 +169,194 @@
       }
     },
     {
+      "case_id": "scikit-learn__scikit-learn-25186",
+      "expected_files": [
+        "sklearn/ensemble/_iforest.py"
+      ],
+      "expected_functions": [
+        "sklearn/ensemble/_iforest.py:IsolationForest.fit",
+        "sklearn/ensemble/_iforest.py:IsolationForest.score_samples",
+        "sklearn/ensemble/_iforest.py:IsolationForest._compute_score_samples"
+      ],
+      "github_pr": {
+        "number": 25186,
+        "merged_at": "2023-01-24T15:03:14Z",
+        "base_revision": "b2fe9746a862272a60ffc7d2c6563d28dd13a6c6",
+        "head_revision": "4c96d5963d8315d9feadc9cbdb36e75b646a29b2",
+        "hunk_functions": [
+          "sklearn/ensemble/_iforest.py:IsolationForest.fit",
+          "sklearn/ensemble/_iforest.py:IsolationForest.score_samples",
+          "sklearn/ensemble/_iforest.py:IsolationForest._compute_score_samples"
+        ]
+      }
+    },
+    {
+      "case_id": "okta__okta-jwt-verifier-python-59",
+      "expected_files": [
+        "okta_jwt_verifier/jwt_utils.py"
+      ],
+      "expected_functions": [
+        "okta_jwt_verifier/jwt_utils.py:JWTUtils.parse_token",
+        "okta_jwt_verifier/jwt_utils.py:JWTUtils.verify_claims",
+        "okta_jwt_verifier/jwt_utils.py:JWTUtils.verify_signature"
+      ],
+      "github_pr": {
+        "number": 59,
+        "merged_at": "2024-08-01T18:51:47Z",
+        "base_revision": "cb4e6780c55c234690299fa4ccef5ad33746c2c2",
+        "head_revision": "712ced619164144c6e50f2235e2a3f55f4bdb44d",
+        "hunk_functions": [
+          "okta_jwt_verifier/jwt_utils.py:JWTUtils.parse_token",
+          "okta_jwt_verifier/jwt_utils.py:JWTUtils.verify_claims",
+          "okta_jwt_verifier/jwt_utils.py:JWTUtils.verify_signature"
+        ]
+      }
+    },
+    {
+      "case_id": "huggingface__optimum-benchmark-266",
+      "expected_files": [
+        "optimum_benchmark/trackers/latency.py"
+      ],
+      "expected_functions": [
+        "optimum_benchmark/trackers/latency.py:LatencyTracker.__init__"
+      ],
+      "github_pr": {
+        "number": 266,
+        "merged_at": "2024-09-20T09:48:22Z",
+        "base_revision": "1992de306378f7d5848d36ddc73f15ba711c8d70",
+        "head_revision": "1ee08825d79245bc202844ed664d8837bd7a30f2",
+        "hunk_functions": [
+          "optimum_benchmark/trackers/latency.py:LatencyTracker.__init__"
+        ]
+      }
+    },
+    {
+      "case_id": "JoinMarket-Org__joinmarket-clientserver-1180",
+      "expected_files": [
+        "jmclient/jmclient/blockchaininterface.py",
+        "jmclient/jmclient/wallet_service.py"
+      ],
+      "expected_functions": [
+        "jmclient/jmclient/blockchaininterface.py:BitcoinCoreInterface._yield_transactions",
+        "jmclient/jmclient/blockchaininterface.py:BitcoinCoreNoHistoryInterface._yield_transactions",
+        "jmclient/jmclient/wallet_service.py:WalletService.__init__",
+        "jmclient/jmclient/wallet_service.py:WalletService.register_callbacks",
+        "jmclient/jmclient/wallet_service.py:WalletService.transaction_monitor",
+        "jmclient/jmclient/wallet_service.py:WalletService.check_callback_called",
+        "jmclient/jmclient/wallet_service.py:WalletService.sync_wallet",
+        "jmclient/jmclient/wallet_service.py:WalletService.get_all_transactions",
+        "jmclient/jmclient/wallet_service.py:WalletService.sync_addresses"
+      ],
+      "github_pr": {
+        "number": 1180,
+        "merged_at": "2022-03-25T12:53:41Z",
+        "base_revision": "aabfd3f7c2ec33391b89369bd1fe354659f10f0f",
+        "head_revision": "8fe5b7b712ed9409d75907e34c1702a1e2d96213",
+        "hunk_functions": [
+          "jmclient/jmclient/blockchaininterface.py:BitcoinCoreInterface._yield_transactions",
+          "jmclient/jmclient/blockchaininterface.py:BitcoinCoreNoHistoryInterface._yield_transactions",
+          "jmclient/jmclient/wallet_service.py:WalletService.__init__",
+          "jmclient/jmclient/wallet_service.py:WalletService.register_callbacks",
+          "jmclient/jmclient/wallet_service.py:WalletService.transaction_monitor",
+          "jmclient/jmclient/wallet_service.py:WalletService.check_callback_called",
+          "jmclient/jmclient/wallet_service.py:WalletService.sync_wallet",
+          "jmclient/jmclient/wallet_service.py:WalletService.get_all_transactions",
+          "jmclient/jmclient/wallet_service.py:WalletService.sync_addresses"
+        ]
+      }
+    },
+    {
+      "case_id": "django__django-18616",
+      "expected_files": [
+        "django/http/response.py",
+        "django/shortcuts.py"
+      ],
+      "expected_functions": [
+        "django/http/response.py:HttpResponseRedirectBase.__init__",
+        "django/shortcuts.py:redirect"
+      ],
+      "github_pr": {
+        "number": 18616,
+        "merged_at": "2024-11-14T18:53:49Z",
+        "base_revision": "b9aa3239ab1328c915684d89b87a49459cabd30b",
+        "head_revision": "784cabb87370f7633be3a8a7d1664669c9c67fb6",
+        "hunk_functions": [
+          "django/http/response.py:HttpResponseRedirectBase.__init__",
+          "django/shortcuts.py:redirect"
+        ]
+      }
+    },
+    {
+      "case_id": "django__django-18435",
+      "expected_files": [
+        "django/core/management/commands/runserver.py"
+      ],
+      "expected_functions": [
+        "django/core/management/commands/runserver.py:Command.on_bind"
+      ],
+      "github_pr": {
+        "number": 18435,
+        "merged_at": "2024-08-09T08:34:11Z",
+        "base_revision": "95827452571eb976c4f0d5e9ac46843948dd5fe6",
+        "head_revision": "58971d76d52c3c56adee96c92664492c2b000376",
+        "hunk_functions": [
+          "django/core/management/commands/runserver.py:Command.on_bind"
+        ]
+      }
+    },
+    {
+      "case_id": "sqlfluff__sqlfluff-6399",
+      "expected_files": [
+        "src/sqlfluff/core/config/loader.py"
+      ],
+      "expected_functions": [
+        "src/sqlfluff/core/config/loader.py:_get_user_config_dir_path",
+        "src/sqlfluff/core/config/loader.py:_load_user_appdir_config",
+        "src/sqlfluff/core/config/loader.py:load_config_up_to_path"
+      ],
+      "github_pr": {
+        "number": 6399,
+        "merged_at": "2024-11-21T15:12:08Z",
+        "base_revision": "80f4fc2d3bbc7839e41a9018ae4918118c309656",
+        "head_revision": "893567425c9404e57fc2d2dfd1f21a80e6910da9",
+        "hunk_functions": [
+          "src/sqlfluff/core/config/loader.py:_get_user_config_dir_path",
+          "src/sqlfluff/core/config/loader.py:_load_user_appdir_config",
+          "src/sqlfluff/core/config/loader.py:load_config_up_to_path"
+        ]
+      }
+    },
+    {
+      "case_id": "huggingface__transformers-22498",
+      "expected_files": [
+        "src/transformers/modeling_utils.py",
+        "src/transformers/trainer.py",
+        "src/transformers/training_args.py"
+      ],
+      "expected_functions": [
+        "src/transformers/modeling_utils.py:load_sharded_checkpoint",
+        "src/transformers/trainer.py:Trainer._load_from_checkpoint",
+        "src/transformers/trainer.py:Trainer._load_best_model",
+        "src/transformers/trainer.py:Trainer._save",
+        "src/transformers/trainer.py:Trainer._push_from_checkpoint",
+        "src/transformers/training_args.py:TrainingArguments.__post_init__"
+      ],
+      "github_pr": {
+        "number": 22498,
+        "merged_at": "2023-04-04T13:05:04Z",
+        "base_revision": "6fc44656b43f1de939a1e62dd59c45d1fec9f1aa",
+        "head_revision": "2a9d22183ed883604fc140c5039b7a5b70c0e4a6",
+        "hunk_functions": [
+          "src/transformers/modeling_utils.py:load_sharded_checkpoint",
+          "src/transformers/trainer.py:Trainer._load_from_checkpoint",
+          "src/transformers/trainer.py:Trainer._load_best_model",
+          "src/transformers/trainer.py:Trainer._save",
+          "src/transformers/trainer.py:Trainer._push_from_checkpoint",
+          "src/transformers/training_args.py:TrainingArguments.__post_init__"
+        ]
+      }
+    },
+    {
       "case_id": "PrefectHQ__prefect-16117",
       "expected_files": [
         "src/prefect/flows.py"
@@ -87,6 +373,80 @@
         "hunk_functions": [
           "src/prefect/flows.py:Flow.validate_parameters",
           "src/prefect/flows.py:select_flow"
+        ]
+      }
+    },
+    {
+      "case_id": "dask__dask-11541",
+      "expected_files": [
+        "dask/array/reshape.py"
+      ],
+      "expected_functions": [
+        "dask/array/reshape.py:reshape_blockwise"
+      ],
+      "github_pr": {
+        "number": 11541,
+        "merged_at": "2024-11-20T10:18:37Z",
+        "base_revision": "5b115c4360fec6a4aa6e0edf8ad1d89a87c986dd",
+        "head_revision": "c366854b7a2c0d9ce0cd60f2c7cbf2917ce579e8",
+        "hunk_functions": [
+          "dask/array/reshape.py:reshape_blockwise"
+        ]
+      }
+    },
+    {
+      "case_id": "DS4SD__docling-330",
+      "expected_files": [
+        "docling/backend/msword_backend.py"
+      ],
+      "expected_functions": [
+        "docling/backend/msword_backend.py:MsWordDocumentBackend.walk_linear",
+        "docling/backend/msword_backend.py:MsWordDocumentBackend.handle_pictures"
+      ],
+      "github_pr": {
+        "number": 330,
+        "merged_at": "2024-11-14T12:33:34Z",
+        "base_revision": "bf2a85f1d45bcff38ff5f9b6269dd1edf7cff0ae",
+        "head_revision": "0e56549082954483ed1bd3be85bf8175576ca26f",
+        "hunk_functions": [
+          "docling/backend/msword_backend.py:MsWordDocumentBackend.walk_linear",
+          "docling/backend/msword_backend.py:MsWordDocumentBackend.handle_pictures"
+        ]
+      }
+    },
+    {
+      "case_id": "getmoto__moto-8342",
+      "expected_files": [
+        "moto/iotdata/models.py"
+      ],
+      "expected_functions": [
+        "moto/iotdata/models.py:FakeShadow.parse_payload"
+      ],
+      "github_pr": {
+        "number": 8342,
+        "merged_at": "2024-11-23T11:14:49Z",
+        "base_revision": "60328d54ee14c390f00d83167da94bf273a58a6b",
+        "head_revision": "4ea75615bddd7d642f27fdc471eb5299daaf6ed4",
+        "hunk_functions": [
+          "moto/iotdata/models.py:FakeShadow.parse_payload"
+        ]
+      }
+    },
+    {
+      "case_id": "getmoto__moto-8316",
+      "expected_files": [
+        "moto/ec2/responses/fleets.py"
+      ],
+      "expected_functions": [
+        "moto/ec2/responses/fleets.py:Fleets.create_fleet"
+      ],
+      "github_pr": {
+        "number": 8316,
+        "merged_at": "2024-11-15T10:15:28Z",
+        "base_revision": "c9536b117e39fef41b9ccb5e07463eecda15ba2a",
+        "head_revision": "a6543232a9de81685a1911b5e9610ba5c55c3ffb",
+        "hunk_functions": [
+          "moto/ec2/responses/fleets.py:Fleets.create_fleet"
         ]
       }
     }

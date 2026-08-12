@@ -238,22 +238,60 @@ def validate_inputs(
         for item in oracles
         if isinstance(item, dict) and isinstance(item.get("case_id"), str)
     }
-    if len(cases) != 4 or len(by_id) != 4:
-        raise MeasurementError("the frozen pilot must contain exactly four cases")
-    if {case.get("category") for case in cases} != CATEGORIES:
-        raise MeasurementError("the frozen pilot is not balanced across four categories")
+    selection = contract.get("selection", {})
+    selected_count = selection.get("count")
+    per_category = selection.get("per_category", 1)
+    if (
+        not isinstance(selected_count, int)
+        or selected_count < 4
+        or not isinstance(per_category, int)
+        or per_category < 1
+        or selected_count != per_category * len(CATEGORIES)
+    ):
+        raise MeasurementError("invalid balanced selection count")
+    if len(cases) != selected_count or len(by_id) != selected_count:
+        raise MeasurementError(
+            f"the frozen comparison must contain exactly {selected_count} cases"
+        )
+    category_counts = {
+        category: sum(case.get("category") == category for case in cases)
+        for category in CATEGORIES
+    }
+    if any(count != per_category for count in category_counts.values()):
+        raise MeasurementError("the frozen comparison is not balanced across categories")
     if len({case.get("case_id") for case in cases}) != len(cases):
         raise MeasurementError("duplicate case identity")
 
     pin_cases = selection_pin.get("cases")
     if not isinstance(pin_cases, list) or selection_pin.get("n") != 200:
         raise MeasurementError("selection pin is not the recorded n=200 pin")
-    first_by_category: dict[str, str] = {}
+    excluded_case_ids = selection.get("excluded_case_ids", [])
+    if (
+        not isinstance(excluded_case_ids, list)
+        or any(not isinstance(item, str) for item in excluded_case_ids)
+        or len(excluded_case_ids) != len(set(excluded_case_ids))
+    ):
+        raise MeasurementError("selection exclusions must be unique case IDs")
+    excluded = set(excluded_case_ids)
+    selected_by_category: dict[str, list[str]] = {
+        category: [] for category in CATEGORIES
+    }
     for item in pin_cases:
-        if isinstance(item, dict) and item.get("category") not in first_by_category:
-            first_by_category[item.get("category")] = item.get("instance_id")
+        if not isinstance(item, dict):
+            continue
+        category = item.get("category")
+        case_id = item.get("instance_id")
+        if (
+            category in selected_by_category
+            and isinstance(case_id, str)
+            and case_id not in excluded
+            and len(selected_by_category[category]) < per_category
+        ):
+            selected_by_category[category].append(case_id)
+    if any(len(items) != per_category for items in selected_by_category.values()):
+        raise MeasurementError("selection pin does not contain enough eligible cases")
     expected_selection = {
-        first_by_category[category] for category in sorted(CATEGORIES)
+        case_id for items in selected_by_category.values() for case_id in items
     }
     if {case.get("case_id") for case in cases} != expected_selection:
         raise MeasurementError("cases do not match the pre-existing selection rule")
@@ -772,6 +810,54 @@ def percentile(values: list[int], fraction: float) -> int:
     return ordered[max(0, math.ceil(len(ordered) * fraction) - 1)]
 
 
+def wilson_interval(successes: int, total: int) -> dict:
+    """Return a two-sided 95% Wilson interval for a binary endpoint."""
+    if total <= 0 or successes < 0 or successes > total:
+        raise ValueError("invalid binary observation counts")
+    z = 1.959963984540054
+    observed = successes / total
+    denominator = 1 + (z * z / total)
+    center = (observed + (z * z / (2 * total))) / denominator
+    margin = (
+        z
+        * math.sqrt(
+            (observed * (1 - observed) / total)
+            + (z * z / (4 * total * total))
+        )
+        / denominator
+    )
+    return {
+        "confidence": 0.95,
+        "method": "wilson_score",
+        "lower": max(0.0, center - margin),
+        "upper": min(1.0, center + margin),
+    }
+
+
+def exact_paired_binary_test(wins: int, losses: int, ties: int) -> dict:
+    """Exact two-sided sign test over discordant paired binary outcomes."""
+    if min(wins, losses, ties) < 0:
+        raise ValueError("paired observation counts cannot be negative")
+    discordant = wins + losses
+    if discordant == 0:
+        p_value = 1.0
+    else:
+        tail = sum(
+            math.comb(discordant, index)
+            for index in range(min(wins, losses) + 1)
+        ) / (2**discordant)
+        p_value = min(1.0, 2 * tail)
+    return {
+        "wins": wins,
+        "losses": losses,
+        "ties": ties,
+        "discordant_pairs": discordant,
+        "test": "exact_two_sided_paired_sign",
+        "two_sided_p_value": p_value,
+        "significant_at_0_05": p_value < 0.05,
+    }
+
+
 def incremental_measurement(
     case: dict,
     oracle: dict,
@@ -911,6 +997,9 @@ def aggregate(case_results: list[dict]) -> dict:
             for case in case_results
             for value in case["arms"][arm].get("latencies_ns", [])
         ]
+        acc_at_1_successes = sum(
+            bool(score["file_acc_at_1"]) for score in scores
+        )
         summary[arm] = {
             "cases": len(scores),
             "file_acc_at_1": statistics.fmean(
@@ -925,10 +1014,34 @@ def aggregate(case_results: list[dict]) -> dict:
             "file_mrr_at_10": statistics.fmean(
                 score["file_mrr_at_10"] for score in scores
             ),
+            "file_acc_at_1_interval": wilson_interval(
+                acc_at_1_successes, len(scores)
+            ),
             "latency_p50_ns": percentile(latencies, 0.50),
             "latency_p95_ns": percentile(latencies, 0.95),
         }
     return summary
+
+
+def paired_acc_at_1(
+    case_results: list[dict], left_arm: str, right_arm: str
+) -> dict:
+    wins = losses = ties = 0
+    for case in case_results:
+        left = bool(case["arms"][left_arm]["score"]["file_acc_at_1"])
+        right = bool(case["arms"][right_arm]["score"]["file_acc_at_1"])
+        if left and not right:
+            wins += 1
+        elif right and not left:
+            losses += 1
+        else:
+            ties += 1
+    return {
+        "left_arm": left_arm,
+        "right_arm": right_arm,
+        "endpoint": "file_acc_at_1",
+        **exact_paired_binary_test(wins, losses, ties),
+    }
 
 
 def run_measurement(args: argparse.Namespace) -> dict:
@@ -1069,27 +1182,46 @@ def run_measurement(args: argparse.Namespace) -> dict:
                 incremental = incremental_measurement(
                     case, oracles[case_id], checkout, search, graph
                 )
+            search_index_bytes = directory_bytes(
+                runtime_root / "code-search-storage"
+            )
+            graph_index_bytes = directory_bytes(
+                runtime_root / "home" / ".cache" / "codebase-memory-mcp"
+            )
             scale = {
                 **stats,
                 "search_cold_index_ns": search_index_ns,
                 "search_cold_peak_rss_bytes": search_rss,
-                "search_index_bytes": directory_bytes(
-                    runtime_root / "code-search-storage"
-                ),
+                "search_index_bytes": search_index_bytes,
                 "search_chunks": search_index.get("index_stats", {}).get(
                     "chunks_indexed"
                 ),
                 "graph_cold_index_ns": graph_index_ns,
                 "graph_cold_peak_rss_bytes": graph_rss,
-                "graph_index_bytes": directory_bytes(
-                    runtime_root / "home" / ".cache" / "codebase-memory-mcp"
-                ),
+                "graph_index_bytes": graph_index_bytes,
                 "graph_nodes": graph_index.get("nodes"),
                 "graph_edges": graph_index.get("edges"),
                 "search_warm_latency_p50_ns": percentile(search_latencies, 0.50),
                 "search_warm_latency_p95_ns": percentile(search_latencies, 0.95),
                 "graph_warm_latency_p50_ns": percentile(graph_latencies, 0.50),
                 "graph_warm_latency_p95_ns": percentile(graph_latencies, 0.95),
+                "combined_index_bytes": search_index_bytes + graph_index_bytes,
+                "search_index_bytes_per_utf8_line": (
+                    search_index_bytes / stats["utf8_text_lines"]
+                    if stats["utf8_text_lines"]
+                    else None
+                ),
+                "graph_index_bytes_per_utf8_line": (
+                    graph_index_bytes / stats["utf8_text_lines"]
+                    if stats["utf8_text_lines"]
+                    else None
+                ),
+                "combined_index_bytes_per_utf8_line": (
+                    (search_index_bytes + graph_index_bytes)
+                    / stats["utf8_text_lines"]
+                    if stats["utf8_text_lines"]
+                    else None
+                ),
             }
         finally:
             search.close()
@@ -1149,6 +1281,18 @@ def run_measurement(args: argparse.Namespace) -> dict:
     if incremental is None:
         raise MeasurementError("the predeclared incremental measurement did not run")
     finished = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    aggregate_result = aggregate(case_results)
+    paired_sourcegraph = paired_acc_at_1(
+        case_results, "code-search", "sourcegraph"
+    )
+    sourcegraph_failures = sum(
+        bool(case["arms"]["sourcegraph"].get("error")) for case in case_results
+    )
+    narrow_superiority = (
+        sourcegraph_failures == 0
+        and paired_sourcegraph["significant_at_0_05"]
+        and paired_sourcegraph["wins"] > paired_sourcegraph["losses"]
+    )
     result = {
         "schema_version": 1,
         "status": "completed",
@@ -1170,11 +1314,22 @@ def run_measurement(args: argparse.Namespace) -> dict:
         },
         "instrument": instrument,
         "cases": case_results,
-        "aggregate": aggregate(case_results),
+        "aggregate": aggregate_result,
+        "aggregate_by_category": {
+            category: aggregate(
+                [case for case in case_results if case["category"] == category]
+            )
+            for category in sorted(CATEGORIES)
+        },
+        "paired_comparisons": {
+            "code_search_vs_sourcegraph_acc_at_1": paired_sourcegraph,
+        },
         "incremental": incremental,
         "interpretation": {
-            "scope": "directional balanced n=4 public pilot",
-            "statistical_superiority_claim_allowed": False,
+            "scope": "bounded balanced n=20 public file-localization comparison",
+            "general_platform_superiority_claim_allowed": False,
+            "narrow_acc_at_1_superiority_over_sourcegraph_allowed": narrow_superiority,
+            "sourcegraph_failures": sourcegraph_failures,
             "unavailable_competitors": ["Cursor", "Augment", "Greptile"],
         },
     }

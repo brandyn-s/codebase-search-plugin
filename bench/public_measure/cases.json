@@ -22,6 +22,34 @@
       "query": "Security: allowed origins should not be * by default\nCORS headers should be restricted to the current domain at least, by default."
     },
     {
+      "case_id": "Open-MSS__MSS-1967",
+      "category": "Performance Issue",
+      "repository": "Open-MSS/MSS",
+      "revision": "56e9528b552a9d8f2e267661473b8f0e724fd093",
+      "query": "What to do with \"UserWarning: An unhandled message box popped up during your test!\"?\nThere are many of these warnings in the CI logs basically spamming the output and drowning out other more interesting warnings."
+    },
+    {
+      "case_id": "sopel-irc__sopel-2285",
+      "category": "Security Vulnerability",
+      "repository": "sopel-irc/sopel",
+      "revision": "51300a1ab854d6ec82d90df1bc876188c03335ff",
+      "query": "url: private_resolution/dns_resolution useless\n### Description\nThe url.enable_private_resolution and url.enable_dns_resolution settings do not work as advertised, and the concept of the latter is fatally flawed."
+    },
+    {
+      "case_id": "mesonbuild__meson-11366",
+      "category": "Security Vulnerability",
+      "repository": "mesonbuild/meson",
+      "revision": "088727164de8496c4bada040c2f4690e42f66b69",
+      "query": "'ninja install' attempts to gain elevated privileges\nIt is disturbing for 'ninja install' to prompt for a sudo password with polkit."
+    },
+    {
+      "case_id": "pypa__pip-13085",
+      "category": "Security Vulnerability",
+      "repository": "pypa/pip",
+      "revision": "fe0925b3c00bf8956a0d33408df692ac364217d4",
+      "query": "Lazy import allows wheel to execute code on install."
+    },
+    {
       "case_id": "vllm-project__vllm-9390",
       "category": "Feature Request",
       "repository": "vllm-project/vllm",
@@ -29,11 +57,95 @@
       "query": "Benchmarking script does not limit the maximum concurrency\nThe current benchmarking script if specified with `INF` arrivals, will not limit the maximum concurrency level as shown [here](https://github.com/vllm-project/vllm/blob/703e42ee4b3efed3c71e7ae7d15f0f96e05722d4/benchmarks/benchmark_serving.py#L191)."
     },
     {
+      "case_id": "scikit-learn__scikit-learn-25186",
+      "category": "Performance Issue",
+      "repository": "scikit-learn/scikit-learn",
+      "revision": "b2fe9746a862272a60ffc7d2c6563d28dd13a6c6",
+      "query": "Improving IsolationForest predict time\n### Discussed in https://github.com/scikit-learn/scikit-learn/discussions/25142"
+    },
+    {
+      "case_id": "okta__okta-jwt-verifier-python-59",
+      "category": "Security Vulnerability",
+      "repository": "okta/okta-jwt-verifier-python",
+      "revision": "cb4e6780c55c234690299fa4ccef5ad33746c2c2",
+      "query": "Dependency python-Jose appears to be unmaintained\nHey - just a heads-up that it appears this library is using `python-jose` as a dependency, which hasn't been updated in ~2 years. Maintainers haven't shown any activity in GitHub for issues or pull requests in quite a while, either. It would probably be prudent to pivot to PyJWT or JWCrypto, before CVEs start cropping up against the abandoned library.\nDependency python-Jose appears to be unmaintained\nHey - just a heads-up that it appears this library is using `python-jose` as a dependency, which hasn't been updated in ~2 years. Maintainers haven't shown any activity in GitHub for issues or pull requests in quite a while, either. It would probably be prudent to pivot to PyJWT or JWCrypto, before CVEs start cropping up against the abandoned library."
+    },
+    {
+      "case_id": "huggingface__optimum-benchmark-266",
+      "category": "Performance Issue",
+      "repository": "huggingface/optimum-benchmark",
+      "revision": "1992de306378f7d5848d36ddc73f15ba711c8d70",
+      "query": "Timeout with multiple AMD GPUs tensor parallelism in vLLM\n## Problem Description"
+    },
+    {
+      "case_id": "JoinMarket-Org__joinmarket-clientserver-1180",
+      "category": "Performance Issue",
+      "repository": "JoinMarket-Org/joinmarket-clientserver",
+      "revision": "aabfd3f7c2ec33391b89369bd1fe354659f10f0f",
+      "query": "yg-privacyenhanced.py: excessive CPU usage\nAt first startup of the Yield Generator, CPU usage seems acceptable, but as it sits running for a few days, it starts using excessive amounts of CPU time. It seems to depend on how many CoinJoins it has participated in. Case in point: I have two instances of `yg-privacyenhanced.py` running (with separate JM wallets and separate Bitcoin Core wallets), one running with native SegWit and the other with transitional SegWit. Both were started at the same time, about 154 hours ago. One has used about 25 minutes of CPU time. The other has used about 75 hours of CPU time — i.e., nearly half of the wall-clock time that it has been running!"
+    },
+    {
+      "case_id": "django__django-18616",
+      "category": "Feature Request",
+      "repository": "django/django",
+      "revision": "b9aa3239ab1328c915684d89b87a49459cabd30b",
+      "query": "Add 307 and 308 redirect response codes to django.shortcuts.redirect\nDescription\n\t \nOther than 301 and 302 response codes for redirects, there is also:\n​https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/307\n​https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308\nCurrently, Django is unaware of these.\nProposal:\nAdd two new HTTP response classes for 307 and 308.\nEnhance django.shortcuts.redirect with a new keyword argument preserve_method that, in combination with the existing permanent, decides which of the four redirect classes to use.\nAdd 307 and 308 redirect response codes to django.shortcuts.redirect\nDescription\n\t \nOther than 301 and 302 response codes for redirects, there is also:\n​https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/307\n​https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308\nCurrently, Django is unaware of these.\nProposal:\nAdd two new HTTP response classes for 307 and 308.\nEnhance django.shortcuts.redirect with a new keyword argument preserve_method that, in combination with the existing permanent, decides which of the four redirect classes to use."
+    },
+    {
+      "case_id": "django__django-18435",
+      "category": "Feature Request",
+      "repository": "django/django",
+      "revision": "95827452571eb976c4f0d5e9ac46843948dd5fe6",
+      "query": "Add warning to runserver that it should not be used for production\nDescription\n\t \nAs per this discussion on the ​forum, I think adding a warning to the start of runserver would be valuable to those new to Django and a healthy reminder to those coming back to Django. \nThe wording of the warning is:\nWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\nFor more information on production servers see the documentation: https://docs.djangoproject.com/en/5.0/howto/deployment/\nAdditionally a flag should be added to optionally hide the warning. --hide-unsuitable-for-production was a suggestion.\nFinally the following 2 pages of the documentation should have add some wording to highlight that a deployed project should not use runserver.\n​https://docs.djangoproject.com/en/5.0/howto/deployment/ (Add a warning or paragraph that mentions switching)\n​https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/ (Add a section to switch away from runserver)\nAdd warning to runserver that it should not be used for production\nDescription\n\t \nAs per this discussion on the ​forum, I think adding a warning to the start of runserver would be valuable to those new to Django and a healthy reminder to those coming back to Django. \nThe wording of the warning is:\nWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\nFor more information on production servers see the documentation: https://docs.djangoproject.com/en/5.0/howto/deployment/\nAdditionally a flag should be added to optionally hide the warning. --hide-unsuitable-for-production was a suggestion.\nFinally the following 2 pages of the documentation should have add some wording to highlight that a deployed project should not use runserver.\n​https://docs.djangoproject.com/en/5.0/howto/deployment/ (Add a warning or paragraph that mentions switching)\n​https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/ (Add a section to switch away from runserver)"
+    },
+    {
+      "case_id": "sqlfluff__sqlfluff-6399",
+      "category": "Feature Request",
+      "repository": "sqlfluff/sqlfluff",
+      "revision": "80f4fc2d3bbc7839e41a9018ae4918118c309656",
+      "query": "replace deprecated appdirs dependency with platformdirs\n### Search before asking"
+    },
+    {
+      "case_id": "huggingface__transformers-22498",
+      "category": "Feature Request",
+      "repository": "huggingface/transformers",
+      "revision": "6fc44656b43f1de939a1e62dd59c45d1fec9f1aa",
+      "query": "Implement safetensors checkpoint loading for Trainer\n### Feature request"
+    },
+    {
       "case_id": "PrefectHQ__prefect-16117",
       "category": "Bug Report",
       "repository": "PrefectHQ/prefect",
       "revision": "fb919c67427d230ecea03a5273dfdd6de59bd697",
       "query": "flow.validate_parameters regression\n### Bug summary"
+    },
+    {
+      "case_id": "dask__dask-11541",
+      "category": "Bug Report",
+      "repository": "dask/dask",
+      "revision": "5b115c4360fec6a4aa6e0edf8ad1d89a87c986dd",
+      "query": "bug in dask.array.reshape_blockwise\n**Minimal Complete Verifiable Example**:"
+    },
+    {
+      "case_id": "DS4SD__docling-330",
+      "category": "Bug Report",
+      "repository": "DS4SD/docling",
+      "revision": "bf2a85f1d45bcff38ff5f9b6269dd1edf7cff0ae",
+      "query": "Identification of images in docx\nHello everyone,\nim working on docx document type with docling.\nMy first test was very poor.\nI have a docx file which is only a testfile and this contains one image.\nThe standard procedure doesnt even recognise the image in the file...\nStandard is this:"
+    },
+    {
+      "case_id": "getmoto__moto-8342",
+      "category": "Bug Report",
+      "repository": "getmoto/moto",
+      "revision": "60328d54ee14c390f00d83167da94bf273a58a6b",
+      "query": "IoT Data Shadow Delta with complex datastructure exposes jsondiff symbol and raises TypeError\nI'm using Moto 5.0.21, and jsondiff 2.2.1."
+    },
+    {
+      "case_id": "getmoto__moto-8316",
+      "category": "Bug Report",
+      "repository": "getmoto/moto",
+      "revision": "c9536b117e39fef41b9ccb5e07463eecda15ba2a",
+      "query": "moto/core/responses.py `_get_multi_param` bug"
     }
   ]
 }

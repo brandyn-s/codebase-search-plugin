@@ -71,10 +71,11 @@ The install script:
 The current internal grade is **B+ overall** and **A- for verifiable code
 intelligence**. A sealed five-route Stage-4 successor passed 10/10 units with
 perfect evidence, adjudication, routing, unsupported-claim, error, and canary
-gates. On the unchanged zero-LLM public LocBench n=4 pilot, released
-code-search v0.3.4 and route-aware composition each reached 1.00 Acc@1 and
-MRR@10, versus Sourcegraph at 0.75 and 0.875. Real-repository indexing was
-measured through 2,351 files and 664,120 lines. These are bounded results, not
+gates. On the balanced zero-LLM public LocBench n=20 comparison, code-search
+reached 0.40 Acc@1 and 0.534 MRR@10 versus Sourcegraph at 0.20 and 0.225. The
+paired Acc@1 test was not significant (p=0.125), so search superiority is not
+established. Direct indexing now reaches 2.39 million lines and 6,842 tracked
+files across separate single-repository cases. These are bounded results, not
 a claim of market-wide superiority. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the gradecard,
 exact measurements, limitations, and next work.
@@ -113,6 +114,12 @@ Cypher-like language to traverse call chains, find dead code, and calculate
 blast radius. Seed truncation, adjacency traversal, and equal-score result
 ordering are canonicalized so repeated queries do not depend on map or edge
 iteration order.
+
+The default graph tier is tree-sitter plus heuristic static resolution. It is
+not compiler-grade. Projects that have a current SCIP index can explicitly
+select the persistent `scip` precision tier; index status reports effective
+tier, coverage, drift, replacements, and insertions. Uncovered or drifted
+files remain heuristic and are labeled accordingly.
 
 **When to use:**
 - "What calls processOrder?" — tracing call chains
@@ -242,7 +249,7 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.3.4`](https://github.com/redacted-org/code-search/releases/tag/v0.3.4)
+[`v0.3.5`](https://github.com/redacted-org/code-search/releases/tag/v0.3.5)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
@@ -264,7 +271,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.3`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.3).
+[`v0.8.0-redacted.4`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.4).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -315,22 +322,25 @@ fixed gate: 1.0 precision, recall, adjudication, routing, and routing-contract
 accuracy, with zero unsupported asserted claims, errors, or host canary
 violations. That single bounded result is sufficient for the current empirical
 release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
-code-search incremental refresh path. Plugin 0.4.21 now pins code-search v0.3.4
-and code-graph v0.8.0-redacted.3, uses query-signal-aware hybrid ranking,
+code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
+and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. These changes receive deterministic
-regression, exact installed-component readiness, and the direct public
-measurement below rather than another model holdout. See
+a search- or graph-primary cascade. Plugin 0.4.22 pins code-search v0.3.5 and
+code-graph v0.8.0-redacted.4 and adds persistent
+per-project SCIP precision, an explicit reachability-versus-taint contract,
+isolated cross-project discovery, and immutable graph-index comparison. These
+changes receive deterministic regression, exact installed-component readiness,
+and the direct public measurement below rather than another model holdout. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
 
 The direct public and scale instrument lives under `bench/public_measure/`.
-The latest frozen n=4 run gave code-search and route-aware composition 1.00
-Acc@1 and 1.00 MRR@10, versus Sourcegraph at 0.75 and 0.875. The preceding run
-had code-search at 0.00/0.119 and symmetric composition at 0.25/0.438, so the
-same instrument directly measures the ranking and routing improvement.
-Code-graph remained stable across all five warm repetitions per case after its
-ordering fixes. The run made zero model calls, and four cases still do not
-support a general superiority claim.
+The latest frozen balanced n=20 run gave code-search 0.40 Acc@1, 0.85 Acc@10,
+and 0.534 MRR@10. Sourcegraph measured 0.20/0.25/0.225 with three request
+timeouts counted as misses. Code-search won four paired Acc@1 cases and lost
+none, but sixteen ties left the exact two-sided p-value at 0.125. Graph-only
+conceptual localization measured 0.10 Acc@1 and 0.117 MRR@10, confirming that
+conceptual discovery must remain search-primary. The run made zero model calls
+and does not support a general or statistically significant superiority claim.
 
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture
@@ -482,18 +492,20 @@ Voyage; that optional pass adds API-dependent time and cost.
 | **Impact** | "Blast radius of changing UserService?" | Graph traces all dependents with hop-distance risk |
 | **Quality** | "Find dead code" | Graph finds functions with zero inbound calls |
 | **Security** | "Where are the input entry points / auth boundaries?" | Graph queries security-tagged surfaces (auth/crypto/input/sink) |
-| **Security** | "Does user input reach a sensitive sink?" | Graph traces source→sink taint paths |
+| **Security** | "Does user input reach a sensitive sink?" | Graph traces CALLS/READS/WRITES/USAGE reachability; vulnerability-grade variable taint is handed to CodeQL |
 | **Compliance** | "What code satisfies STIG control X?" | Graph maps the control ID to code evidence |
 | **Localization** | "Where would I fix \<issue\>?" | Semantic chunk evidence is aggregated into a file-level ranking |
 
 ### Step 3: Multi-repo
 
-Each verified repo can be activated independently.
+Each verified repo can be activated independently. Bounded cross-project
+discovery can query up to 25 isolated indexes without changing the active
+project; rankings remain per-project and scores are not compared globally.
 
 ```
 /index-repo /path/to/repo-a
 /index-repo /path/to/repo-b
-# Now asking about repo-a's code auto-switches back to repo-a
+# Discover across both, then select one project for exact evidence
 ```
 
 ## Historical component-only measurements
@@ -647,7 +659,10 @@ git worktree add ../myrepo-v2 v2.0.0
 /index-repo ../myrepo-v2
 ```
 
-Each version gets its own isolated index. Use `switch_project` (or just ask about code in a specific version) to query one or the other. The plugin auto-switches based on which project your question targets.
+Each version gets its own isolated index. Use bounded cross-project discovery
+to locate candidates, then select one project for exact follow-up evidence.
+Code-graph's immutable index comparison reports file-content and declaration
+deltas without treating retrieval scores as comparable.
 
 **Use cases:**
 - **Release notes**: Index v1 and v2, search each for "what changed in authentication" — compare results
@@ -657,8 +672,11 @@ Each version gets its own isolated index. Use `switch_project` (or just ask abou
 **Tip for doc generation:** If your docs are well-structured (MDX, Markdown with clear sections), the local Jina model works well — structured text is self-descriptive, like typed code. You don't need Voyage's contextualized embeddings for docs that already have good headings and organization.
 
 **Current limitations:**
-- No cross-project search (can't query both versions in one call)
-- No diff between indexes ("show what changed between v1 and v2")
+- Cross-project results are project-balanced discovery only; scores from
+  separate indexes are not globally comparable
+- Index comparison covers file content and declarations, not a semantic
+  organization-wide diff
+- No organization ACL model or continuously managed indexing fleet
 - Worktrees use disk space for each checked-out version
 
 ## Troubleshooting

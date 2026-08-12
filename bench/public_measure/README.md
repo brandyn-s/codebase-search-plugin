@@ -6,7 +6,7 @@ the Stage-4 release harness.
 
 The measurement answers two narrow questions:
 
-1. On a balanced four-case public LocBench pilot, how do code-search,
+1. On a balanced 20-case public LocBench sample, how do code-search,
    code-graph, their deterministic composition, a local lexical baseline, and
    Sourcegraph public code search rank the oracle files at the same historical
    revision?
@@ -15,8 +15,10 @@ The measurement answers two narrow questions:
    backends? One predeclared repository also receives a one-file incremental
    update.
 
-This is a directional pilot, not a statistically powered market ranking. It
-does not evaluate Cursor, Augment, or Greptile because no callable, revision-
+This is a bounded comparison, not a market ranking. It reports confidence
+intervals and an exact paired test, and it refuses a superiority claim when
+that test does not pass. It does not evaluate Cursor, Augment, or Greptile
+because no callable, revision-
 pinned interface for those products is available in this environment. It also
 does not evaluate answer quality or agent behavior: all arms are direct,
 zero-LLM retrieval calls.
@@ -31,25 +33,27 @@ are accepted only where two public sources agree:
 - the merged GitHub pull request, whose base revision, changed file, and diff
   hunk function header agree with the LocBench label.
 
-The four cases are the first Bug, Feature, Performance, and Security cases in
-the previously recorded 200-case pin. Selection therefore predates this run
-and is not based on observed performance.
+The current sample contains the first five eligible Bug, Feature, Performance,
+and Security cases in the previously recorded 200-case pin. Eligibility
+requires the complete LocBench label to be corroborated by the merged GitHub
+patch before retrieval. One case was excluded before execution because its
+live patch did not expose two labeled function headers. Selection therefore
+predates the run and is not based on observed performance.
 
-The query text is independently available in public GitHub issues:
-[UXARRAY #1116](https://github.com/UXARRAY/uxarray/issues/1116),
-[Chainlit #1359](https://github.com/Chainlit/chainlit/issues/1359),
-[vLLM #3127](https://github.com/vllm-project/vllm/issues/3127), and
-[Prefect #16105](https://github.com/PrefectHQ/prefect/issues/16105). The
-checked-in files do not redistribute the external LocBench Parquet or its
-complete case set.
+The query text is independently available in the public GitHub issues named by
+each checked-in case. The checked-in files do not redistribute the external
+LocBench Parquet or its complete case set.
 
 ## Frozen measurement contract
 
 - File localization is the primary endpoint: Acc@1, Acc@3, Acc@10, and
   MRR@10 over ten distinct ranked files.
+- Acc@1 includes a Wilson 95% interval. The code-search/Sourcegraph Acc@1
+  comparison uses an exact two-sided paired sign test. A point estimate alone
+  cannot authorize a superiority statement.
 - The issue text is the normalized first paragraph recorded by the existing
   200-case pin.
-- Code-search receives the issue text in hybrid mode. The released v0.3.4
+- Code-search receives the issue text in hybrid mode. The released v0.3.5
   adapter extracts explicit symbols, qualified names, and GitHub blob paths,
   widens the candidate pool when those signals are present, reranks each
   lexical/vector arm before fusion, and applies a bounded post-fusion boost.
@@ -96,29 +100,35 @@ the pinned source checkout or calls a model API.
 
 ## Latest measured result
 
-The 2026-08-12 run is summarized in
-[`results/2026-08-12-summary.json`](results/2026-08-12-summary.json). On the
-unchanged directional n=4 pilot, released code-search v0.3.4 and route-aware
-composition each reached Acc@1 1.00 and MRR@10 1.00. Sourcegraph reached 0.75
-and 0.875, code-graph 0.50 and 0.583, and native lexical 0.50 and 0.50. The
-preceding frozen run is retained in
-[`results/2026-08-11-summary.json`](results/2026-08-11-summary.json): its
-code-search arm measured 0.00/0.119 and symmetric composition 0.25/0.438.
-This is a direct before/after result on the same cases, but four cases do not
-establish statistical superiority.
+The balanced n=20 run is summarized in
+[`results/2026-08-12-n20-summary.json`](results/2026-08-12-n20-summary.json).
+Code-search reached Acc@1 0.40 (Wilson 95% interval 0.219–0.613), Acc@10 0.85,
+and MRR@10 0.534. Sourcegraph reached 0.20, 0.25, and 0.225 respectively, with
+three request timeouts counted as misses. The paired Acc@1 result was four
+code-search wins, zero losses, and sixteen ties, but the exact two-sided
+p-value was 0.125. The point estimate favors code-search; statistical
+superiority is not established.
 
-The largest measured checkout contained 2,351 tracked files and 664,120 UTF-8
-lines. In the latest run, cold indexing took 18.82 s for code-search and 18.27 s
-for code-graph; warm p50 query latency was 501 ms and 496 ms respectively. The
-one-file Prefect update took 2.31 s for search and 5.06 s for graph. The
-persisted-index size defect was fixed in code-search v0.3.3 and the regression
-remains covered in v0.3.4.
+Graph-only issue localization reached Acc@1 0.10 and MRR@10 0.117. This is a
+measured routing boundary: conceptual discovery should remain search-primary;
+the graph is for explicit relationships, traces, dependencies, and evidence.
+Route-aware composition reached 0.35/0.461 and therefore did not improve the
+search-primary result on this sample.
 
-Code-graph v0.8.0-redacted.3 canonicalizes truncated seeds, adjacency traversal,
-and equal-score result ordering. All four graph rankings were stable across
-five warm calls in the latest fresh build. The prior cross-build variance is
-retained as historical evidence; a larger cross-platform repeat is still
-needed before claiming universal reproducibility.
+The previous balanced n=4 result remains in
+[`results/2026-08-12-summary.json`](results/2026-08-12-summary.json), and the
+pre-improvement n=4 baseline remains in
+[`results/2026-08-11-summary.json`](results/2026-08-11-summary.json). They are
+historical regression evidence, not the current comparative headline.
+
+Single-repository scale now reaches 2,385,397 UTF-8 lines and 6,842 tracked
+files across different cases. On the 2.39-million-line Moto checkout, cold
+indexing took 24.54 s for search and 13.16 s for graph; warm p50 was 632 ms and
+737 ms; the indexes totaled 566 MB. The largest persisted pair was 1.148 GB on
+the 1.19-million-line Transformers checkout, with search/graph warm p50 of
+675 ms/1.408 s and peak RSS of 1.04 GB/1.72 GB. This demonstrates million-line
+single-repository operation, not giant-monorepo, multi-repository fleet, or
+distributed organizational scale.
 
 The Sourcegraph adapter uses the documented
 [V3 streaming endpoint](https://sourcegraph.com/docs/api/stream-api) and

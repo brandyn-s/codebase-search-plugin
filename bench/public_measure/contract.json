@@ -1,12 +1,17 @@
 {
   "schema_version": 1,
-  "measurement_id": "public-locbench-balanced-n4-scale-v1",
-  "purpose": "directional public retrieval comparison plus real-repository scale and latency",
+  "measurement_id": "public-locbench-balanced-n20-scale-v2",
+  "purpose": "bounded public retrieval comparison plus real-repository scale and latency",
   "selection": {
     "source_pin": "bench/compare/pins/locbench-june-n200.external.json",
     "resolved_pin_sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
-    "rule": "first recorded case for each of Bug Report, Feature Request, Performance Issue, and Security Vulnerability",
-    "count": 4
+    "rule": "first five recorded cases per category whose full LocBench function labels are corroborated by a merged GitHub PR at the same base revision",
+    "count": 20,
+    "per_category": 5,
+    "excluded_case_ids": [
+      "ray-project__ray-26818"
+    ],
+    "exclusion_reason": "The live GitHub patch did not expose two LocBench-labeled function headers, so the case was excluded before retrieval rather than weakening the two-source oracle."
   },
   "query_rule": "normalize CRLF to LF, then take and strip the first blank-line-delimited paragraph",
   "top_k_files": 10,

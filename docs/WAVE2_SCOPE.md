@@ -18,9 +18,14 @@ source coordinates; a single host-owned state machine enforces route, trace,
 evidence, and terminal completion; and schema-v2 manifests bind canonical cases
 and artifact roles explicitly. The latest five-route/two-repetition Stage-4
 successor passed all fixed gates. Plugin 0.4.21 subsequently improved the
-product layer without expanding that harness: query-aware hybrid ranking,
-deterministic graph ordering, and route-aware composition reached 1.00 Acc@1
-and MRR@10 on the unchanged directional n=4 public pilot. The remaining grade
-gap is public retrieval breadth, cross-platform graph reproducibility, and
-larger-repository performance—not more canaries or proof-harness layers. See
+product layer without expanding that harness. The current candidate adds
+persistent per-project SCIP precision, a fail-closed reachability-versus-taint
+contract, bounded cross-project discovery, and immutable graph-index
+comparison. The direct public comparison now covers 20 balanced cases:
+code-search measured 0.40 Acc@1 and 0.534 MRR@10 versus Sourcegraph at 0.20
+and 0.225, but the paired test did not establish superiority (p=0.125).
+Single-repository scale now reaches 2.39 million lines. The remaining grade
+gap is statistically stronger public retrieval evidence, broader relationship
+oracles, very-large-monorepo and multi-repository operation, and resource
+efficiency—not more canaries or proof-harness layers. See
 [`CAPABILITY_STATE.md`](CAPABILITY_STATE.md).

@@ -2,116 +2,150 @@
 
 ## Decision
 
-The product remains **B+ overall** and **A- for verifiable code intelligence**.
-The grade is now better supported, and general localization moves from B- to
-B+, but the four-case public comparison is too small to justify an overall A
-or a claim that this is the strongest general code-search platform.
+The product remains **B+ overall** and **A- for verifiable code
+intelligence**. The evidence is broader and the architecture is more honest,
+but general search superiority is not established. The defensible position is
+still verifiable code intelligence: useful retrieval and structural context
+whose checkout identity, precision tier, exact evidence, route, and terminal
+claims can be checked mechanically.
 
-The supergoal did result in a better product. It first consolidated the
-verification boundary, then exposed and fixed concrete product defects:
-manufactured evidence ranges, route drift, nondeterministic graph ordering,
-weak hybrid ranking for explicit code signals, symmetric fusion that diluted
-the right backend, and stale incremental-index state. The latest sealed
-Stage-4 holdout still provides the behavioral proof, while the latest direct
-public measurement shows that the retrieval changes materially improved
-localization without adding another proof layer.
-
-The defensible product position is **verifiable code intelligence**: useful
-retrieval and structural context whose source identity, exact evidence,
-routing, and terminal claims can be checked mechanically.
+This iteration improved the product, not merely the release proof. It made
+SCIP precision a persistent per-project contract, separated graph reachability
+from variable-level taint assurance, added isolated cross-project discovery
+and immutable index comparison, expanded the public comparison from 4 to 20
+cases, and measured current relationship accuracy and million-line scale.
 
 ## Gradecard
 
 | Capability | Grade | Current evidence and limit |
 |---|---:|---|
-| Verifiable code intelligence | A- | The sealed five-route/two-repetition Stage-4 successor completed 10/10 units with 1.0 evidence precision, recall, adjudication, routing, and routing-contract accuracy; zero unsupported claims, errors, or host canary violations. Manifest SHA-256: `92d290ef23811c00dd80b6545030a2896f54ff897c1b4f27b2db66f6b73121ac`. This is a bounded holdout, not broad field evidence. |
-| General code localization | B+ | On the unchanged public LocBench n=4 pilot, code-search v0.3.4 and route-aware composition each reached Acc@1 and MRR@10 of 1.00, versus Sourcegraph at 0.75 and 0.875. The earlier code-search result was 0.00/0.119 and composition was 0.25/0.438. Four cases are directional only. |
-| Structural retrieval | B+ | Code-graph v0.8.0-redacted.3 made seed truncation, edge traversal, and equal-score ordering deterministic. The latest run was stable across five warm calls per case, with Acc@1 0.50, Acc@3 0.75, and MRR@10 0.583. Broader cross-build and cross-platform repeats remain. |
-| Operational scale | B+ | Measured through 2,351 tracked files and 664,120 UTF-8 lines. On that checkout, cold indexing was 18.82 s for search and 18.27 s for graph; warm p50 query latency was 501 ms and 496 ms; combined index storage was about 578 MB. This is not yet a giant-monorepo result. |
-| Release and evidence integrity | A- | Plugin 0.4.21 pins checksum- and provenance-bound code-search v0.3.4 and code-graph v0.8.0-redacted.3. Contract snapshots, exact installed readiness, typed evidence IDs, component identity, explicit artifact roles, and sealed results are verified. The release path should now be simplified, not expanded. |
+| Verifiable code intelligence | A- | The sealed five-route/two-repetition Stage-4 successor completed 10/10 units with 1.0 evidence precision, recall, adjudication, routing, and routing-contract accuracy; zero unsupported claims, errors, or host canary violations. Backends issue typed immutable evidence IDs, and one host state machine owns route, evidence, trace, and terminal enforcement. This is a bounded holdout, not broad field evidence. |
+| General code localization | B | On the balanced public LocBench n=20 comparison, code-search reached Acc@1 0.40, Acc@10 0.85, and MRR@10 0.534. Sourcegraph reached 0.20/0.25/0.225, with three request failures counted as misses. The paired Acc@1 test favored code-search 4-0 with 16 ties, but p=0.125; superiority is not established. Cursor, Augment, and Greptile remain ungraded. |
+| Relationship graph | B+ | On a current pinned Go fixture, heuristic CALLS achieved scope-aligned precision 0.953, recall 1.000, and F1 0.976. Raw unscoped precision was 0.540, Go IMPORTS lacks a current oracle, and this does not generalize automatically to every language or relationship. SCIP can improve covered calls, but coverage and drift remain explicit. |
+| Graph-only conceptual localization | C | On the n=20 issue-localization comparison, graph-only Acc@1 was 0.10 and MRR@10 was 0.117. This route is not used as the conceptual-discovery primary; code-search remains primary and graph is invoked for explicit relationships, traces, dependencies, and proof. |
+| Operational scale | B+ | Direct measurement reached 2.39 million UTF-8 lines and 6,842 tracked files across separate single-repository cases. This establishes million-line operation, not a very large monorepo, unified multi-repository query plane, or distributed organizational fleet. |
+| Resource efficiency | B- | On the 2.39-million-line Moto checkout, indexes totaled 566 MB and warm p50 was 632 ms search / 737 ms graph. The largest persisted pair was 1.148 GB on Transformers, with 675 ms / 1.408 s warm p50 and 1.04 GB / 1.72 GB peak RSS. The immutable-generation plus writable-compatibility design deliberately duplicates persisted search artifacts; safely removing that cost requires a persistence redesign. |
+| Cross-project operations | B- | Search and graph now support bounded project-balanced discovery across up to 25 isolated indexes without mutating active state. Graph can compare immutable indexes by file content and declaration deltas. Scores remain per-index and non-comparable; there is no organization ACL model, index-to-index semantic score federation, or continuously managed indexing fleet. |
+| Product surface | B- | The plugin offers FIND / UNDERSTAND / PROVE, coherent indexing, cross-project discovery, structural evidence, and deterministic verification. It does not provide Sourcegraph's search language/history/ACL surface, Cursor's editor experience, Augment's multi-source context fabric, or Greptile's complete review-feedback loop. Those are deliberate scope limits, not hidden parity claims. |
+| Release and evidence integrity | A- | Contract snapshots, exact installed readiness, typed evidence IDs, component identity, explicit artifact roles, and sealed results are verified. Broad deterministic CI remains; expensive empirical validation is limited to one bounded holdout when behavior materially changes. |
 
-Cursor, Augment, and Greptile remain **ungraded** because no callable,
-revision-pinned interface was available. Their exclusion is a measurement
-limit, not evidence that they perform worse.
+## Public retrieval comparison
 
-## Public head-to-head
+The checked-in instrument uses the first five eligible cases in each of four
+categories from an independently pinned LocBench n=200 selection. Ground truth
+requires agreement between LocBench and the corresponding merged GitHub pull
+request at the exact historical revision. All arms receive the oracle-blind
+issue text, failures remain misses, and no language model is called.
 
-The checked-in instrument uses the first recorded Bug, Feature, Performance,
-and Security cases from an independently pinned LocBench selection. Ground
-truth requires agreement between LocBench and the corresponding merged GitHub
-pull request. Every arm receives an oracle-blind query at the exact historical
-revision; failures remain misses; no language model is called.
+| Retrieval arm | Acc@1 | 95% interval | Acc@3 | Acc@10 | MRR@10 | Warm p50 | Warm p95 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| code-search candidate | 0.40 | 0.219–0.613 | 0.65 | 0.85 | 0.534 | 608 ms | 2,143 ms |
+| Route-aware composition | 0.35 | 0.181–0.567 | 0.55 | 0.75 | 0.461 | 1,027 ms | 2,754 ms |
+| Sourcegraph public search | 0.20 | 0.081–0.416 | 0.25 | 0.25 | 0.225 | 3,930 ms | 35,906 ms |
+| code-graph candidate | 0.10 | 0.028–0.301 | 0.15 | 0.15 | 0.117 | 368 ms | 1,408 ms |
+| Native lexical | 0.20 | 0.081–0.416 | 0.30 | 0.45 | 0.267 | 128 ms | 447 ms |
 
-| Retrieval arm | Acc@1 | Acc@3 | Acc@10 | MRR@10 | Warm p50 | Warm p95 |
+The code-search/Sourcegraph Acc@1 comparison produced four wins, zero losses,
+and sixteen ties; the exact two-sided paired sign test yielded p=0.125. Three
+Sourcegraph request timeouts are included as misses under the frozen contract.
+Sourcegraph latency includes public network time and is not directly
+comparable with local process latency. The compact record is
+[bench/public_measure/results/2026-08-12-n20-summary.json](../bench/public_measure/results/2026-08-12-n20-summary.json).
+
+The old n=4 result remains regression evidence, but it is no longer the
+comparative headline. Cursor, Augment, and Greptile remain ungraded because no
+callable, revision-pinned interface was available; that absence is a
+measurement limitation, not evidence they perform worse.
+
+## Graph precision and assurance contracts
+
+The default graph tier is `heuristic`: tree-sitter plus static resolution
+heuristics. A caller can request `precision_tier="scip"` and an optional
+`scip_index_path` per project. That choice persists for watcher and incremental
+runs. Index and status responses report requested/effective tier, SCIP digest,
+document/function coverage, drift, heuristic replacements, inserted edges,
+and degradation. Missing or stale SCIP cannot silently present as
+compiler-grade success.
+
+SCIP remains an optional coverage layer, not an automatic organization-wide
+compiler pipeline. The product does not yet operate a Sourcegraph-scale SCIP
+indexing fleet across languages and repositories.
+
+`trace_data_flow` follows CALLS, READS, WRITES, and USAGE graph connectivity.
+It does not model variables, value propagation, sanitizers, source-to-sink
+semantics, or path feasibility. Requests declaring
+`required_assurance="variable_level_taint"` fail closed with a structured
+CodeQL handoff. CodeQL remains the appropriate tool for vulnerability-grade
+taint and path analysis.
+
+## Relationship accuracy
+
+The current pinned Go CALLS measurement used a deterministic `go/ast` oracle
+over five production subsets:
+
+| Operating point | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
-| code-search v0.3.4 | 1.00 | 1.00 | 1.00 | 1.000 | 493 ms | 565 ms |
-| Route-aware composition | 1.00 | 1.00 | 1.00 | 1.000 | 592 ms | 1,017 ms |
-| Sourcegraph public search | 0.75 | 1.00 | 1.00 | 0.875 | 309 ms | 38,028 ms |
-| code-graph v0.8.0-redacted.3 | 0.50 | 0.75 | 0.75 | 0.583 | 67 ms | 497 ms |
-| Native lexical | 0.50 | 0.50 | 0.50 | 0.500 | 54 ms | 120 ms |
+| Scope-aligned heuristic CALLS | 2,869 | 141 | 0 | 0.953 | 1.000 | 0.976 |
+| Raw exact, including oracle-external callers | 2,869 | 2,441 | 0 | 0.540 | 1.000 | 0.702 |
 
-Sourcegraph latency includes public network requests and is not directly
-comparable with local process latency. The latest result file SHA-256 is
-`710a2ac9325435643879bc1be017d435158cd8d3e6d77056f8a29e071e34c862`;
-its embedded result hash is
-`92a230fd173b4d54989c1e43a343f6ae4530b4859bea66be69068c19287bd8a5`.
-The compact record is
-[bench/public_measure/results/2026-08-12-summary.json](../bench/public_measure/results/2026-08-12-summary.json).
+This closes the claim that relationship precision/recall was wholly
+unmeasured, but only for this route, language, fixture, and oracle scope. Go
+IMPORTS remains explicitly unmeasured by the current oracle, and per-subset
+scope-aligned F1 ranges from 0.614 to 1.000. The full report is in the
+code-graph repository under
+`bench/accuracy/baselines/2026-08-12-code-graph-go-report.md`.
 
-This result is a strong directional signal, not a market ranking. The next
-comparative claim requires a preregistered, stratified sample with confidence
-intervals.
-
-## Real-repository scale
+## Scale and resource profile
 
 | Repository | Files | Lines | Search cold | Graph cold | Search index | Graph index | Search warm p50 | Graph warm p50 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| UXARRAY/uxarray | 309 | 210,499 | 3.79 s | 0.57 s | 11.1 MB | 13.2 MB | 466 ms | 46 ms |
-| Chainlit/chainlit | 513 | 71,204 | 4.24 s | 0.83 s | 18.5 MB | 17.9 MB | 422 ms | 63 ms |
-| vllm-project/vllm | 1,263 | 269,055 | 9.72 s | 6.13 s | 104.3 MB | 126.3 MB | 511 ms | 360 ms |
-| PrefectHQ/prefect | 2,351 | 664,120 | 18.82 s | 18.27 s | 307.3 MB | 270.3 MB | 501 ms | 496 ms |
+| getmoto/moto | 2,770 | 2,385,397 | 24.54 s | 13.16 s | 267.9 MB | 298.1 MB | 632 ms | 737 ms |
+| django/django | 6,842 | 1,047,067 | 44.72 s | 36.05 s | 287.6 MB | 386.2 MB | 892 ms | 1,061 ms |
+| huggingface/transformers | 3,167 | 1,192,807 | 64.64 s | 76.88 s | 554.3 MB | 593.5 MB | 675 ms | 1,408 ms |
+| PrefectHQ/prefect | 2,351 | 664,120 | 25.11 s | 17.50 s | 307.8 MB | 306.8 MB | 534 ms | 498 ms |
 
-The Prefect one-file update reported zero added files and one modified file.
-Search refreshed in 2.31 s instead of the 18.82 s cold build (8.13x faster);
-graph updated in 5.06 s instead of 18.27 s (3.61x faster). The persisted-size
-defect was fixed in code-search v0.3.3 and remains covered in v0.3.4.
+The Prefect one-file update took 2.32 s for search and 5.05 s for graph and
+found the injected probe. These figures demonstrate bounded single-repository
+operation and make the storage/latency cost visible. They do not demonstrate
+huge-monorepo, multi-repository, distributed-fleet, or class-leading resource
+efficiency.
 
 ## What changed
 
-- Backends issue typed, immutable `ev:v1` evidence IDs with exact source
-  coordinates and index generation. The model selects evidence rather than
-  manufacturing ranges.
+- Backends issue typed immutable `ev:v1` evidence IDs with exact coordinates
+  and index generation; the model selects evidence instead of manufacturing
+  ranges.
 - One host-owned state machine enforces route capability, evidence reads,
   directed traces, selected IDs, and terminal output.
-- Code-search recognizes explicit identifiers, qualified names, acronyms,
-  camel/snake tokens, and GitHub blob paths; it widens and reranks hybrid
-  candidates without abandoning semantic retrieval.
-- Code-graph canonicalizes seeds before truncation, orders adjacency before
-  traversal, and applies a deterministic tie comparator at the final ranking
-  boundary.
-- Composition preserves route intent: conceptual localization is search
-  primary; explicit relationships, traces, dependencies, and impact are graph
-  primary. The secondary backend fills gaps instead of diluting the primary.
-- Canonical response and manifest contracts distinguish host observations from
-  model declarations and bind artifact roles explicitly.
-- The empirical runner uses a $2.50 per-case ceiling with eight-round-trip and
-  180-second bounds. One bounded successful holdout is retained; further
-  release validation is deterministic unless behavior materially changes.
-- Plugin 0.4.21 binds the attested backend releases and the latest readiness
-  evidence.
+- Code-search isolates cross-project discovery from active project/provider
+  state, caps it at 25 indexes, and interleaves per-project rankings without
+  pretending scores are globally comparable.
+- Code-graph persists a per-project heuristic/SCIP precision choice and makes
+  coverage, drift, and effective tier observable.
+- Code-graph distinguishes reachability from variable-level taint assurance
+  and hands the latter to CodeQL.
+- Code-graph supports project-balanced cross-index localization and immutable
+  file/declaration index comparison.
+- The public comparison expanded from 4 to 20 balanced cases and added Wilson
+  intervals, an exact paired test, category breakdowns, resource-per-line
+  metrics, and explicit claim gating.
+- A current edge-level Go CALLS measurement was generated; unmeasured
+  relationship types remain labeled as such.
 
 ## Next grade increase
 
-Do not add another canary or proof layer. Use the existing harness for:
+Do not add another canary or proof layer. The next bounded work is:
 
-1. A preregistered 40–100 case public comparison stratified by repository,
-   language, and query type, with confidence intervals.
-2. One multi-language repository above one million lines, including peak
-   memory, steady-state storage, and repeated incremental updates.
-3. Cross-platform graph reproducibility and graph-specific relationship
-   accuracy, not only file localization.
-4. Separate measurements for the production Jina and Voyage embedding
-   providers; the current public result uses pinned local MiniLM.
+1. Expand the public comparison only when a preregistered sample is large
+   enough to narrow the Acc@1 interval and reduce live-comparator failures.
+2. Add one independent current oracle for a non-Go language and one additional
+   relationship type; prioritize IMPORTS and dynamic-dispatch-heavy CALLS.
+3. Profile the immutable-generation/writable-mirror storage design and choose
+   a safe copy-on-write or direct-generation reader architecture before trying
+   to remove duplication.
+4. Measure one genuinely large monorepo and one multi-repository workflow,
+   including steady-state storage, repeated incremental updates, and failure
+   recovery.
 
-Those results can raise the overall and scale grades. More release-harness
-machinery cannot.
+Product-surface expansion into a general developer platform, editor, review
+bot, or organization indexing service remains outside the present thesis.

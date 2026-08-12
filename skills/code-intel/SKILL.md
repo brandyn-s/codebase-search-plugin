@@ -65,6 +65,9 @@ conceptual implementations, similar code, or files relevant to an issue.
   qualified name is available; never convert a short or merged chunk name into
   a graph identity.
 - Issue-to-file localization: `mcp__code-search__code_localize`.
+- Multi-project discovery: `mcp__code-search__search_all_projects`. Treat its
+  ranking as project-balanced discovery only. Scores from different indexes
+  are not comparable; choose one returned project before gathering proof.
 
 Return the smallest sufficient set of backend-issued evidence. The backends
 own each immutable evidence ID and its exact source coordinates; select IDs
@@ -122,6 +125,15 @@ resolver source, confidence tier/band, and runtime-observation fields. A
 runtime-confirmed edge corroborates a static relationship; it does not erase
 coverage gaps elsewhere in the graph.
 
+Read `index_status` before presenting a consequential relationship as
+verified. The default `heuristic` tier is tree-sitter plus static resolution,
+not compiler-grade. A requested `scip` tier strengthens only covered,
+non-drifted documents; preserve the effective tier, coverage, and drift in the
+answer. For cross-project structural discovery, use
+`localize_across_projects` only to choose a project. Use
+`compare_project_indexes` for deterministic file-content and declaration
+deltas between immutable indexes; it is not semantic score federation.
+
 ## PROVE
 
 Use when the user asks for a security/compliance assertion, exhaustive
@@ -130,6 +142,13 @@ source-to-sink paths, policy/control evidence, or whether all relevant paths
 satisfy a property.
 
 A PROVE answer is a deterministic proof workflow, not ordinary retrieval:
+
+`trace_data_flow` proves only CALLS/READS/WRITES/USAGE connectivity. It does
+not model variables, value propagation, sanitizers, source-to-sink taint, or
+path feasibility. When the requested assurance is variable-level taint, call
+it with `required_assurance="variable_level_taint"` and follow the structured
+handoff with CodeQL. If the external analysis cannot be run or is incomplete,
+the proof remains `unresolved`; never relabel graph reachability as taint.
 
 1. Pass the coherence gate below before gathering mixed evidence.
 2. Create one canonical claim record with a stable `claim:v1` identity.

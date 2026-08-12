@@ -14,9 +14,14 @@ Index a repository for both code-search (semantic embeddings) and code-graph (AS
 
 ## Usage
 
-`/index-repo /path/to/my-repo`
+`/index-repo /path/to/my-repo [--graph-precision heuristic|scip] [--scip-index /path/to/index.scip]`
 
 If no path is provided, ask the user which repo to index.
+
+Default `<graph-precision>` to `heuristic`. Select `scip` only when the user
+requests it or supplies a SCIP index; do not treat the mere presence of an
+`index.scip` file as consent. Resolve a supplied SCIP path to an absolute
+regular file. `--scip-index` is invalid with the heuristic tier.
 
 ## Steps
 
@@ -42,7 +47,8 @@ If no path is provided, ask the user which repo to index.
      compatibility snapshot. A missing live schema or any fingerprint
      mismatch is an **incompatible component** result.
    - After that exact match, require the live code-graph `index_repository`
-     schema to expose a boolean `skip_report` property.
+     schema to expose boolean `skip_report`, string/enum `precision_tier`, and
+     optional string `scip_index_path` properties.
    - Also require the live code-search `get_index_status` schema to expose an
      optional string `project_path` property. It must not appear in the
      schema's `required` array. This binds final semantic verification to the
@@ -121,7 +127,12 @@ If no path is provided, ask the user which repo to index.
 
 5. Run **code-graph** indexing without mutating the checkout:
    ```
-   mcp__code-graph__index_repository(repo_path=<resolved-root>, skip_report=true)
+   mcp__code-graph__index_repository(
+     repo_path=<resolved-root>,
+     skip_report=true,
+     precision_tier=<graph-precision>,
+     scip_index_path=<absolute-scip-path-if-supplied>
+   )
    ```
    For Nix-based repos (presence of `flake.nix`, `Cargo.nix`), use `mode: "full"` — fast mode returns 0 results on Nix repos.
    Require that MCP `isError` is absent or false, the payload
@@ -152,6 +163,19 @@ If no path is provided, ask the user which repo to index.
    `index_identity` object with `schema_version: 1` and these fields:
    `repository_id`, `checkout_id`, `source_revision`, `dirty_fingerprint`,
    `index_generation`, and `captured_at`.
+
+   Both graph completion and status responses must also contain
+   `graph_precision` with `requested_tier == <graph-precision>` and an
+   `effective_tier` of `heuristic` or `scip`:
+
+   - For requested `heuristic`, require effective `heuristic`.
+   - For requested `scip`, require effective `scip`, status `ready`, the
+     expected SCIP path/digest, nonzero covered documents/functions, and zero
+     drift unless the user explicitly accepts partial coverage. Missing,
+     invalid, or drifted SCIP is a visible **partial index**, even when the
+     heuristic graph remains usable.
+   - Preserve coverage, drift, heuristic replacements, and SCIP insertions in
+     the final report. Never call a degraded heuristic fallback compiler-grade.
 
    First compare the graph completion identity with the final graph identity.
    `repository_id`, `checkout_id`, `source_revision`, `dirty_fingerprint`, and `index_generation`
@@ -184,7 +208,8 @@ If no path is provided, ask the user which repo to index.
    Require an explicit success response. A switch failure means indexing
    succeeded but the repository is not ready for immediate queries.
 
-8. Summarize semantic chunks/files/time, graph nodes/edges/time, the shared
+8. Summarize semantic chunks/files/time, graph nodes/edges/time, requested and
+   effective graph precision with SCIP coverage/drift, the shared
    `index_generation`, and the active project. Confirm readiness only when
    every prior gate succeeded. Otherwise use the phrase **partial index** and
    state the failed gate and safe retry action.
@@ -204,6 +229,10 @@ If no path is provided, ask the user which repo to index.
 - **code-graph** performs tree-sitter AST extraction locally (~30-60s). When
   `VOYAGE_API_KEY` is configured, its optional natural-language graph search
   also sends graph-node text to Voyage for embedding.
+  - The normal graph is the `heuristic` tier. The optional `scip` tier replaces
+    covered heuristic CALLS with compiler-derived relationships and persists
+    per project for watcher/incremental runs. It is not an automatic
+    organization-wide SCIP indexing service.
 - Both support incremental indexing — re-running only processes changed files.
 - After indexing, use natural language queries. The code-explore skill handles routing.
 
@@ -224,6 +253,8 @@ Runs incremental indexing on both tools. Only changed files are reprocessed.
 ## Success Criteria
 
 - Installed code-graph schema supports `skip_report`, and graph indexing used `skip_report=true`
+- Installed code-graph schema supports explicit persistent graph precision;
+  requested/effective tier and SCIP coverage/drift were verified
 - `get_indexing_progress` explicitly returned `completed` before graph indexing began
 - Both code-search and code-graph indexes verified without errors
 - Both engines reported the same complete `index_identity` envelope

@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "measurement_id": "public-locbench-balanced-n20-scale-v2",
+  "measured_at": "2026-08-12T07:37:26.088397Z",
+  "scope": "balanced public file-localization comparison; no general platform or statistical superiority claim",
+  "language_model_calls": 0,
+  "cases": 20,
+  "cases_per_category": 5,
+  "categories": [
+    "Bug Report",
+    "Feature Request",
+    "Performance Issue",
+    "Security Vulnerability"
+  ],
+  "selection": {
+    "source": "pre-existing LocBench n=200 pin",
+    "rule": "first five pre-recorded, two-source-corroborated cases per category",
+    "excluded_before_retrieval": [
+      "ray-project__ray-26818"
+    ],
+    "exclusion_reason": "The live GitHub patch did not expose two LocBench-labeled function headers, so the two-source oracle could not be retained."
+  },
+  "result": {
+    "file_sha256": "b90107ab9c2b390f5b16e1ad4f9294e8ea9ad7fee13527431a9b95da55fe4bc1",
+    "embedded_result_sha256": "3eacce56a2a3fb7fa254f3c5e063404a560fcb08866cb27e8c4e7621eda5f900",
+    "aggregate": {
+      "code-search": {
+        "file_acc_at_1": 0.4,
+        "file_acc_at_1_wilson_95": [0.21880653237281705, 0.6134184992377469],
+        "file_acc_at_3": 0.65,
+        "file_acc_at_10": 0.85,
+        "file_mrr_at_10": 0.5344246031746032,
+        "latency_p50_ms": 607.993916,
+        "latency_p95_ms": 2143.402584
+      },
+      "composed": {
+        "file_acc_at_1": 0.35,
+        "file_acc_at_1_wilson_95": [0.18119182410108206, 0.5671457233147638],
+        "file_acc_at_3": 0.55,
+        "file_acc_at_10": 0.75,
+        "file_mrr_at_10": 0.46061507936507934,
+        "latency_p50_ms": 1027.439625,
+        "latency_p95_ms": 2754.142792
+      },
+      "sourcegraph": {
+        "file_acc_at_1": 0.2,
+        "file_acc_at_1_wilson_95": [0.08065766257979806, 0.41601743225189364],
+        "file_acc_at_3": 0.25,
+        "file_acc_at_10": 0.25,
+        "file_mrr_at_10": 0.225,
+        "latency_p50_ms": 3930.372459,
+        "latency_p95_ms": 35906.455542,
+        "request_failures_counted_as_misses": 3
+      },
+      "code-graph": {
+        "file_acc_at_1": 0.1,
+        "file_acc_at_1_wilson_95": [0.027866481213768224, 0.3010336452284873],
+        "file_acc_at_3": 0.15,
+        "file_acc_at_10": 0.15,
+        "file_mrr_at_10": 0.11666666666666667,
+        "latency_p50_ms": 367.884084,
+        "latency_p95_ms": 1408.087708
+      },
+      "native": {
+        "file_acc_at_1": 0.2,
+        "file_acc_at_1_wilson_95": [0.08065766257979806, 0.41601743225189364],
+        "file_acc_at_3": 0.3,
+        "file_acc_at_10": 0.45,
+        "file_mrr_at_10": 0.26749999999999996,
+        "latency_p50_ms": 127.715584,
+        "latency_p95_ms": 446.592209
+      }
+    },
+    "paired_code_search_vs_sourcegraph_acc_at_1": {
+      "wins": 4,
+      "losses": 0,
+      "ties": 16,
+      "discordant_pairs": 4,
+      "test": "exact two-sided paired sign",
+      "p_value": 0.125,
+      "significant_at_0_05": false
+    }
+  },
+  "scale": {
+    "largest_line_count": {
+      "repository": "getmoto/moto",
+      "revision": "c9536b117e39fef41b9ccb5e07463eecda15ba2a",
+      "tracked_files": 2770,
+      "utf8_text_lines": 2385397,
+      "search_cold_seconds": 24.544104125,
+      "graph_cold_seconds": 13.15634125,
+      "search_peak_rss_bytes": 997654528,
+      "graph_peak_rss_bytes": 1090486272,
+      "search_index_bytes": 267871469,
+      "graph_index_bytes": 298139824,
+      "combined_index_bytes": 566011293,
+      "search_warm_p50_ms": 632.1855,
+      "graph_warm_p50_ms": 736.981916
+    },
+    "largest_file_count": {
+      "repository": "django/django",
+      "revision": "b9aa3239ab1328c915684d89b87a49459cabd30b",
+      "tracked_files": 6842,
+      "utf8_text_lines": 1047067
+    },
+    "largest_index": {
+      "repository": "huggingface/transformers",
+      "revision": "6fc44656b43f1de939a1e62dd59c45d1fec9f1aa",
+      "tracked_files": 3167,
+      "utf8_text_lines": 1192807,
+      "search_index_bytes": 554326749,
+      "graph_index_bytes": 593453232,
+      "combined_index_bytes": 1147779981,
+      "search_warm_p50_ms": 674.794916,
+      "graph_warm_p50_ms": 1408.087708,
+      "search_peak_rss_bytes": 1036926976,
+      "graph_peak_rss_bytes": 1717354496
+    }
+  },
+  "incremental": {
+    "repository": "PrefectHQ/prefect",
+    "modified_files": 1,
+    "added_files": 0,
+    "search_seconds": 2.316990958,
+    "graph_seconds": 5.048670959,
+    "probe_found": true
+  },
+  "interpretation": {
+    "general_platform_superiority_claim_allowed": false,
+    "narrow_acc_at_1_superiority_over_sourcegraph_allowed": false,
+    "graph_conceptual_localization_is_a_supported_primary_route": false,
+    "million_line_single_repository_scale_demonstrated": true,
+    "very_large_monorepo_or_distributed_scale_demonstrated": false
+  },
+  "provenance": {
+    "locbench_parquet_sha256": "8df0833c2c1276c5837aab923d489ab97d7654529abe759d0f59242c4978a662",
+    "selection_pin_sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
+    "contract_sha256": "33219444ae6e76a257d83e451e84513b36b93296032673f137dcd0a9258e76b7",
+    "cases_sha256": "cbd5be8a59247214c21473c8aa4f8d36ba31738e338e717ded6548ef67443a6b",
+    "oracle_sha256": "2940906bca5f06115eb533bbfcd213b02a3478b16882b29f8c4aafd7e2beeeb5",
+    "plugin_revision": "e8a8f408da4e47455d524bda7cb32c298223bf3a",
+    "code_search_revision": "897ba3d4bbafeeddb08fd6379566ae4d3b0c07c5",
+    "code_search_server_sha256": "cce27d166007b7d80a6b1fa9f078a06f062663b5c2482ebb38da42996b364a81",
+    "code_graph_revision": "81c26e02aa71e27ba414b3232a7d9dd9e2f020e2",
+    "code_graph_server_sha256": "a369983fb284a9e75461576b506fc25b89a0fb915ed0863cac08b459cc624b18",
+    "local_model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "unavailable_competitors": [
+    "Cursor",
+    "Augment",
+    "Greptile"
+  ]
+}

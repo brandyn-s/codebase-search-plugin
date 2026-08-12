@@ -24,6 +24,7 @@ Route code exploration queries to the narrowest tool that can answer them.
 | `mcp__code-search__search_code` | Find code by meaning/keywords |
 | `mcp__code-search__find_similar_code` | Find similar chunks to a result |
 | `mcp__code-search__code_localize` | Rank files for a natural-language issue |
+| `mcp__code-search__search_all_projects` | Bounded project-balanced discovery across isolated indexes; scores remain per-project |
 | `mcp__code-search__get_index_status` | Check if repo is indexed |
 | `mcp__code-search__switch_project` | Change active project context |
 
@@ -37,13 +38,15 @@ Route code exploration queries to the narrowest tool that can answer them.
 | `mcp__code-graph__get_code_snippet` | Get source + caller/callee metadata |
 | `mcp__code-graph__get_architecture` | Codebase overview (routes, hotspots, layers) |
 | `mcp__code-graph__detect_changes` | Blast radius of uncommitted changes |
+| `mcp__code-graph__localize_across_projects` | Bounded structural discovery across isolated project indexes |
+| `mcp__code-graph__compare_project_indexes` | File-content and declaration delta between two immutable indexes |
 
 ### code-graph (security & localization — redacted extensions)
 
 | Tool | Use for |
 |------|---------|
-| `mcp__code-graph__query_security_surfaces` | Enumerate security-tagged surfaces by `role` (`auth_boundary`, `input_entry_point`, `sensitive_sink`, `crypto_operation`, `privilege_escalation`, `session_management`, `audit_logging`, `sanitizer`). Pass `mode="tainted_paths"` to return source→sink taint paths instead of a flat surface list |
-| `mcp__code-graph__trace_data_flow` | Trace propagation from a `source` function through the graph (env-var aware) — "where does this sensitive data end up?" |
+| `mcp__code-graph__query_security_surfaces` | Enumerate security-tagged surfaces by `role` (`auth_boundary`, `input_entry_point`, `sensitive_sink`, `crypto_operation`, `privilege_escalation`, `session_management`, `audit_logging`, `sanitizer`). Returned paths are graph connectivity, not variable-level taint proof |
+| `mcp__code-graph__trace_data_flow` | Trace CALLS/READS/WRITES/USAGE reachability. Use `required_assurance="variable_level_taint"` to fail closed with a CodeQL handoff |
 | `mcp__code-graph__query_stig_evidence` | Map a STIG/NIST `control_id` to the code that provides evidence for it |
 Use code-search's `code_localize` for natural-language issue localization.
 Code-graph's structural localizer remains available for explicitly structural
@@ -59,7 +62,7 @@ Before routing, verify the target repo is indexed and active:
    - If `current_project` matches the query context: proceed.
 2. **Read and retain both status envelopes before retrieval**:
    - `mcp__code-search__get_index_status` — if empty or stale, suggest running `/index-repo`
-   - `mcp__code-graph__index_status` — if not found or stale, suggest running `/index-repo`
+   - `mcp__code-graph__index_status` — if not found or stale, suggest running `/index-repo`; retain requested/effective graph precision and SCIP coverage/drift fields
 3. **Verify cross-engine identity**. Each status must contain
    `index_identity.schema_version: 1` plus `repository_id`, `checkout_id`,
    `source_revision`, `dirty_fingerprint`, and `index_generation`.
@@ -112,8 +115,8 @@ search as corroboration unless the question is graph, mixed, or security work.
 | "What depends on X?" | Structural | graph: query_graph IMPORTS inbound |
 | "Understand this codebase" | Overview | graph: get_architecture, then code-search |
 | "Where are the auth/input/crypto surfaces?" | Security | graph: query_security_surfaces (by `role`) |
-| "Does any user input reach a sink?" | Security | graph: query_security_surfaces mode="tainted_paths" |
-| "Trace how X (secret/PII/token) flows" | Security | graph: trace_data_flow(source=X) |
+| "Does graph connectivity link input to a sink?" | Security | graph: trace_data_flow(source=X, required_assurance="graph_reachability") |
+| "Can attacker-controlled input taint this sink?" | Security | graph: trace_data_flow(source=X, required_assurance="variable_level_taint"), then CodeQL |
 | "What code satisfies STIG/NIST <control>?" | Compliance | graph: query_stig_evidence(control_id=...) |
 | "Where's the code I'd change for <issue>?" | Localization | code-search: code_localize (issue text) |
 
@@ -129,6 +132,18 @@ relationships and pin source lines without repeating graph discovery. Resolve
 every named relationship endpoint before asserting the edge. Cite the direct
 call site as edge evidence and minimal source evidence for every candidate-named
 endpoint. One location may satisfy both the edge and endpoint roles.
+
+Graph precision is explicit. The normal tier is tree-sitter plus heuristic
+resolution, not compiler-grade. When a consequential answer depends on a
+CALLS edge, report the effective tier from `index_status`. A requested SCIP
+tier strengthens only covered, non-drifted documents. Do not describe an
+uncovered heuristic edge as SCIP-backed.
+
+`trace_data_flow` is graph reachability, not taint analysis. It does not model
+variables, values, sanitizers, path feasibility, or source-to-sink taint
+semantics. For vulnerability-grade taint, require the fail-closed external
+analyzer response and use CodeQL; if CodeQL is unavailable, mark the taint
+claim unresolved rather than relabeling connectivity as taint.
 
 ### Step 3: Chain only when the question needs the other tool
 
@@ -198,10 +213,15 @@ Detailed Cypher patterns and pitfalls are in `references/graph-queries.md`.
 3. Structural -> graph: trace auth call chain
 4. Answer with combined narrative
 
-**"Where are the input entry points, and does any reach a sensitive sink?"**
-1. Security -> graph: `query_security_surfaces(role="input_entry_point", mode="tainted_paths")`
-2. Chain -> graph: `trace_data_flow(source=<entry function>)` to follow propagation
-3. Answer with the surfaces, any source→sink paths, and file:line for each
+**"Where are the input entry points, and does graph connectivity reach a sensitive sink?"**
+1. Security -> graph: `query_security_surfaces(role="input_entry_point")`
+2. Chain -> graph: `trace_data_flow(source=<entry function>, required_assurance="graph_reachability")`
+3. Answer with the surfaces and reachable paths, explicitly labeled as graph reachability
+
+**"Can attacker-controlled input taint this sink?"**
+1. Security -> graph: `trace_data_flow(source=<entry function>, required_assurance="variable_level_taint")`
+2. Follow the structured handoff with CodeQL variable-level taint analysis
+3. If the external analyzer is unavailable or incomplete, answer `unresolved`
 
 ## Success Criteria
 

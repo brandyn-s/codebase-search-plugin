@@ -10,7 +10,7 @@ published component and has been captured from `tools/list`.
 The current BOM's integrated readiness status is `ready`. Its
 `tested_capabilities` section declares complete version-1 `index_identity`
 outputs, semantic `index_ready`, graph `status: ready`, and the optional
-boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.3`. The
+boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.4`. The
 committed schema snapshots cover MCP input surfaces; they do not by themselves
 prove output behavior. `/index-repo` revalidates every live input-schema
 fingerprint before either index starts.
@@ -46,7 +46,7 @@ server for a blocked BOM unless a reviewer explicitly supplies
 ## Code-search release promotion
 
 The production BOM pins code-search release
-[`v0.3.4`](https://github.com/redacted-org/code-search/releases/tag/v0.3.4),
+[`v0.3.5`](https://github.com/redacted-org/code-search/releases/tag/v0.3.5),
 its exact source commit, wheel, and offline attestation bundle. Contract
 capture and validation support future GitHub Release wheel candidates without
 weakening readiness: capture preserves the complete release descriptor,

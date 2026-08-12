@@ -7,9 +7,9 @@
   },
   "schema_version": 1,
   "source": {
-    "install_descriptor_sha256": "f9cd666bd2b40fab3cc6fac42cd28c536169606d00c43bf1dacdd5a24e8ac495",
+    "install_descriptor_sha256": "ef8250e8021294d2ac55125e79adc99f261df60f16b8151842f9725e76a1224f",
     "kind": "github-release",
-    "version": "v0.3.4"
+    "version": "v0.3.5"
   },
   "tested_capabilities": {
     "outputs": {
@@ -243,9 +243,29 @@
             "title": "K",
             "type": "integer"
           },
+          "projects": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Projects"
+          },
           "query": {
             "title": "Query",
             "type": "string"
+          },
+          "top_k": {
+            "default": 25,
+            "title": "Top K",
+            "type": "integer"
           }
         },
         "required": [
@@ -254,7 +274,7 @@
         "title": "search_all_projectsArguments",
         "type": "object"
       },
-      "input_schema_sha256": "745b49bb16454a03e2e99789d324923ad351d4d19cd6561340cbb1656f8c93b1"
+      "input_schema_sha256": "bbe8862b1d8fd998390f7c121e88247c1eccc479e97c1e6835999ec415bdf637"
     },
     "search_code": {
       "input_schema": {
