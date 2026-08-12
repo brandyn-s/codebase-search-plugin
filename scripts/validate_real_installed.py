@@ -1015,11 +1015,12 @@ def install_typescript_scip(
     extracted = destination / "typescript-node-extracted"
     extracted.mkdir()
     with tarfile.open(archive_path, "r:xz") as bundle:
-        if any(
-            member.issym() or member.islnk() or member.isdev()
-            for member in bundle.getmembers()
-        ):
+        if any(member.islnk() or member.isdev() for member in bundle.getmembers()):
             raise RealInstallError("Node archive contains an unsafe member")
+        # Official Node archives contain relative symlinks such as bin/npm.
+        # Python's data filter accepts only links that resolve beneath the
+        # extraction destination, so retain those while rejecting hard links
+        # and device members explicitly above.
         bundle.extractall(extracted, filter="data")
     node_matches = [
         path

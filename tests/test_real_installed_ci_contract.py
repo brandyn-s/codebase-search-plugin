@@ -1095,6 +1095,10 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 entry.mode = mode
                 entry.size = len(content)
                 archive.addfile(entry, io.BytesIO(content))
+            npm_link = tarfile.TarInfo("node-v22.23.2-linux-x64/bin/npm")
+            npm_link.type = tarfile.SYMTYPE
+            npm_link.linkname = "../lib/node_modules/npm/bin/npm-cli.js"
+            archive.addfile(npm_link)
         archive_bytes = archive_buffer.getvalue()
         generator_bytes = b"// verified scip-typescript entrypoint\n"
         asset_name = "node-v22.23.2-linux-x64.tar.xz"
