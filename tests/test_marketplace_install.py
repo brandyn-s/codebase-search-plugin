@@ -15,7 +15,7 @@ class MarketplaceInstallTests(unittest.TestCase):
             (ROOT / ".claude-plugin" / "plugin.json").read_text()
         )
 
-        self.assertEqual(plugin["version"], "0.4.25")
+        self.assertEqual(plugin["version"], "0.4.26")
         self.assertEqual(marketplace["name"], "redacted-code-intelligence")
         self.assertEqual(len(marketplace["plugins"]), 1)
         entry = marketplace["plugins"][0]
@@ -41,6 +41,26 @@ class MarketplaceInstallTests(unittest.TestCase):
         self.assertNotIn("/install-plugin", readme)
         self.assertNotIn("/install-plugin", shell_installer)
         self.assertNotIn("/install-plugin", powershell_installer)
+
+    def test_upgrade_refreshes_native_components_before_plugin_cache(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        upgrade = readme.split("## Upgrade", 1)[1].split(
+            "## Current measured state", 1
+        )[0]
+
+        marketplace_update = (
+            "claude plugin marketplace update redacted-code-intelligence"
+        )
+        native_install = 'bash "$PLUGIN_DIR/install.sh"'
+        plugin_update = (
+            "claude plugin update "
+            "codebase-search@redacted-code-intelligence --scope user"
+        )
+        for command in (marketplace_update, native_install, plugin_update):
+            self.assertIn(command, upgrade)
+        self.assertLess(upgrade.index(marketplace_update), upgrade.index(native_install))
+        self.assertLess(upgrade.index(native_install), upgrade.index(plugin_update))
+        self.assertIn("Restart Claude Code", upgrade)
 
 
 if __name__ == "__main__":

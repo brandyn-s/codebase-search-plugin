@@ -1,6 +1,6 @@
 {
   "name": "codebase-search",
-  "version": "0.4.25",
+  "version": "0.4.26",
   "description": "Verifiable code intelligence over an exact checkout: semantic discovery, structural understanding, and deterministic evidence-backed proofs.",
   "author": {
     "name": "redacted Security"

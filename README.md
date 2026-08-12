@@ -74,6 +74,27 @@ The install script:
 > CI must reproduce readiness from the exact pins. See
 > `compatibility/README.md`.
 
+## Upgrade
+
+The native MCP binaries and Python environment are installed runtime state;
+they are intentionally excluded from Git and are not refreshed by
+`claude plugin update` alone. Upgrade in this order so the plugin cache cannot
+carry a schema-compatible but older binary forward:
+
+```bash
+claude plugin marketplace update redacted-code-intelligence
+PLUGIN_DIR="$(claude plugin marketplace list --json | python3 -c \
+  'import json,sys; print(next(x["installLocation"] for x in json.load(sys.stdin) if x["name"] == "redacted-code-intelligence"))')"
+bash "$PLUGIN_DIR/install.sh"
+claude plugin update codebase-search@redacted-code-intelligence --scope user
+```
+
+On Windows, run `install.ps1` from the refreshed marketplace checkout instead
+of `install.sh`. The installer stages, verifies, and atomically promotes the
+exact BOM components. Restart Claude Code after the plugin update so existing
+sessions do not retain the prior MCP processes, then confirm both plugin MCPs
+are connected with `claude mcp list`.
+
 ## Current measured state
 
 The current internal grade is **A- overall** and **A for verifiable code
@@ -339,7 +360,7 @@ release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
 code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
 and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.25 pins code-search v0.3.5 and
+a search- or graph-primary cascade. Plugin 0.4.26 pins code-search v0.3.5 and
 code-graph v0.8.0-redacted.7 and adds persistent
 per-project SCIP precision, an explicit reachability-versus-taint contract,
 isolated cross-project discovery, immutable graph-index comparison, automated
