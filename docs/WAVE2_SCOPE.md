@@ -18,7 +18,7 @@ source coordinates; a single host-owned state machine enforces route, trace,
 evidence, and terminal completion; and schema-v2 manifests bind canonical cases
 and artifact roles explicitly. The latest five-route/two-repetition Stage-4
 successor passed all fixed gates. Plugin 0.4.21 subsequently improved the
-product layer without expanding that harness. Plugin 0.4.26 consolidates
+product layer without expanding that harness. Plugin 0.4.27 consolidates
 persistent per-project SCIP precision, a fail-closed reachability-versus-taint
 contract, bounded cross-project discovery, immutable graph-index comparison,
 automatic pinned Go and TypeScript SCIP preparation, independent Go SSA/RTA and

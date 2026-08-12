@@ -22,21 +22,21 @@ structural indexing workflow.
 # 1. Add the GitHub-backed marketplace
 claude plugin marketplace add redacted-org/codebase-search-plugin
 
-# 2. Resolve its durable checkout and install both MCP servers (Linux/Mac)
-PLUGIN_DIR="$(claude plugin marketplace list --json | python3 -c \
-  'import json,sys; print(next(x["installLocation"] for x in json.load(sys.stdin) if x["name"] == "redacted-code-intelligence"))')"
+# 2. Install the namespaced plugin for your user
+claude plugin install codebase-search@redacted-code-intelligence --scope user
+
+# 3. Resolve that exact installed version and install both MCP servers (Linux/Mac)
+PLUGIN_DIR="$(claude plugin list --json | python3 -c \
+  'import json,sys; print(next(x["installPath"] for x in json.load(sys.stdin) if x["id"] == "codebase-search@redacted-code-intelligence" and x["scope"] == "user"))')"
 bash "$PLUGIN_DIR/install.sh"
 
-# 3. Set your embedding provider
+# 4. Set your embedding provider
 export EMBEDDING_PROVIDER="voyage"          # Voyage 4 Large (cloud)
 export VOYAGE_API_KEY="your-key"
 # OR, keep both indexes on-device
 unset VOYAGE_API_KEY
 export EMBEDDING_PROVIDER="jina"            # local code-search embeddings
 export CODE_GRAPH_SKIP_EMBEDDINGS=1         # disable graph cloud embeddings
-
-# 4. Install the namespaced plugin for your user
-claude plugin install codebase-search@redacted-code-intelligence --scope user
 
 # 5. Build and verify both indexes
 /index-repo /path/to/your/repo
@@ -83,17 +83,19 @@ carry a schema-compatible but older binary forward:
 
 ```bash
 claude plugin marketplace update redacted-code-intelligence
-PLUGIN_DIR="$(claude plugin marketplace list --json | python3 -c \
-  'import json,sys; print(next(x["installLocation"] for x in json.load(sys.stdin) if x["name"] == "redacted-code-intelligence"))')"
-bash "$PLUGIN_DIR/install.sh"
 claude plugin update codebase-search@redacted-code-intelligence --scope user
+PLUGIN_DIR="$(claude plugin list --json | python3 -c \
+  'import json,sys; print(next(x["installPath"] for x in json.load(sys.stdin) if x["id"] == "codebase-search@redacted-code-intelligence" and x["scope"] == "user"))')"
+bash "$PLUGIN_DIR/install.sh"
 ```
 
-On Windows, run `install.ps1` from the refreshed marketplace checkout instead
-of `install.sh`. The installer stages, verifies, and atomically promotes the
-exact BOM components. Restart Claude Code after the plugin update so existing
-sessions do not retain the prior MCP processes, then confirm both plugin MCPs
-are connected with `claude mcp list`.
+On Windows, run `install.ps1` from the resolved installed plugin path instead
+of `install.sh`. Installing inside the exact cache version keeps Python console
+script shebangs and both MCP launchers self-contained; do not copy an ignored
+marketplace `bin/` or `.venv/` into the cache. The installer stages, verifies,
+and atomically promotes the exact BOM components. Restart Claude Code after the
+plugin update so existing sessions do not retain the prior MCP processes, then
+confirm both plugin MCPs are connected with `claude mcp list`.
 
 ## Current measured state
 
@@ -360,7 +362,7 @@ release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
 code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
 and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.26 pins code-search v0.3.5 and
+a search- or graph-primary cascade. Plugin 0.4.27 pins code-search v0.3.5 and
 code-graph v0.8.0-redacted.7 and adds persistent
 per-project SCIP precision, an explicit reachability-versus-taint contract,
 isolated cross-project discovery, immutable graph-index comparison, automated
