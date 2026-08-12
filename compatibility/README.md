@@ -10,7 +10,7 @@ published component and has been captured from `tools/list`.
 The current BOM's integrated readiness status is `ready`. Its
 `tested_capabilities` section declares complete version-1 `index_identity`
 outputs, semantic `index_ready`, graph `status: ready`, and the optional
-boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.5`. The
+boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.6`. The
 committed schema snapshots cover MCP input surfaces; they do not by themselves
 prove output behavior. `/index-repo` revalidates every live input-schema
 fingerprint before either index starts.
@@ -39,23 +39,34 @@ directory. The validator requires that live override to report
 `promotion-candidate` record. That trusted, run-specific `ready-validation`
 artifact is the authoritative runtime check for the revision.
 
-## Optional Go compiler precision
+## Optional Go and TypeScript compiler precision
 
 `precision_generators.go-scip` pins the public `scip-code/scip-go` release,
 source revision, reported version, and per-platform archive and extracted
-binary digests. Interactive install supports macOS arm64 and Linux amd64/arm64;
-the trusted Linux post-merge job independently downloads and verifies its
-matching pin. Windows, macOS amd64, and other platforms retain heuristic and
-user-supplied SCIP modes rather than selecting an unpinned generator.
+binary digests. `precision_generators.typescript-scip` pins the official
+`@sourcegraph/scip-typescript` package, npm integrity value, lockfile, and an
+isolated Node 22 runtime with per-platform archive and executable digests.
+Interactive install supports Go on macOS arm64 and Linux amd64/arm64, and
+TypeScript on macOS, Linux, and Windows amd64. Unsupported platforms retain
+heuristic and user-supplied SCIP modes rather than selecting an unpinned
+generator.
 
 Automatic use remains explicit through `/index-repo --graph-precision auto`.
-The preparation boundary requires a clean canonical Git root with a root
-`go.mod`, verifies the generator, rejects checkout mutation, and stores the
-result outside the repository under an index-generation-bound cache key.
-Code-graph must report the same SCIP digest it prepared. Drift remains visible
-coverage telemetry: only emitted relationship references bound to that digest
-can satisfy `compiler_resolution`; uncovered or drifted relationships remain
-heuristic. This is a bounded Go path, not a general SCIP indexing fleet.
+The preparation boundary requires a clean canonical Git root and exactly one
+supported project shape: root `go.mod` for Go, or root `package.json` plus
+`tsconfig.json`/`jsconfig.json` for TypeScript. It verifies the selected
+generator and runtime, rejects checkout mutation, and stores the result outside
+the repository under an index-generation-bound cache key. Mixed Go/TypeScript
+roots require an explicit language instead of guessing. Code-graph must report
+the same SCIP digest it prepared. Drift remains visible coverage telemetry:
+only emitted relationship references bound to that digest can satisfy
+`compiler_resolution`; uncovered or drifted relationships remain heuristic.
+This is bounded per-repository automation, not a general SCIP indexing fleet.
+
+The released Go compiler tier has an independent SSA/RTA CALLS oracle. The
+TypeScript path has deterministic generation and ingestion coverage but does
+not yet have a comparably independent compiler-tier accuracy oracle, so its
+presence must not be interpreted as a language-wide accuracy score.
 
 A blocked BOM remains fail-closed. The smoke generator refuses to start either
 server for a blocked BOM unless a reviewer explicitly supplies

@@ -131,6 +131,64 @@ class PublicMeasurementTests(unittest.TestCase):
             summary["prior_baseline"]["code_search_acc_at_1"], 0.0
         )
 
+    def test_multirepo_summary_preserves_measured_limits(self):
+        summary = json.loads(
+            (
+                MEASURE / "results" / "2026-08-12-multirepo-summary.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(summary["repositories"], 3)
+        self.assertEqual(summary["language_model_calls"], 0)
+        self.assertEqual(
+            summary["search"]["correct_file_ranks_within_project"],
+            [1, 1, 2],
+        )
+        self.assertEqual(
+            summary["graph"]["correct_file_ranks_within_project"],
+            [None, None, None],
+        )
+        self.assertTrue(
+            summary["interpretation"][
+                "direct_multi_repository_query_demonstrated"
+            ]
+        )
+        self.assertFalse(
+            summary["interpretation"][
+                "organization_fleet_or_acl_model_demonstrated"
+            ]
+        )
+        self.assertTrue(
+            summary["interpretation"]["search_stability_issue_observed"]
+        )
+
+    def test_balanced_n80_summary_preserves_narrow_claim_boundary(self):
+        summary = json.loads(
+            (
+                MEASURE / "results" / "2026-08-12-n80-summary.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(summary["cases"], 80)
+        self.assertEqual(summary["cases_per_category"], 20)
+        self.assertEqual(summary["language_model_calls"], 0)
+        comparison = summary["result"][
+            "paired_code_search_vs_sourcegraph_acc_at_1"
+        ]
+        self.assertTrue(comparison["significant_at_0_05"])
+        self.assertGreater(comparison["wins"], comparison["losses"])
+        self.assertTrue(
+            summary["interpretation"][
+                "narrow_acc_at_1_superiority_over_sourcegraph_allowed"
+            ]
+        )
+        self.assertFalse(
+            summary["interpretation"][
+                "general_platform_superiority_claim_allowed"
+            ]
+        )
+        self.assertEqual(summary["interpretation"]["sourcegraph_failures"], 0)
+
     def test_query_adapter_is_deterministic_and_oracle_blind(self):
         ux = query_anchors(
             "Optimize Face Centroid Calculations\n"

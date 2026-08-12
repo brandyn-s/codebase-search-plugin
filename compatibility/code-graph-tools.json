@@ -7,9 +7,9 @@
   },
   "schema_version": 1,
   "source": {
-    "install_descriptor_sha256": "bf4db3dc476147cb60892de232302e81c4c2c313ac2e51aa21e93487e7c046af",
+    "install_descriptor_sha256": "d2e7370f2b38fee7cda38b06dd85ea424c2e0a3af6c9fa5b8c20655a0e637ae0",
     "kind": "github-release",
-    "version": "v0.8.0-redacted.5"
+    "version": "v0.8.0-redacted.6"
   },
   "tested_capabilities": {
     "inputs": {

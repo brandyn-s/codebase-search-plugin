@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "measurement_id": "released-backends-multi-repository-v1",
+  "measured_at": "2026-08-12T15:29:31.005539Z",
+  "scope": "direct zero-LLM discovery across three isolated, revision-pinned repositories; not an organization indexing fleet or ACL claim",
+  "language_model_calls": 0,
+  "repositories": 3,
+  "source": {
+    "utf8_text_lines": 283785,
+    "repositories_measured": [
+      {
+        "case_id": "UXARRAY__uxarray-1117",
+        "revision": "fe4cae1311db7fb21187b505e06018334a015c48",
+        "tracked_files": 309,
+        "utf8_text_lines": 210499
+      },
+      {
+        "case_id": "Chainlit__chainlit-1575",
+        "revision": "8b2d4bacfd4fa2c8af72e2d140d527d20125b07b",
+        "tracked_files": 513,
+        "utf8_text_lines": 71204
+      },
+      {
+        "case_id": "okta__okta-jwt-verifier-python-59",
+        "revision": "cb4e6780c55c234690299fa4ccef5ad33746c2c2",
+        "tracked_files": 30,
+        "utf8_text_lines": 2082
+      }
+    ]
+  },
+  "search": {
+    "correct_project_ranks": [2, 1, 3],
+    "correct_file_ranks_within_project": [1, 1, 2],
+    "warm_p50_ms_range": [62.029167, 153.786833],
+    "warm_p95_ms_range": [183.346708, 381.921666],
+    "project_errors": 0,
+    "stable_cases": 2,
+    "cases": 3
+  },
+  "graph": {
+    "correct_project_ranks": [1, 1, 3],
+    "correct_file_ranks_within_project": [null, null, null],
+    "warm_p50_ms_range": [563.275625, 1715.718334],
+    "warm_p95_ms_range": [663.9585, 2923.0985],
+    "project_errors": 0,
+    "stable_cases": 3,
+    "cases": 3
+  },
+  "storage": {
+    "search_index_bytes": 30762451,
+    "graph_index_bytes": 36780176,
+    "combined_index_bytes": 67542627,
+    "combined_index_bytes_per_utf8_line": 238.00633225857604
+  },
+  "interpretation": {
+    "direct_multi_repository_query_demonstrated": true,
+    "search_expected_file_retrieval_demonstrated": true,
+    "graph_expected_file_retrieval_demonstrated": false,
+    "organization_fleet_or_acl_model_demonstrated": false,
+    "search_stability_issue_observed": true
+  },
+  "provenance": {
+    "full_result_file_sha256": "7335aa493ebaa0a8584cb0dc249536de6d73be6b7dbffda6317955033eb1c6b7",
+    "embedded_result_sha256": "5fc8d7d167f2776608e85f0f88e6a4d22555f59fc8809e441a58701f510f075d",
+    "plugin_revision": "771c2b3f664df34e94583d88710b3555b443f06b",
+    "runner_sha256": "6beb6c24489f0ad723d278ec23f9639ac7edebc3703afe4b151d92f0bc2a3a39",
+    "cases_sha256": "de09dcbbe31a48782391aeff92badbdf71853b7b0f8bdbdf6a483ed5d728e63b",
+    "oracle_sha256": "1f0cdf82d808d1a5a488af67d621002dd909b8cb3900483090b194d1f5625d70",
+    "code_search_server_sha256": "8034a3798c7a20673422eb3026bb79cae6925af68b9a9a7abe573d773fae7ffc",
+    "code_graph_server_sha256": "8b0e11282ee649fefafa6f14723a6aa9dc7fe5e010f37ecbd3fea419deff9825"
+  }
+}

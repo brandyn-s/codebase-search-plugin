@@ -76,15 +76,16 @@ The install script:
 
 ## Current measured state
 
-The current internal grade is **B+ overall** and **A- for verifiable code
+The current internal grade is **A- overall** and **A for verifiable code
 intelligence**. A sealed five-route Stage-4 successor passed 10/10 units with
 perfect evidence, adjudication, routing, unsupported-claim, error, and canary
-gates. On the balanced zero-LLM public LocBench n=20 comparison, code-search
-reached 0.40 Acc@1 and 0.534 MRR@10 versus Sourcegraph at 0.20 and 0.225. The
-paired Acc@1 test was not significant (p=0.125), so search superiority is not
-established. Direct indexing now reaches 2.39 million lines and 6,842 tracked
-files across separate single-repository cases. These are bounded results, not
-a claim of market-wide superiority. See
+gates. On 80 balanced public LocBench cases, code-search reached 0.375 Acc@1
+versus Sourcegraph's 0.150; the paired 22-4 result was significant
+(p=0.00053), supporting narrow file-localization superiority only. Direct
+scale measurement covers a 39.2-million-line LLVM checkout plus a
+three-repository query. Final public and scale results are reported verbatim in
+the capability state; they support only their bounded endpoints, not a claim
+of market-wide superiority. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the gradecard,
 exact measurements, limitations, and next work.
 
@@ -125,8 +126,9 @@ iteration order.
 
 The default graph tier is tree-sitter plus heuristic static resolution. It is
 not compiler-grade. Projects that have a current SCIP index can explicitly
-select the persistent `scip` precision tier; clean Go repositories can opt into
-the BOM-pinned generator with `--graph-precision auto`. Index status reports
+select the persistent `scip` precision tier; clean Go and TypeScript
+repositories can opt into the BOM-pinned generators and isolated runtimes with
+`--graph-precision auto`. Index status reports
 effective tier, artifact digest, coverage, drift, replacements, and insertions.
 Uncovered or drifted files remain heuristic and are labeled accordingly. A
 relationship satisfies compiler assurance only when its immutable evidence
@@ -283,7 +285,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.5`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.5).
+[`v0.8.0-redacted.6`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.6).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -337,22 +339,34 @@ release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
 code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
 and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.23 pins code-search v0.3.5 and
-code-graph v0.8.0-redacted.5 and adds persistent
+a search- or graph-primary cascade. Plugin 0.4.24 pins code-search v0.3.5 and
+code-graph v0.8.0-redacted.6 and adds persistent
 per-project SCIP precision, an explicit reachability-versus-taint contract,
-isolated cross-project discovery, and immutable graph-index comparison. These
-changes receive deterministic regression, exact installed-component readiness,
-and the direct public measurement below rather than another model holdout. See
+isolated cross-project discovery, immutable graph-index comparison, automated
+Go and TypeScript SCIP preparation, and an independent Go SSA/RTA accuracy
+oracle. These changes receive deterministic regression, exact
+installed-component readiness, and direct public/scale measurement rather than
+another model holdout. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
 
 The direct public and scale instrument lives under `bench/public_measure/`.
-The latest frozen balanced n=20 run gave code-search 0.40 Acc@1, 0.85 Acc@10,
-and 0.534 MRR@10. Sourcegraph measured 0.20/0.25/0.225 with three request
-timeouts counted as misses. Code-search won four paired Acc@1 cases and lost
-none, but sixteen ties left the exact two-sided p-value at 0.125. Graph-only
-conceptual localization measured 0.10 Acc@1 and 0.117 MRR@10, confirming that
-conceptual discovery must remain search-primary. The run made zero model calls
-and does not support a general or statistically significant superiority claim.
+The latest frozen balanced run contains 80 two-source-corroborated cases
+across bug, feature, performance, and security categories. Code-search reached
+Acc@1 0.375, Acc@10 0.788, and MRR@10 0.503 versus Sourcegraph at
+0.150/0.188/0.165 with zero request failures. The paired Acc@1 result was
+22 wins, 4 losses, and 54 ties (p=0.00053). Its full aggregate and allowed
+narrow claim are recorded in
+[`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md); conceptual discovery
+remains search-primary regardless of the graph arm's result.
+
+Both released backends also completed a clean, revision-pinned LLVM checkout
+containing 39,222,246 UTF-8 source lines and 160,123 tracked files. Search
+indexed it in 609.3 seconds with 3.65 GB peak RSS, a 4.98 GB index, and 3.77 s
+warm-query p50. Graph indexed it in 2,198.0 seconds with 9.43 GB peak RSS, a
+2.89 GB index, and 9.78 s warm-query p50. The combined 7.87 GB footprint is
+direct very-large-single-host evidence, not a distributed-fleet or
+class-leading-efficiency claim. See
+[`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the complete scope.
 
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture

@@ -4,6 +4,16 @@ This directory contains a small, direct measurement of the installed code
 intelligence backends. It intentionally does not invoke a language model or
 the Stage-4 release harness.
 
+The latest checked-in compact results are:
+
+- `results/2026-08-12-n80-summary.json`: balanced 80-case public
+  file-localization comparison, including the bounded paired test;
+- `results/2026-08-12-multirepo-summary.json`: direct querying across three
+  isolated, revision-pinned repositories; and
+- `results/2026-08-12-llvm-scale-summary.json`: both released backends on a
+  39,222,246-line LLVM checkout, including cold time, peak RSS, persisted
+  bytes, bytes per line, and warm latency.
+
 The measurement answers two narrow questions:
 
 1. On a balanced 20-case public LocBench sample, how do code-search,
@@ -129,6 +139,26 @@ the 1.19-million-line Transformers checkout, with search/graph warm p50 of
 675 ms/1.408 s and peak RSS of 1.04 GB/1.72 GB. This demonstrates million-line
 single-repository operation, not giant-monorepo, multi-repository fleet, or
 distributed organizational scale.
+
+The separate direct multi-repository run queried three isolated, pinned
+checkouts totaling 283,785 UTF-8 lines through each released backend. Search
+returned the correct project at ranks 2, 1, and 3 and the oracle file within
+that project at ranks 1, 1, and 2, with no project errors. Graph returned the
+correct project at ranks 1, 1, and 3 but did not return the oracle file in its
+top results. Combined indexes occupied 67,542,627 bytes, or 238.0 bytes per
+source line. One of three search cases changed ranked results across warm
+repetitions; all graph cases were stable. The compact record is
+[`results/2026-08-12-multirepo-summary.json`](results/2026-08-12-multirepo-summary.json).
+This demonstrates bounded direct cross-project operation, not an organization
+indexing fleet, unified ACL model, or globally comparable per-project scores.
+
+The current public headline is the frozen balanced n=80 run in
+[`results/2026-08-12-n80-summary.json`](results/2026-08-12-n80-summary.json).
+Code-search measured Acc@1 0.375, Acc@10 0.788, and MRR@10 0.503 versus the
+Sourcegraph public endpoint at 0.150/0.188/0.165. The exact paired Acc@1 test
+recorded 22 wins, 4 losses, and 54 ties (p=0.00053), with zero Sourcegraph
+request failures. This supports only the preregistered narrow
+file-localization claim; general platform superiority remains prohibited.
 
 The Sourcegraph adapter uses the documented
 [V3 streaming endpoint](https://sourcegraph.com/docs/api/stream-api) and

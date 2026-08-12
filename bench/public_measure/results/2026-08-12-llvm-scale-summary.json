@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "measurement_id": "released-backends-very-large-repository-v1",
+  "measured_at": "2026-08-12",
+  "language_model_calls": 0,
+  "repository": {
+    "name": "llvm/llvm-project",
+    "revision": "2078da43e25a4623cab2d0d60decddf709aaea28",
+    "tracked_files": 160123,
+    "tracked_bytes": 1866557978,
+    "utf8_text_bytes": 1773065028,
+    "utf8_text_lines": 39222246,
+    "tracked_manifest_sha256": "174742c7fa111639194f69a9e31d98eb0b859387af32403c7b5a0f103c868d30"
+  },
+  "components": {
+    "code-search": {
+      "release": "v0.3.5",
+      "server_sha256": "8034a3798c7a20673422eb3026bb79cae6925af68b9a9a7abe573d773fae7ffc",
+      "status": "completed",
+      "chunks": 183663,
+      "cold_index_seconds": 609.327337083,
+      "cold_peak_rss_bytes": 3650469888,
+      "index_bytes": 4977720119,
+      "index_bytes_per_utf8_line": 126.91063431196673,
+      "query": {
+        "latency_p50_seconds": 3.767611875,
+        "latency_p95_seconds": 3.837618417,
+        "query_sha256": "0980d8338131715668cdfb28a932e394c1fec4bff0a50d63a6de40347bd5c4c2",
+        "repetitions": 5,
+        "result_count": 7
+      }
+    },
+    "code-graph": {
+      "release": "v0.8.0-redacted.6",
+      "server_sha256": "d9a6281c2b81c2cdffcd6c8a2a1e348026297ee95083d666f85ea9b9a7b6735d",
+      "status": "completed",
+      "nodes": 729625,
+      "edges": 2302869,
+      "cold_index_seconds": 2198.038109125,
+      "cold_peak_rss_bytes": 9428811776,
+      "index_bytes": 2890117296,
+      "index_bytes_per_utf8_line": 73.68566542568725,
+      "query": {
+        "latency_p50_seconds": 9.784289583,
+        "latency_p95_seconds": 10.503138083,
+        "query_sha256": "0980d8338131715668cdfb28a932e394c1fec4bff0a50d63a6de40347bd5c4c2",
+        "repetitions": 5,
+        "result_count": 20
+      }
+    }
+  },
+  "combined": {
+    "index_bytes": 7867837415,
+    "index_bytes_per_utf8_line": 200.59629973765397,
+    "sequential_cold_index_seconds": 2807.365446208,
+    "largest_observed_component_peak_rss_bytes": 9428811776
+  },
+  "source_results": {
+    "code_search_result_file_sha256": "831068ace4d0daff59d6e1409dcdf42f2627691bc4e7ea7103b696d5327cf9c8",
+    "code_graph_result_file_sha256": "11681c997a2060aea9561a3f0c6c61f26fc5899d51af89330d609bc3c9653a2b",
+    "code_graph_embedded_result_sha256": "2f6702be6fb250d9afd49fe3b278658d827a487ac0fbcdce07fb4c93cb655690"
+  },
+  "interpretation": {
+    "very_large_single_host_demonstrated": true,
+    "multi_repository_direct_query_demonstrated_separately": true,
+    "distributed_or_org_fleet_demonstrated": false,
+    "class_leading_efficiency_claim_allowed": false,
+    "scope": "One revision-pinned LLVM checkout on one Apple Silicon host; local latency is not a managed-service comparison."
+  }
+}

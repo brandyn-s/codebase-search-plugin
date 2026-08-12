@@ -18,21 +18,26 @@ source coordinates; a single host-owned state machine enforces route, trace,
 evidence, and terminal completion; and schema-v2 manifests bind canonical cases
 and artifact roles explicitly. The latest five-route/two-repetition Stage-4
 successor passed all fixed gates. Plugin 0.4.21 subsequently improved the
-product layer without expanding that harness. The current candidate adds
+product layer without expanding that harness. Plugin 0.4.24 consolidates
 persistent per-project SCIP precision, a fail-closed reachability-versus-taint
-contract, bounded cross-project discovery, and immutable graph-index
-comparison. The direct public comparison now covers 20 balanced cases:
-code-search measured 0.40 Acc@1 and 0.534 MRR@10 versus Sourcegraph at 0.20
-and 0.225, but the paired test did not establish superiority (p=0.125).
-Single-repository scale now reaches 2.39 million lines. The remaining grade
-gap is statistically stronger public retrieval evidence, broader relationship
-oracles, very-large-monorepo and multi-repository operation, and resource
-efficiency—not more canaries or proof-harness layers. See
+contract, bounded cross-project discovery, immutable graph-index comparison,
+automatic pinned Go and TypeScript SCIP preparation, and an independent Go
+SSA/RTA compiler-tier CALLS oracle. Direct three-repository measurement now
+exercises the released cross-project interfaces and records both successful
+search localization and the graph's weaker file-localization boundary. The
+public comparison is frozen at 80 balanced cases and the
+very-large-repository runner records storage, memory, cold indexing, and
+warm-query cost. These replace the former n=20 and 2.39-million-line ceilings
+as the current evidence once their checked-in results are named in
 [`CAPABILITY_STATE.md`](CAPABILITY_STATE.md).
 
-The next development slice stays inside that boundary. It adds an explicit
-capability lattice, canonical CodeQL-path ingestion, and an opt-in pinned Go
-SCIP preparation path. Compiler assurance is edge-scoped and requires the
-exact ingested artifact digest; graph-wide tier labels or legacy SCIP
-provenance are insufficient. These are consolidation changes, not another
-holdout layer or an organization-wide indexing service.
+The remaining grade gap is broader non-Go relationship oracles, additional
+callable public comparators, fleet/ACL operations, and materially better
+storage and query efficiency—not more canaries or proof-harness layers. See
+[`CAPABILITY_STATE.md`](CAPABILITY_STATE.md).
+
+The evidence lattice, canonical CodeQL-path ingestion, and pinned SCIP
+preparation paths stay inside that boundary. Compiler assurance is edge-scoped
+and requires the exact ingested artifact digest; graph-wide tier labels or
+legacy SCIP provenance are insufficient. These are consolidation changes, not
+another holdout layer or an organization-wide indexing service.

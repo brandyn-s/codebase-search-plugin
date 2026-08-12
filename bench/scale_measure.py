@@ -36,6 +36,17 @@ class ScaleError(RuntimeError):
     """A measurement precondition or backend call failed."""
 
 
+COMPONENTS = ("code-search", "code-graph")
+
+
+def selected_components(requested: list[str] | None) -> tuple[str, ...]:
+    """Return the requested components in canonical execution order."""
+    if not requested:
+        return COMPONENTS
+    selected = set(requested)
+    return tuple(component for component in COMPONENTS if component in selected)
+
+
 def canonical_json(value: object) -> bytes:
     return json.dumps(
         value,
@@ -200,8 +211,14 @@ def measure_component(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", required=True, type=Path)
-    parser.add_argument("--search-server", required=True, type=Path)
-    parser.add_argument("--graph-server", required=True, type=Path)
+    parser.add_argument("--search-server", type=Path)
+    parser.add_argument("--graph-server", type=Path)
+    parser.add_argument(
+        "--component",
+        action="append",
+        choices=COMPONENTS,
+        help="backend to measure; repeat for both (default: both)",
+    )
     parser.add_argument("--local-model", required=True, type=Path)
     parser.add_argument("--runtime-root", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
@@ -211,7 +228,16 @@ def main() -> int:
     args = parser.parse_args()
     if args.warm_repetitions < 1 or args.timeout <= 0:
         parser.error("repetitions and timeout must be positive")
-    for path in (args.search_server, args.graph_server):
+    components = selected_components(args.component)
+    servers = {
+        "code-search": args.search_server,
+        "code-graph": args.graph_server,
+    }
+    for component in components:
+        path = servers[component]
+        if path is None:
+            option = "--search-server" if component == "code-search" else "--graph-server"
+            parser.error(f"{option} is required when measuring {component}")
         if not path.is_file() or not os.access(path, os.X_OK):
             parser.error(f"server is missing or not executable: {path}")
     if args.runtime_root.exists() or args.output.exists():
@@ -231,12 +257,13 @@ def main() -> int:
                 **stats,
             },
             "components": {},
+            "selected_components": list(components),
             "language_model_calls": 0,
         }
-        for component, server in (
-            ("code-search", args.search_server.resolve()),
-            ("code-graph", args.graph_server.resolve()),
-        ):
+        for component in components:
+            server = servers[component]
+            assert server is not None
+            server = server.resolve()
             try:
                 result["components"][component] = measure_component(
                     component,
@@ -264,7 +291,9 @@ def main() -> int:
             value.get("status") == "completed"
             for value in result["components"].values()
         )
-        result["status"] = "completed" if completed == 2 else "partial"
+        result["status"] = (
+            "completed" if completed == len(components) else "partial"
+        )
         result["result_sha256"] = hashlib.sha256(canonical_json(result)).hexdigest()
         write_checkpoint(args.output, result)
         print(json.dumps(result, sort_keys=True))

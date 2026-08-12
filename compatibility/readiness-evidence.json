@@ -4,17 +4,17 @@
   "components": {
     "code-graph": {
       "index_identity": {
-        "captured_at": "2026-08-12T14:23:04Z",
-        "checkout_id": "d2d30c6e1e4ed9cc289a454022a7295a37b9f568a2c413e7c0c664d1b4441bb4",
+        "captured_at": "2026-08-12T16:29:55Z",
+        "checkout_id": "d0098617e4fa47009864c83fc33e46b7ad56d3fab1fbbd302404d08cf83442dc",
         "dirty_fingerprint": "clean",
-        "index_generation": "9b38787107a99ecafbbd48c0f992129e4c7497e4cfefc7ab3de46497389dc8e0",
-        "repository_id": "d2d30c6e1e4ed9cc289a454022a7295a37b9f568a2c413e7c0c664d1b4441bb4",
+        "index_generation": "da32d19574f63434fbd6a7095a58345a951936432008d09ba39690b441fdda82",
+        "repository_id": "d0098617e4fa47009864c83fc33e46b7ad56d3fab1fbbd302404d08cf83442dc",
         "schema_version": 1,
         "source_revision": "6cdd8a27ca80fd36c7f27f20dd8c5ce4aaab485e"
       },
-      "install_descriptor_sha256": "bf4db3dc476147cb60892de232302e81c4c2c313ac2e51aa21e93487e7c046af",
+      "install_descriptor_sha256": "d2e7370f2b38fee7cda38b06dd85ea424c2e0a3af6c9fa5b8c20655a0e637ae0",
       "status": "ready",
-      "version": "v0.8.0-redacted.5"
+      "version": "v0.8.0-redacted.6"
     },
     "code-search": {
       "completion": {
@@ -28,17 +28,17 @@
       },
       "evidence_coordinate": {
         "end_line": 3,
-        "index_generation": "9b38787107a99ecafbbd48c0f992129e4c7497e4cfefc7ab3de46497389dc8e0",
+        "index_generation": "da32d19574f63434fbd6a7095a58345a951936432008d09ba39690b441fdda82",
         "relative_path": "src/config.py",
         "start_line": 3,
         "status": "verified"
       },
       "index_identity": {
-        "captured_at": "2026-08-12T14:23:04.357116Z",
-        "checkout_id": "d2d30c6e1e4ed9cc289a454022a7295a37b9f568a2c413e7c0c664d1b4441bb4",
+        "captured_at": "2026-08-12T16:29:55.538829Z",
+        "checkout_id": "d0098617e4fa47009864c83fc33e46b7ad56d3fab1fbbd302404d08cf83442dc",
         "dirty_fingerprint": "clean",
-        "index_generation": "9b38787107a99ecafbbd48c0f992129e4c7497e4cfefc7ab3de46497389dc8e0",
-        "repository_id": "d2d30c6e1e4ed9cc289a454022a7295a37b9f568a2c413e7c0c664d1b4441bb4",
+        "index_generation": "da32d19574f63434fbd6a7095a58345a951936432008d09ba39690b441fdda82",
+        "repository_id": "d0098617e4fa47009864c83fc33e46b7ad56d3fab1fbbd302404d08cf83442dc",
         "schema_version": 1,
         "source_revision": "6cdd8a27ca80fd36c7f27f20dd8c5ce4aaab485e"
       },

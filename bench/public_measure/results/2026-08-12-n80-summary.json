@@ -1,0 +1,186 @@
+{
+  "cases": 80,
+  "cases_per_category": 20,
+  "categories": [
+    "Bug Report",
+    "Feature Request",
+    "Performance Issue",
+    "Security Vulnerability"
+  ],
+  "incremental": {
+    "case_id": "PrefectHQ__prefect-16117",
+    "dirty_index_generation": "2bbcac84bd5d90b66694e81609342a85499f80f24bbeefb066c1a36e0e87a7c1",
+    "graph_action": "updated",
+    "graph_index_ns": 7328441208,
+    "graph_peak_rss_bytes": 1126776832,
+    "modified_path": "benches/__main__.py",
+    "probe_found": true,
+    "search_files_added": 0,
+    "search_files_modified": 1,
+    "search_index_ns": 3252162125,
+    "search_peak_rss_bytes": 974520320
+  },
+  "interpretation": {
+    "general_platform_superiority_claim_allowed": false,
+    "narrow_acc_at_1_superiority_over_sourcegraph_allowed": true,
+    "scope": "bounded balanced n=80 public file-localization comparison",
+    "sourcegraph_failures": 0,
+    "unavailable_competitors": [
+      "Cursor",
+      "Augment",
+      "Greptile"
+    ]
+  },
+  "language_model_calls": 0,
+  "measured_at": "2026-08-12T16:48:50.493316Z",
+  "measurement_id": "public-locbench-balanced-n80-scale-v3",
+  "provenance": {
+    "cases_sha256": "de09dcbbe31a48782391aeff92badbdf71853b7b0f8bdbdf6a483ed5d728e63b",
+    "code_graph_server_sha256": "8b0e11282ee649fefafa6f14723a6aa9dc7fe5e010f37ecbd3fea419deff9825",
+    "code_search_server_sha256": "8034a3798c7a20673422eb3026bb79cae6925af68b9a9a7abe573d773fae7ffc",
+    "contract_sha256": "f6969fe368d30f58e90ea9e7d095c95ea9b2f54db21203d417df41af87d46d36",
+    "dataset_parquet_sha256": "8df0833c2c1276c5837aab923d489ab97d7654529abe759d0f59242c4978a662",
+    "oracle_sha256": "1f0cdf82d808d1a5a488af67d621002dd909b8cb3900483090b194d1f5625d70",
+    "plugin_revision": "c4d4a2b75d5a7636b44df17b5d5a57b19e58d547",
+    "selection_pin_sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453"
+  },
+  "result": {
+    "aggregate": {
+      "code-graph": {
+        "cases": 80,
+        "file_acc_at_1": 0.175,
+        "file_acc_at_10": 0.35,
+        "file_acc_at_1_interval": {
+          "confidence": 0.95,
+          "lower": 0.10720636440977926,
+          "method": "wilson_score",
+          "upper": 0.2725754197883133
+        },
+        "file_acc_at_3": 0.25,
+        "file_mrr_at_10": 0.2193204365079365,
+        "latency_p50_ns": 459362625,
+        "latency_p95_ns": 2091463542
+      },
+      "code-search": {
+        "cases": 80,
+        "file_acc_at_1": 0.375,
+        "file_acc_at_10": 0.7875,
+        "file_acc_at_1_interval": {
+          "confidence": 0.95,
+          "lower": 0.27694178701531175,
+          "method": "wilson_score",
+          "upper": 0.48451274536857
+        },
+        "file_acc_at_3": 0.6125,
+        "file_mrr_at_10": 0.5032539682539683,
+        "latency_p50_ns": 686196709,
+        "latency_p95_ns": 1597321500
+      },
+      "composed": {
+        "cases": 80,
+        "file_acc_at_1": 0.3625,
+        "file_acc_at_10": 0.7625,
+        "file_acc_at_1_interval": {
+          "confidence": 0.95,
+          "lower": 0.2657079306444915,
+          "method": "wilson_score",
+          "upper": 0.4718920549777783
+        },
+        "file_acc_at_3": 0.5625,
+        "file_mrr_at_10": 0.4753571428571428,
+        "latency_p50_ns": 1153650709,
+        "latency_p95_ns": 3758094375
+      },
+      "native": {
+        "cases": 80,
+        "file_acc_at_1": 0.2,
+        "file_acc_at_10": 0.525,
+        "file_acc_at_1_interval": {
+          "confidence": 0.95,
+          "lower": 0.12702844043960787,
+          "method": "wilson_score",
+          "upper": 0.30046243728170835
+        },
+        "file_acc_at_3": 0.3875,
+        "file_mrr_at_10": 0.31114583333333334,
+        "latency_p50_ns": 134862541,
+        "latency_p95_ns": 597171041
+      },
+      "sourcegraph": {
+        "cases": 80,
+        "file_acc_at_1": 0.15,
+        "file_acc_at_10": 0.1875,
+        "file_acc_at_1_interval": {
+          "confidence": 0.95,
+          "lower": 0.08794040506163547,
+          "method": "wilson_score",
+          "upper": 0.24413228561323347
+        },
+        "file_acc_at_3": 0.175,
+        "file_mrr_at_10": 0.16499999999999998,
+        "latency_p50_ns": 5273659541,
+        "latency_p95_ns": 60200458333
+      }
+    },
+    "aggregate_by_category_acc_at_1": {
+      "Bug Report": {
+        "code-graph": 0.2,
+        "code-search": 0.3,
+        "composed": 0.25,
+        "native": 0.2,
+        "sourcegraph": 0.15
+      },
+      "Feature Request": {
+        "code-graph": 0.1,
+        "code-search": 0.5,
+        "composed": 0.5,
+        "native": 0.1,
+        "sourcegraph": 0.2
+      },
+      "Performance Issue": {
+        "code-graph": 0.3,
+        "code-search": 0.25,
+        "composed": 0.25,
+        "native": 0.2,
+        "sourcegraph": 0.1
+      },
+      "Security Vulnerability": {
+        "code-graph": 0.1,
+        "code-search": 0.45,
+        "composed": 0.45,
+        "native": 0.3,
+        "sourcegraph": 0.15
+      }
+    },
+    "embedded_result_sha256": "b2a8c50e2b0141c22b80c14fd0c2ccc7ffe37bba24a418875fe63618b925f012",
+    "file_sha256": "0d0983f3bf4e70cfc120b653be08736d51cae5bf2b187273824ec34fe6e8af5e",
+    "paired_code_search_vs_sourcegraph_acc_at_1": {
+      "discordant_pairs": 26,
+      "endpoint": "file_acc_at_1",
+      "left_arm": "code-search",
+      "losses": 4,
+      "right_arm": "sourcegraph",
+      "significant_at_0_05": true,
+      "test": "exact_two_sided_paired_sign",
+      "ties": 54,
+      "two_sided_p_value": 0.0005335211753845215,
+      "wins": 22
+    },
+    "stability": {
+      "code_graph_stable_cases": 80,
+      "code_search_stable_cases": 80
+    }
+  },
+  "schema_version": 1,
+  "scope": "bounded balanced n=80 public file-localization comparison",
+  "selection": {
+    "excluded_before_retrieval": 12,
+    "rule": "first twenty pre-recorded, two-source-corroborated cases per category after twelve predeclared oracle exclusions",
+    "source": "pre-existing LocBench n=200 pin"
+  },
+  "unavailable_competitors": [
+    "Cursor",
+    "Augment",
+    "Greptile"
+  ]
+}
