@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "measurement_id": "public-locbench-balanced-n4-scale-v1",
+  "measured_at": "2026-08-12T05:02:35.205143Z",
+  "scope": "directional balanced public pilot; no statistical superiority claim",
+  "language_model_calls": 0,
+  "cases": 4,
+  "categories": [
+    "Bug Report",
+    "Feature Request",
+    "Performance Issue",
+    "Security Vulnerability"
+  ],
+  "public_query_sources": {
+    "UXARRAY__uxarray-1117": "https://github.com/UXARRAY/uxarray/issues/1116",
+    "Chainlit__chainlit-1575": "https://github.com/Chainlit/chainlit/issues/1359",
+    "vllm-project__vllm-9390": "https://github.com/vllm-project/vllm/issues/3127",
+    "PrefectHQ__prefect-16117": "https://github.com/PrefectHQ/prefect/issues/16105"
+  },
+  "current_run": {
+    "file_sha256": "710a2ac9325435643879bc1be017d435158cd8d3e6d77056f8a29e071e34c862",
+    "embedded_result_sha256": "92a230fd173b4d54989c1e43a343f6ae4530b4859bea66be69068c19287bd8a5",
+    "aggregate": {
+      "code-search": {"file_acc_at_1": 1.0, "file_acc_at_3": 1.0, "file_acc_at_10": 1.0, "file_mrr_at_10": 1.0, "latency_p50_ms": 492.816166, "latency_p95_ms": 564.804667},
+      "composed": {"file_acc_at_1": 1.0, "file_acc_at_3": 1.0, "file_acc_at_10": 1.0, "file_mrr_at_10": 1.0, "latency_p50_ms": 592.404499, "latency_p95_ms": 1016.975083},
+      "sourcegraph": {"file_acc_at_1": 0.75, "file_acc_at_3": 1.0, "file_acc_at_10": 1.0, "file_mrr_at_10": 0.875, "latency_p50_ms": 308.708167, "latency_p95_ms": 38028.221834},
+      "code-graph": {"file_acc_at_1": 0.5, "file_acc_at_3": 0.75, "file_acc_at_10": 0.75, "file_mrr_at_10": 0.5833333333333334, "latency_p50_ms": 66.711958, "latency_p95_ms": 497.092708},
+      "native": {"file_acc_at_1": 0.5, "file_acc_at_3": 0.5, "file_acc_at_10": 0.5, "file_mrr_at_10": 0.5, "latency_p50_ms": 53.58275, "latency_p95_ms": 119.880208}
+    }
+  },
+  "prior_baseline": {
+    "measured_at": "2026-08-12T02:41:06.708936Z",
+    "file_sha256": "592fcb92283446fe4a60bf0f1c58d2aa9313f40d4c67a78689ba1c9f51d4e858",
+    "embedded_result_sha256": "f965544b1710cf3be6d76ce13cb432ebf2e3dfcbd413666a77ea3445010ac7c9",
+    "code_search_acc_at_1": 0.0,
+    "code_search_mrr_at_10": 0.11904761904761904,
+    "composition_acc_at_1": 0.25,
+    "composition_mrr_at_10": 0.4375
+  },
+  "measured_improvement": {
+    "code_search_acc_at_1_delta": 1.0,
+    "code_search_mrr_at_10_delta": 0.8809523809523809,
+    "composition_acc_at_1_delta": 0.75,
+    "composition_mrr_at_10_delta": 0.5625,
+    "note": "The query-signal hybrid reranker and route-aware cascade reached rank one on all four frozen cases; n=4 is directional and does not establish general superiority."
+  },
+  "stability": {
+    "warm_repetitions_per_local_backend_per_case": 5,
+    "code_search_stable_cases": 4,
+    "code_graph_stable_cases": 4,
+    "note": "All local rankings were stable within this fresh build. Deterministic ordering removes the known unordered-traversal mechanism; broader cross-platform reproducibility remains to be measured."
+  },
+  "largest_repository": {
+    "repository": "PrefectHQ/prefect",
+    "revision": "fb919c67427d230ecea03a5273dfdd6de59bd697",
+    "tracked_files": 2351,
+    "utf8_text_lines": 664120,
+    "search_cold_seconds": 18.819809208,
+    "graph_cold_seconds": 18.269272833,
+    "search_peak_rss_bytes": 901677056,
+    "graph_peak_rss_bytes": 862846976,
+    "search_index_bytes": 307297303,
+    "graph_index_bytes": 270319744,
+    "search_warm_p50_ms": 500.781666,
+    "graph_warm_p50_ms": 496.148667
+  },
+  "incremental": {
+    "repository": "PrefectHQ/prefect",
+    "modified_files": 1,
+    "added_files": 0,
+    "search_seconds": 2.314625375,
+    "graph_seconds": 5.0612945,
+    "search_cold_speedup": 8.130822988147704,
+    "graph_cold_speedup": 3.6096047825314255,
+    "probe_found": true,
+    "fix_release": "code-search v0.3.3 (retained in v0.3.4)"
+  },
+  "provenance": {
+    "locbench_parquet_sha256": "8df0833c2c1276c5837aab923d489ab97d7654529abe759d0f59242c4978a662",
+    "selection_pin_sha256": "886156bbd16eb753a690da6bcb452f9238f53ef28409b1f4e483b842a0556453",
+    "contract_sha256": "c84d8d2b5003a484d509c154350e367d98ecd18e9856e785cbc2dd66a5883bfe",
+    "cases_sha256": "60491308ae85d0e6dc950846a03bfd463ce7e243381015462027552887148b18",
+    "oracle_sha256": "711cbfd0b9f2e61999f660aafb9fe127ec7985c999312a91ceb63e13c01435a2",
+    "plugin_behavior_revision": "037ced7fee7fcce0efe3b9ebce18750e587d89b0",
+    "code_graph_release": "v0.8.0-redacted.3",
+    "code_graph_source_revision": "252454b5b547129f00405b0326e23fbe2ccdef6f",
+    "code_graph_server_sha256": "8066fb75b97f1842e0763551c0bd0752204e05bbe97516d86b4fa1c34743d514",
+    "code_search_release": "v0.3.4",
+    "code_search_source_revision": "63fb24b6626b55e35a101b8a1092583a7cae213b",
+    "code_search_server_sha256": "eb247b31ef067c448166b95e307b3a4e5bea2d7cff6958941e466f8fc37903e5",
+    "local_model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "unavailable_competitors": ["Cursor", "Augment", "Greptile"]
+}

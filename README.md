@@ -71,12 +71,13 @@ The install script:
 The current internal grade is **B+ overall** and **A- for verifiable code
 intelligence**. A sealed five-route Stage-4 successor passed 10/10 units with
 perfect evidence, adjudication, routing, unsupported-claim, error, and canary
-gates. A separate zero-LLM public LocBench n=4 pilot favored Sourcegraph for
-general file localization; code-graph was the strongest local arm, while the
-measured MiniLM semantic arm lagged. Real-repository indexing was measured
-through 2,351 files and 664,120 lines. These are bounded results, not a claim of
-market-wide superiority. See [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md)
-for the gradecard, exact measurements, limitations, and next work.
+gates. On the unchanged zero-LLM public LocBench n=4 pilot, released
+code-search v0.3.4 and route-aware composition each reached 1.00 Acc@1 and
+MRR@10, versus Sourcegraph at 0.75 and 0.875. Real-repository indexing was
+measured through 2,351 files and 664,120 lines. These are bounded results, not
+a claim of market-wide superiority. See
+[`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the gradecard,
+exact measurements, limitations, and next work.
 
 ## How It Works
 
@@ -86,7 +87,12 @@ The ready integrated design combines two different search technologies.
 
 **What it does:** Finds code by *meaning*, not just keywords. When you search "authentication middleware," it returns functions related to auth even if they're named `verify_jwt_token` or `check_session`.
 
-**How:** Your code is split into chunks (functions, classes, modules) using tree-sitter AST parsing. Each chunk is converted into a numeric vector (embedding) that captures its meaning. Search queries are also converted to vectors, and the closest vectors are returned. A keyword index (BM25) runs in parallel and results are fused together.
+**How:** Your code is split into chunks (functions, classes, modules) using
+tree-sitter AST parsing. Each chunk is converted into a numeric vector
+(embedding) that captures its meaning. A keyword index (BM25) runs in
+parallel. Hybrid search detects explicit code signals such as identifiers,
+qualified names, and file paths, widens the candidate pool, reranks each arm,
+then applies bounded fusion and signal boosts.
 
 **When to use:**
 - "How does X work?" — conceptual understanding
@@ -104,7 +110,9 @@ also sends selected node text to Voyage during indexing and sends query text
 for embedding-backed graph searches. Set `CODE_GRAPH_SKIP_EMBEDDINGS=1` before
 launching the MCP to disable graph embedding generation. Queries use a
 Cypher-like language to traverse call chains, find dead code, and calculate
-blast radius.
+blast radius. Seed truncation, adjacency traversal, and equal-score result
+ordering are canonicalized so repeated queries do not depend on map or edge
+iteration order.
 
 **When to use:**
 - "What calls processOrder?" — tracing call chains
@@ -123,10 +131,13 @@ same automatic backend routing and cross-engine coherence checks:
 | UNDERSTAND | Structural code-graph, optionally chained from FIND | "What calls processOrder?" |
 | PROVE | Coherent evidence from both engines plus deterministic contradiction and coverage evaluation | "Prove every request path passes through authorization" |
 
-You do not need to select a backend. `/code-explore` remains available as the
-compact natural-language discovery and relationship workflow; it uses the
-same engines and preserves canonical evidence when the installed components
-expose it.
+You do not need to select a backend. Conceptual discovery keeps code-search
+primary; explicit caller, callee, trace, dependency, relationship, and impact
+questions keep code-graph primary. A complete primary result is not
+automatically diluted by the other backend; the secondary engine fills only
+missing paths when composition is useful. `/code-explore` remains available as
+the compact natural-language workflow and preserves canonical evidence when
+the installed components expose it.
 
 ### Verification boundary
 
@@ -231,7 +242,7 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.3.3`](https://github.com/redacted-org/code-search/releases/tag/v0.3.3)
+[`v0.3.4`](https://github.com/redacted-org/code-search/releases/tag/v0.3.4)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
@@ -253,7 +264,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.2`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.2).
+[`v0.8.0-redacted.3`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.3).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -303,15 +314,22 @@ plugin 0.4.19 completed all ten five-route/two-repetition units and passed every
 fixed gate: 1.0 precision, recall, adjudication, routing, and routing-contract
 accuracy, with zero unsupported asserted claims, errors, or host canary
 violations. That single bounded result is sufficient for the current empirical
-release claim; it is not a statistical ranking. Plugin 0.4.20 changes the
-code-search incremental refresh path and receives deterministic regression plus
-exact installed-component readiness validation rather than another model
-holdout. See [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
+release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
+code-search incremental refresh path. Plugin 0.4.21 now pins code-search v0.3.4
+and code-graph v0.8.0-redacted.3, uses query-signal-aware hybrid ranking,
+deterministic graph traversal and tie ordering, and preserves route intent with
+a search- or graph-primary cascade. These changes receive deterministic
+regression, exact installed-component readiness, and the direct public
+measurement below rather than another model holdout. See
+[`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
 
 The direct public and scale instrument lives under `bench/public_measure/`.
-Its first directional n=4 result favored Sourcegraph for general localization,
-identified code-graph as the strongest local arm, and exposed the incremental
-refresh defect fixed in code-search v0.3.3. It made zero model calls and does not
+The latest frozen n=4 run gave code-search and route-aware composition 1.00
+Acc@1 and 1.00 MRR@10, versus Sourcegraph at 0.75 and 0.875. The preceding run
+had code-search at 0.00/0.119 and symmetric composition at 0.25/0.438, so the
+same instrument directly measures the ranking and routing improvement.
+Code-graph remained stable across all five warm repetitions per case after its
+ordering fixes. The run made zero model calls, and four cases still do not
 support a general superiority claim.
 
 The content-addressed five-arm localization instrument lives under

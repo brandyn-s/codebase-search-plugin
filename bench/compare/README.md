@@ -19,10 +19,11 @@ better.
 
 The current public result does not use this model-driven harness. The bounded
 zero-LLM comparison in [`../public_measure/`](../public_measure/) calls each
-retrieval backend directly and records the 2026-08-11 directional n=4 result
-plus real-repository scale. This five-arm harness remains available for a future
-agent-level study, but its disabled live executor is not a plugin release
-blocker.
+retrieval backend directly. Its 2026-08-12 directional n=4 result gives
+code-search and route-aware composition 1.00 Acc@1 and MRR@10 and records
+real-repository scale; the preceding run is retained as the before state. This
+five-arm harness remains available for a future agent-level study, but its
+disabled live executor is not a plugin release blocker.
 
 ## Frozen contract
 

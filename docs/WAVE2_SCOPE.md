@@ -17,7 +17,10 @@ backend. Evidence-capable tools now issue immutable typed evidence IDs at exact
 source coordinates; a single host-owned state machine enforces route, trace,
 evidence, and terminal completion; and schema-v2 manifests bind canonical cases
 and artifact roles explicitly. The latest five-route/two-repetition Stage-4
-successor passed all fixed gates. The remaining grade gap is public retrieval
-breadth, graph-build reproducibility, and larger-repository performance—not
-more canaries or proof-harness layers. See
+successor passed all fixed gates. Plugin 0.4.21 subsequently improved the
+product layer without expanding that harness: query-aware hybrid ranking,
+deterministic graph ordering, and route-aware composition reached 1.00 Acc@1
+and MRR@10 on the unchanged directional n=4 public pilot. The remaining grade
+gap is public retrieval breadth, cross-platform graph reproducibility, and
+larger-repository performance—not more canaries or proof-harness layers. See
 [`CAPABILITY_STATE.md`](CAPABILITY_STATE.md).

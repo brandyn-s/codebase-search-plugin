@@ -49,13 +49,19 @@ complete case set.
   MRR@10 over ten distinct ranked files.
 - The issue text is the normalized first paragraph recorded by the existing
   200-case pin.
-- Code-search receives the issue text in semantic mode.
+- Code-search receives the issue text in hybrid mode. The released v0.3.4
+  adapter extracts explicit symbols, qualified names, and GitHub blob paths,
+  widens the candidate pool when those signals are present, reranks each
+  lexical/vector arm before fusion, and applies a bounded post-fusion boost.
 - Code-graph receives deterministic identifier/title anchors through
   `code_localize` with substring seeds and depth 3.
 - Sourcegraph receives the same anchors through its documented V3 streaming
   search API, scoped to the exact repository and revision.
-- `composed` is reciprocal-rank fusion (`k=60`) of the code-search and
-  code-graph file rankings. It has no model or tuning step.
+- `composed` is a deterministic route-aware cascade. Conceptual localization
+  keeps code-search primary; explicit caller, callee, trace, dependency,
+  relationship, or impact questions keep code-graph primary. The secondary
+  ranking only fills unseen paths, so fusion cannot dilute the chosen route.
+  It has no model or tuning step.
 - All failures remain misses. No arm falls back to another arm.
 - Cold indexes use the installed plugin binaries and the pinned local
   `sentence-transformers/all-MiniLM-L6-v2` model revision recorded in
@@ -90,24 +96,29 @@ the pinned source checkout or calls a model API.
 
 ## Latest measured result
 
-The corrected 2026-08-11 run is summarized in
-[`results/2026-08-11-summary.json`](results/2026-08-11-summary.json). Sourcegraph
-led the directional n=4 localization pilot at Acc@1 0.75 and MRR@10 0.875.
-Code-graph was the strongest local arm at Acc@1 0.50 and MRR@10 0.661; native
-lexical scored 0.500 MRR, deterministic composition 0.438, and the local MiniLM
-code-search arm 0.119. These four cases do not establish statistical
-superiority.
+The 2026-08-12 run is summarized in
+[`results/2026-08-12-summary.json`](results/2026-08-12-summary.json). On the
+unchanged directional n=4 pilot, released code-search v0.3.4 and route-aware
+composition each reached Acc@1 1.00 and MRR@10 1.00. Sourcegraph reached 0.75
+and 0.875, code-graph 0.50 and 0.583, and native lexical 0.50 and 0.50. The
+preceding frozen run is retained in
+[`results/2026-08-11-summary.json`](results/2026-08-11-summary.json): its
+code-search arm measured 0.00/0.119 and symmetric composition 0.25/0.438.
+This is a direct before/after result on the same cases, but four cases do not
+establish statistical superiority.
 
 The largest measured checkout contained 2,351 tracked files and 664,120 UTF-8
-lines. Cold indexing took 22.30 s for code-search and 22.06 s for code-graph;
-warm p50 query latency was approximately 537 ms for each. The one-file Prefect
-update took 2.57 s for search and 5.83 s for graph after the persisted-index
-size defect was fixed in code-search v0.3.3.
+lines. In the latest run, cold indexing took 18.82 s for code-search and 18.27 s
+for code-graph; warm p50 query latency was 501 ms and 496 ms respectively. The
+one-file Prefect update took 2.31 s for search and 5.06 s for graph. The
+persisted-index size defect was fixed in code-search v0.3.3 and the regression
+remains covered in v0.3.4.
 
-Two fresh graph builds were each stable over five warm calls, but one case
-moved from outside the top ten to rank seven between builds. The summary
-therefore records code-graph Acc@10 as a 0.75–1.00 range and MRR@10 as
-0.625–0.661 instead of selecting only the stronger build.
+Code-graph v0.8.0-redacted.3 canonicalizes truncated seeds, adjacency traversal,
+and equal-score result ordering. All four graph rankings were stable across
+five warm calls in the latest fresh build. The prior cross-build variance is
+retained as historical evidence; a larger cross-platform repeat is still
+needed before claiming universal reproducibility.
 
 The Sourcegraph adapter uses the documented
 [V3 streaming endpoint](https://sourcegraph.com/docs/api/stream-api) and

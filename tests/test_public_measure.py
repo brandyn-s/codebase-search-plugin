@@ -27,26 +27,30 @@ class PublicMeasurementTests(unittest.TestCase):
     def test_checked_in_summary_preserves_scope_and_result_bindings(self):
         summary = json.loads(
             (
-                MEASURE / "results" / "2026-08-11-summary.json"
+                MEASURE / "results" / "2026-08-12-summary.json"
             ).read_text(encoding="utf-8")
         )
         self.assertEqual(summary["cases"], 4)
         self.assertEqual(summary["language_model_calls"], 0)
         self.assertIn("no statistical superiority claim", summary["scope"])
         self.assertEqual(
-            summary["corrected_run"]["aggregate"]["sourcegraph"][
+            summary["current_run"]["aggregate"]["code-search"][
                 "file_acc_at_1"
             ],
-            0.75,
+            1.0,
         )
         self.assertEqual(
-            summary["fresh_build_variance"][
-                "code_graph_file_acc_at_10_range"
+            summary["current_run"]["aggregate"]["composed"][
+                "file_mrr_at_10"
             ],
-            [0.75, 1.0],
+            1.0,
         )
         self.assertEqual(
-            summary["incremental"]["fix_release"], "code-search v0.3.3"
+            summary["provenance"]["code_search_release"], "v0.3.4"
+        )
+        self.assertEqual(summary["stability"]["code_graph_stable_cases"], 4)
+        self.assertEqual(
+            summary["prior_baseline"]["code_search_acc_at_1"], 0.0
         )
 
     def test_query_adapter_is_deterministic_and_oracle_blind(self):
