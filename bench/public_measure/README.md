@@ -14,6 +14,13 @@ The latest checked-in compact results are:
   39,222,246-line LLVM checkout, including cold time, peak RSS, persisted
   bytes, bytes per line, and warm latency.
 
+A separate lifecycle instrument, `bench/lifecycle_measure.py`, measures clean,
+true no-op, and comment-only one-file update behavior without invoking a model.
+Its current bounded baseline is
+[`../baselines/2026-08-13-index-lifecycle-resource-baseline.md`](../baselines/2026-08-13-index-lifecycle-resource-baseline.md).
+Unlike the broad scale run, this lifecycle trial requires backend-reported
+source deltas and exact clean-versus-update graph semantic equivalence.
+
 The measurement answers two narrow questions:
 
 1. On a balanced 20-case public LocBench sample, how do code-search,

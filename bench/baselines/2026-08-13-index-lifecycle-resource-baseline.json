@@ -1,0 +1,95 @@
+{
+  "component_sha256": {
+    "code_graph_released": "36d6c9018be11411c2f9718c7185d43e2d96e04db7d1f50e368cb2e7bfb627b5",
+    "code_search_released": "8034a3798c7a20673422eb3026bb79cae6925af68b9a9a7abe573d773fae7ffc"
+  },
+  "finished_at": "2026-08-13T05:42:52.505418Z",
+  "language_model_calls": 0,
+  "measurement_id": "bounded-index-lifecycle-v1",
+  "metrics": {
+    "code_graph": {
+      "allocated_index_bytes": {
+        "clean": 17199104,
+        "no_op": 17186816,
+        "small_change": 17674240
+      },
+      "index_elapsed_seconds": {
+        "clean": 0.703708125,
+        "no_op": 0.26147075,
+        "small_change": 0.654833959
+      },
+      "peak_rss_bytes": {
+        "clean": 137265152,
+        "no_op": 139198464,
+        "small_change": 145997824
+      },
+      "semantic_fingerprint": {
+        "clean_and_small_change_sha256": "80b95c74ce21ae924db8d2054c68ffa6641accfc363ed735b2518601bb13e25b",
+        "edge_count": 10479,
+        "node_count": 4355
+      },
+      "source_delta": {
+        "clean": {"files_changed": 447, "files_discovered": 447, "files_unchanged": 0, "mode": "full"},
+        "no_op": {"files_changed": 0, "files_discovered": 447, "files_unchanged": 447, "mode": "noop"},
+        "small_change": {"files_changed": 1, "files_discovered": 447, "files_unchanged": 446, "mode": "incremental"}
+      },
+      "warm_query_p95_milliseconds": {
+        "clean": 5.302416,
+        "small_change": 5.598917
+      }
+    },
+    "code_search": {
+      "allocated_index_bytes": {
+        "clean": 16588800,
+        "no_op": 16588800,
+        "small_change": 24915968
+      },
+      "index_elapsed_seconds": {
+        "clean": 8.760361083,
+        "no_op": 0.410146042,
+        "small_change": 0.811972375
+      },
+      "peak_rss_bytes": {
+        "clean": 712605696,
+        "no_op": 757727232,
+        "small_change": 761774080
+      },
+      "source_delta": {
+        "clean": {"chunks_added": 767, "chunks_removed": 0, "files_added": 460, "files_modified": 0, "files_removed": 0},
+        "no_op": {"chunks_added": 0, "chunks_removed": 0, "files_added": 0, "files_modified": 0, "files_removed": 0},
+        "small_change": {"chunks_added": 2, "chunks_removed": 1, "files_added": 0, "files_modified": 1, "files_removed": 0}
+      },
+      "warm_query_p95_milliseconds": {
+        "clean": 383.485083,
+        "small_change": 467.172541
+      }
+    }
+  },
+  "mutation": {
+    "bytes_added": 39,
+    "kind": "comment_only",
+    "relative_path": "frontend/src/components/atoms/icons/Descope.tsx"
+  },
+  "raw_operator_result": {
+    "file_sha256": "e5bd1e2dea1c342aa6350fc9404b57ad152310a979ef3590a93e8ca2f5d89fa4",
+    "payload_sha256": "08c4b8c91170da69627e9ea26632033f217cc51ada00f147b4f8b7cd075444bb"
+  },
+  "repository": {
+    "origin": "https://github.com/Chainlit/chainlit.git",
+    "revision": "8b2d4bacfd4fa2c8af72e2d140d527d20125b07b",
+    "tracked_bytes": 4737044,
+    "tracked_files": 513,
+    "tracked_manifest_sha256": "2c2796ce4c4f8d679779af1be557c58cb3758085426062f70b32a4cfe3d74f91",
+    "utf8_text_bytes": 2565422,
+    "utf8_text_lines": 71204
+  },
+  "schema_version": 1,
+  "started_at": "2026-08-13T05:42:23.388566Z",
+  "status": "completed",
+  "summary": {
+    "dominant_index_time_cell": {"component": "code-search", "phase": "clean", "seconds": 8.760361083},
+    "dominant_maintenance_time_cell": {"component": "code-search", "phase": "small_change", "seconds": 0.811972375},
+    "optimization_decision": "No resource optimization: neither measured resource cell failed a preregistered threshold. The proven graph semantic-equivalence failure was the only optimized cell."
+  },
+  "warm_query_repetitions": 20
+}

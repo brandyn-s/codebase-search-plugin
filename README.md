@@ -108,9 +108,10 @@ versus Sourcegraph's 0.150; the paired 22-4 result was significant
 scale measurement covers a 39.2-million-line LLVM checkout plus a
 three-repository query. Code-search v0.3.6 separately improved a paired
 same-index replay from 0.3625 to 0.3875 Acc@1 with 13 cases improved and none
-regressed. Code-graph v0.8.0-redacted.8 adds an independent TypeScript IMPORTS
-result of 456 TP with no FP or FN across Ky and Chainlit's frontend. Final
-public and scale results are reported verbatim in
+regressed. Code-graph v0.8.0-redacted.9 adds an independent TypeScript declared
+relationship result of 13 TP with no FP or FN across Ky, Chainlit's frontend,
+and free-style, while preserving the prior 456/456 TypeScript IMPORTS result.
+Final public and scale results are reported verbatim in
 the capability state; they support only their bounded endpoints, not a claim
 of market-wide superiority. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the gradecard,
@@ -312,7 +313,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.8`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.8).
+[`v0.8.0-redacted.9`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.9).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -366,17 +367,27 @@ release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
 code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
 and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.28 pins code-search v0.3.6 and
-code-graph v0.8.0-redacted.8 and adds persistent
+a search- or graph-primary cascade. Plugin 0.4.29 pins code-search v0.3.6 and
+code-graph v0.8.0-redacted.9 and adds persistent
 per-project SCIP precision, an explicit reachability-versus-taint contract,
 isolated cross-project discovery, immutable graph-index comparison, automated
 Go and TypeScript SCIP preparation, independent Go SSA/RTA and TypeScript
-compiler-tier CALLS and IMPORTS oracles, a lower-memory graph-localization path,
+compiler-tier CALLS and IMPORTS oracles, an independent normal-tier TypeScript
+`INHERITS`/`IMPLEMENTS` oracle, a lower-memory graph-localization path,
 code-aware source-role ranking, and copy-on-write search publication on
 supported filesystems. These changes receive deterministic regression, exact
 installed-component readiness, and direct public/scale measurement rather than
 another model holdout. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
+
+Plugin 0.4.29 also adds a zero-LLM clean/no-op/one-file-update lifecycle
+instrument and a compact released-component resource baseline. On pinned
+Chainlit (71,204 text lines), code-search measured 8.760 s / 0.410 s / 0.812 s
+and code-graph measured 0.704 s / 0.261 s / 0.655 s for those three phases.
+The graph's exact canonical fingerprint remained identical after the
+comment-only update; see
+[`bench/baselines/2026-08-13-index-lifecycle-resource-baseline.md`](bench/baselines/2026-08-13-index-lifecycle-resource-baseline.md)
+for RSS, allocated storage, p95 latency, inputs, and limits.
 
 The direct public and scale instrument lives under `bench/public_measure/`.
 The latest frozen balanced run contains 80 two-source-corroborated cases

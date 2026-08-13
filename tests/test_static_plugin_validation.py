@@ -277,7 +277,7 @@ class StaticPluginValidationTests(unittest.TestCase):
                 checkout
                 / "compatibility"
                 / "attestations"
-                / "code-graph-v0.8.0-redacted.8-provenance.jsonl"
+                / "code-graph-v0.8.0-redacted.9-provenance.jsonl"
             )
             bundle.unlink()
 
@@ -299,7 +299,7 @@ class StaticPluginValidationTests(unittest.TestCase):
                 checkout
                 / "compatibility"
                 / "attestations"
-                / "code-graph-v0.8.0-redacted.8-provenance.jsonl"
+                / "code-graph-v0.8.0-redacted.9-provenance.jsonl"
             )
             bundle.write_text('{"tampered":true}\n', encoding="utf-8")
 
