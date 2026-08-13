@@ -9,9 +9,9 @@ relate, and prove code facts against an exact checkout while preserving the
 origin and assurance tier of every consequential observation.
 
 This grade is based on released and installed behavior, not development plans.
-Plugin 0.4.31 pins code-search v0.3.6 and code-graph
-v0.8.0-redacted.10. The graph release was built from commit
-`eaaa894ef5d499811643c2d01d6c440e3fa3832e` with per-platform checksums and
+Plugin 0.4.32 pins code-search v0.3.6 and code-graph
+v0.8.0-redacted.11. The graph release was built from commit
+`45250f8638308f12447dfe023585e6d7e9ab41a6` with per-platform checksums and
 GitHub-hosted build provenance. The user-scoped plugin installation uses those
 exact component identities and both installed MCPs pass live connection and
 contract checks.
@@ -31,6 +31,8 @@ The product improved materially during this effort:
 - a frozen public comparison is expanded from 20 to 80 balanced cases;
 - a paired n=80 replay measures a code-aware source-role prior and file
   diversification without re-indexing or oracle access;
+- a separate paired n=80 graph replay preserves lexical seed quality through
+  expansion instead of flattening every matched seed to equal weight;
 - released backends are measured on three repositories at once and on a
   39.2-million-line LLVM checkout;
 - copy-on-write search publication avoids most initial compatibility-mirror
@@ -48,7 +50,7 @@ The product improved materially during this effort:
 | Verifiable code intelligence | A | A sealed five-route/two-repetition Stage-4 successor completed 10/10 with 1.0 evidence precision, recall, adjudication, routing, and routing-contract accuracy; zero unsupported claims, errors, or host canary violations. Typed backend IDs and one host state machine make the proof boundary mechanical. This remains one bounded holdout, not a field reliability rate. |
 | General code localization | B+ | On the frozen balanced public LocBench n=80 endpoint, code-search v0.3.5 reached Acc@1 0.375, Acc@10 0.788, and MRR@10 0.503. Sourcegraph reached 0.150/0.188/0.165 with zero request failures. A separate same-index paired replay for v0.3.6 improved its immediate baseline from 0.3625 to 0.3875 Acc@1 and from 0.491 to 0.516 MRR@10, with 13 improved cases and no regressions. These establish bounded progress and narrow superiority on one file-localization endpoint—not general platform superiority. Cursor, Augment, and Greptile remain ungraded because no callable revision-pinned interface was available. |
 | Relationship graph | A- | The normal tier remains tree-sitter plus static heuristics. The released Go compiler tier has independent aggregate precision 0.969, recall 0.932, and F1 0.950 across code-graph and Cobra; TypeScript reached 138/138 compiler-tier CALLS, 456/456 project-local static IMPORTS/re-exports, and 13/13 normal-tier declared `INHERITS`/`IMPLEMENTS` relationships. The new conservative direct-method comparison recovered 43/70 oracle edges with 0.915 precision and 0.614 recall; its represented top-level-type subset reached 1.000 recall. Function-local classes and overload identity remain explicit gaps. Other relationships and languages still lack comparable independent oracles, and not every edge is compiler-derived. |
-| Graph-only conceptual localization | C+ | On the same n=80 issue-localization endpoint, graph-only reached Acc@1 0.175, Acc@10 0.350, and MRR@10 0.219. That is better than the old n=20 result but remains materially weaker than search. Conceptual discovery remains search-primary; graph is primary for explicit relationships, traces, dependencies, and proof. |
+| Graph-only conceptual localization | C+ | The frozen n=80 run established a 0.175/0.350/0.219 Acc@1/Acc@10/MRR@10 baseline. A separate same-index paired replay in v0.8.0-redacted.11 improved it to 0.200/0.400/0.260, with 12 cases improved, 2 regressed, and 66 tied. This is measurable progress but remains materially weaker than search. Conceptual discovery stays search-primary; graph is primary for explicit relationships, traces, dependencies, and proof. |
 | Operational scale | A- | Both released backends completed a 39,222,246-line, 160,123-file LLVM checkout, and direct querying across three isolated repositories also completed. This is direct single-host evidence, not a distributed indexing fleet or failure-recovery study. |
 | Resource efficiency | B | The historical LLVM indexing run persisted 4.98 GB for search and 2.89 GB for graph—7.87 GB combined—and graph indexing peaked at 9.43 GB RSS. The optimized graph localization path separately improved median latency from 12.95 s to 3.02 s with identical output and reduced a fresh-process sample from 1.78 GB to 627 MB. Search v0.3.6 publishes compatibility mirrors with APFS copy-on-write. A new released-component Chainlit lifecycle trial measures clean/no-op/one-file update, allocated storage, process-tree peak RSS, and warm p95; it identifies search clean indexing as the dominant local resource cell. Non-APFS, write-heavy, and fleet behavior remain unmeasured, so efficiency is not class-leading. |
 | Cross-project operations | B | Direct zero-LLM querying across three pinned repositories and 283,785 lines completed without project errors. Search found every oracle file at within-project ranks 1, 1, and 2; graph identified the correct projects but missed the oracle files in its top results. This is not organization-wide ACL, fleet, or globally calibrated ranking. |
@@ -91,6 +93,16 @@ The comparison can support only its preregistered file-localization endpoint.
 It cannot establish general platform superiority, editor/review quality, code
 understanding, or performance against unavailable competitors.
 
+Code-graph v0.8.0-redacted.11 was evaluated separately in a paired, same-index
+replay over those 80 frozen queries and stored index generations. Preserving
+lexical seed quality through graph expansion changed Acc@1 from 0.175 to
+0.200, Acc@3 from 0.250 to 0.300, Acc@10 from 0.350 to 0.400, and MRR@10 from
+0.21932 to 0.26012. Twelve cases improved, two regressed, and 66 tied; seven
+errors remained misses in each arm. A broader compound-token expansion was
+rejected because it restored Acc@1 to 0.175 and caused seven regressions. This
+is paired iteration evidence, not a fresh public comparison or a claim that
+graph should replace semantic search for conceptual discovery.
+
 Code-search v0.3.6 was also evaluated in a separate paired, same-index replay
 against the immediate pre-change `main` revision. With the same 80 queries,
 repositories, revisions, oracle, and stored index generations, its bounded
@@ -109,7 +121,7 @@ status responses report requested/effective tier, artifact digest, coverage,
 drift, replacements, insertions, and degradation. Missing or stale SCIP cannot
 silently present as compiler-grade success.
 
-Plugin 0.4.31 makes two automatic preparation paths operational:
+Plugin 0.4.32 makes two automatic preparation paths operational:
 
 - Go uses the BOM-pinned `scip-go` release on supported macOS arm64 and Linux
   amd64/arm64 hosts.
@@ -153,7 +165,7 @@ path provenance.
 ## Independent compiler-tier accuracy
 
 The Go compiler behavior first released in `v0.8.0-redacted.5` was compared with
-an independent Go SSA/RTA oracle and remains in `v0.8.0-redacted.10`. The oracle
+an independent Go SSA/RTA oracle and remains in `v0.8.0-redacted.11`. The oracle
 loads source with `go/packages`, builds SSA, runs RTA with all source functions
 as roots, and emits definition coordinates. It reads neither SCIP nor
 code-graph truth.
@@ -193,7 +205,7 @@ TypeScript CALLS tier, not compiler-perfect TypeScript graph accuracy.
 
 TypeScript `IMPORTS` has a separate compiler-API oracle that resolves static
 imports and re-exports to project-local source files without reading graph
-output. In code-graph v0.8.0-redacted.10, Ky produced 83 TP, 0 FP, and 0 FN;
+output. In code-graph v0.8.0-redacted.11, Ky produced 83 TP, 0 FP, and 0 FN;
 Chainlit's frontend produced 373 TP, 0 FP, and 0 FN. The aggregate 456/456
 result covers the measured project scopes, including relative `.js` specifiers
 that resolve to `.ts`/`.tsx`, re-export barrels, and unambiguous root-relative
@@ -205,7 +217,7 @@ Normal-tier TypeScript declared relationships have a separate TypeScript 5.9.3
 compiler-API oracle that reads source and compiler symbols but never graph
 output. A hand-enumerated fixture passed 5/5. Across Ky, Chainlit's frontend,
 and free-style at immutable revisions, the prior graph emitted none of the 13
-expected relationships; v0.8.0-redacted.10 produced 10/10 `INHERITS` and 3/3
+expected relationships; v0.8.0-redacted.11 produced 10/10 `INHERITS` and 3/3
 `IMPLEMENTS` edges with zero false positives. This establishes project-local
 declared `extends`/`implements` in the measured scopes, including generic
 targets and interfaces extending local type aliases. It does not establish
@@ -213,7 +225,7 @@ structural interface satisfaction, runtime prototype changes, or external-
 package relationships.
 
 Direct TypeScript/TSX method relationships have a separate TypeScript 5.9.3
-compiler-API oracle. On the hand fixture, v0.8.0-redacted.10 recovered both
+compiler-API oracle. On the hand fixture, v0.8.0-redacted.11 recovered both
 expected method relationships while retaining all five declared type
 relationships. Across frozen scopes in tsyringe, InversifyJS, free-style, and
 Nest core, the prior graph emitted none of 70 expected edges; the release

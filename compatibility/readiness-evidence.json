@@ -4,17 +4,17 @@
   "components": {
     "code-graph": {
       "index_identity": {
-        "captured_at": "2026-08-13T16:27:38Z",
-        "checkout_id": "462fda40baa5dfb842ab755e9565f1237b5ff64064e5440558bcab06b871bd11",
+        "captured_at": "2026-08-13T23:01:10Z",
+        "checkout_id": "df5d1edc4d90fc9821c02e5213e646390f311474e7fd5a202e1b81169c0751e6",
         "dirty_fingerprint": "clean",
-        "index_generation": "a817b59414173f934d66465f2eac89c34705cb691bcefd48790e7a7962e5286b",
-        "repository_id": "462fda40baa5dfb842ab755e9565f1237b5ff64064e5440558bcab06b871bd11",
+        "index_generation": "777cc8929fe1df88b9e7821a06a45f243bb89a1101eda6feabce71afa75d1c55",
+        "repository_id": "df5d1edc4d90fc9821c02e5213e646390f311474e7fd5a202e1b81169c0751e6",
         "schema_version": 1,
         "source_revision": "6cdd8a27ca80fd36c7f27f20dd8c5ce4aaab485e"
       },
-      "install_descriptor_sha256": "16f7611229f708ebfb080862480490e2eeb23bf6c9df943c1fb66aa1da79dd32",
+      "install_descriptor_sha256": "511a36fbb995f7580bcb25bfd686c0ade4e8cc49d1b39aa8dcf20355a2e1ce47",
       "status": "ready",
-      "version": "v0.8.0-redacted.10"
+      "version": "v0.8.0-redacted.11"
     },
     "code-search": {
       "completion": {
@@ -23,22 +23,22 @@
         "files_added": 11,
         "index_identity_status": "ready",
         "index_ready": true,
-        "pipeline_version": "a431f89b4fd0aa86",
+        "pipeline_version": "774b34a8963a630f",
         "success": true
       },
       "evidence_coordinate": {
         "end_line": 3,
-        "index_generation": "a817b59414173f934d66465f2eac89c34705cb691bcefd48790e7a7962e5286b",
+        "index_generation": "777cc8929fe1df88b9e7821a06a45f243bb89a1101eda6feabce71afa75d1c55",
         "relative_path": "src/config.py",
         "start_line": 3,
         "status": "verified"
       },
       "index_identity": {
-        "captured_at": "2026-08-13T16:27:38.059122Z",
-        "checkout_id": "462fda40baa5dfb842ab755e9565f1237b5ff64064e5440558bcab06b871bd11",
+        "captured_at": "2026-08-13T23:01:10.608239Z",
+        "checkout_id": "df5d1edc4d90fc9821c02e5213e646390f311474e7fd5a202e1b81169c0751e6",
         "dirty_fingerprint": "clean",
-        "index_generation": "a817b59414173f934d66465f2eac89c34705cb691bcefd48790e7a7962e5286b",
-        "repository_id": "462fda40baa5dfb842ab755e9565f1237b5ff64064e5440558bcab06b871bd11",
+        "index_generation": "777cc8929fe1df88b9e7821a06a45f243bb89a1101eda6feabce71afa75d1c55",
+        "repository_id": "df5d1edc4d90fc9821c02e5213e646390f311474e7fd5a202e1b81169c0751e6",
         "schema_version": 1,
         "source_revision": "6cdd8a27ca80fd36c7f27f20dd8c5ce4aaab485e"
       },
