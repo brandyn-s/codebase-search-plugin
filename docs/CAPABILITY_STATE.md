@@ -9,9 +9,9 @@ relate, and prove code facts against an exact checkout while preserving the
 origin and assurance tier of every consequential observation.
 
 This grade is based on released and installed behavior, not development plans.
-Plugin 0.4.30 pins code-search v0.3.6 and code-graph
-v0.8.0-redacted.9. The graph release was built from commit
-`b110e6ac2e54682436b3776d90e93d606dcf06f1` with per-platform checksums and
+Plugin 0.4.31 pins code-search v0.3.6 and code-graph
+v0.8.0-redacted.10. The graph release was built from commit
+`eaaa894ef5d499811643c2d01d6c440e3fa3832e` with per-platform checksums and
 GitHub-hosted build provenance. The user-scoped plugin installation uses those
 exact component identities and both installed MCPs pass live connection and
 contract checks.
@@ -26,13 +26,13 @@ The product improved materially during this effort:
 - compiler-derived relationships bind the exact SCIP digest rather than
   relabeling an entire graph as compiler-grade;
 - independent Go SSA/RTA and TypeScript compiler-API oracles now measure
-  released CALLS, TypeScript IMPORTS, and TypeScript declared
-  `INHERITS`/`IMPLEMENTS` relationships;
+  released CALLS, TypeScript IMPORTS, TypeScript declared type relationships,
+  and direct TypeScript method overrides/implementations;
 - a frozen public comparison is expanded from 20 to 80 balanced cases;
 - a paired n=80 replay measures a code-aware source-role prior and file
   diversification without re-indexing or oracle access;
 - released backends are measured on three repositories at once and on a
-  39.2-million-line LLVM checkout; and
+  39.2-million-line LLVM checkout;
 - copy-on-write search publication avoids most initial compatibility-mirror
   allocation on APFS while preserving distinct inodes;
 - a bounded zero-LLM lifecycle instrument measures clean, no-op, and one-file
@@ -47,7 +47,7 @@ The product improved materially during this effort:
 |---|---:|---|
 | Verifiable code intelligence | A | A sealed five-route/two-repetition Stage-4 successor completed 10/10 with 1.0 evidence precision, recall, adjudication, routing, and routing-contract accuracy; zero unsupported claims, errors, or host canary violations. Typed backend IDs and one host state machine make the proof boundary mechanical. This remains one bounded holdout, not a field reliability rate. |
 | General code localization | B+ | On the frozen balanced public LocBench n=80 endpoint, code-search v0.3.5 reached Acc@1 0.375, Acc@10 0.788, and MRR@10 0.503. Sourcegraph reached 0.150/0.188/0.165 with zero request failures. A separate same-index paired replay for v0.3.6 improved its immediate baseline from 0.3625 to 0.3875 Acc@1 and from 0.491 to 0.516 MRR@10, with 13 improved cases and no regressions. These establish bounded progress and narrow superiority on one file-localization endpoint—not general platform superiority. Cursor, Augment, and Greptile remain ungraded because no callable revision-pinned interface was available. |
-| Relationship graph | A- | The normal tier remains tree-sitter plus static heuristics. The released Go compiler tier has independent aggregate precision 0.969, recall 0.932, and F1 0.950 across code-graph and Cobra; TypeScript reached 138/138 compiler-tier CALLS on Ky, 456/456 project-local static IMPORTS/re-exports across Ky and Chainlit's frontend, and 13/13 normal-tier declared `INHERITS`/`IMPLEMENTS` relationships across three public projects. Other relationships and languages still lack comparable independent oracles, and not every edge is compiler-derived. |
+| Relationship graph | A- | The normal tier remains tree-sitter plus static heuristics. The released Go compiler tier has independent aggregate precision 0.969, recall 0.932, and F1 0.950 across code-graph and Cobra; TypeScript reached 138/138 compiler-tier CALLS, 456/456 project-local static IMPORTS/re-exports, and 13/13 normal-tier declared `INHERITS`/`IMPLEMENTS` relationships. The new conservative direct-method comparison recovered 43/70 oracle edges with 0.915 precision and 0.614 recall; its represented top-level-type subset reached 1.000 recall. Function-local classes and overload identity remain explicit gaps. Other relationships and languages still lack comparable independent oracles, and not every edge is compiler-derived. |
 | Graph-only conceptual localization | C+ | On the same n=80 issue-localization endpoint, graph-only reached Acc@1 0.175, Acc@10 0.350, and MRR@10 0.219. That is better than the old n=20 result but remains materially weaker than search. Conceptual discovery remains search-primary; graph is primary for explicit relationships, traces, dependencies, and proof. |
 | Operational scale | A- | Both released backends completed a 39,222,246-line, 160,123-file LLVM checkout, and direct querying across three isolated repositories also completed. This is direct single-host evidence, not a distributed indexing fleet or failure-recovery study. |
 | Resource efficiency | B | The historical LLVM indexing run persisted 4.98 GB for search and 2.89 GB for graph—7.87 GB combined—and graph indexing peaked at 9.43 GB RSS. The optimized graph localization path separately improved median latency from 12.95 s to 3.02 s with identical output and reduced a fresh-process sample from 1.78 GB to 627 MB. Search v0.3.6 publishes compatibility mirrors with APFS copy-on-write. A new released-component Chainlit lifecycle trial measures clean/no-op/one-file update, allocated storage, process-tree peak RSS, and warm p95; it identifies search clean indexing as the dominant local resource cell. Non-APFS, write-heavy, and fleet behavior remain unmeasured, so efficiency is not class-leading. |
@@ -109,7 +109,7 @@ status responses report requested/effective tier, artifact digest, coverage,
 drift, replacements, insertions, and degradation. Missing or stale SCIP cannot
 silently present as compiler-grade success.
 
-Plugin 0.4.30 makes two automatic preparation paths operational:
+Plugin 0.4.31 makes two automatic preparation paths operational:
 
 - Go uses the BOM-pinned `scip-go` release on supported macOS arm64 and Linux
   amd64/arm64 hosts.
@@ -128,8 +128,9 @@ Compiler assurance is edge-scoped. Only a canonical relationship whose
 `resolution_artifact_sha256` matches the prepared artifact satisfies
 `compiler_resolution`. Uncovered, drifted, legacy, and heuristic edges do not.
 TypeScript accuracy is independently measured for compiler-derived CALLS,
-normal-tier static IMPORTS, and normal-tier declared `INHERITS`/`IMPLEMENTS` as
-described below. Other TypeScript relationship types remain ungraded.
+normal-tier static IMPORTS, declared `INHERITS`/`IMPLEMENTS`, and direct method
+overrides/implementations as described below. Remaining TypeScript relationship
+types remain ungraded.
 
 The proof evaluator preserves an evidence lattice rather than flattening every
 signal into one confidence score:
@@ -152,9 +153,10 @@ path provenance.
 ## Independent compiler-tier accuracy
 
 The Go compiler behavior first released in `v0.8.0-redacted.5` was compared with
-an independent Go SSA/RTA oracle and remains in `v0.8.0-redacted.9`. The oracle loads source with
-`go/packages`, builds SSA, runs RTA with all source functions as roots, and
-emits definition coordinates. It reads neither SCIP nor code-graph truth.
+an independent Go SSA/RTA oracle and remains in `v0.8.0-redacted.10`. The oracle
+loads source with `go/packages`, builds SSA, runs RTA with all source functions
+as roots, and emits definition coordinates. It reads neither SCIP nor
+code-graph truth.
 Candidate edges are limited to CALLS edges whose resolver is `scip-ingest` and
 whose artifact digest equals the exact fixture index.
 
@@ -191,7 +193,7 @@ TypeScript CALLS tier, not compiler-perfect TypeScript graph accuracy.
 
 TypeScript `IMPORTS` has a separate compiler-API oracle that resolves static
 imports and re-exports to project-local source files without reading graph
-output. In code-graph v0.8.0-redacted.9, Ky produced 83 TP, 0 FP, and 0 FN;
+output. In code-graph v0.8.0-redacted.10, Ky produced 83 TP, 0 FP, and 0 FN;
 Chainlit's frontend produced 373 TP, 0 FP, and 0 FN. The aggregate 456/456
 result covers the measured project scopes, including relative `.js` specifiers
 that resolve to `.ts`/`.tsx`, re-export barrels, and unambiguous root-relative
@@ -203,12 +205,28 @@ Normal-tier TypeScript declared relationships have a separate TypeScript 5.9.3
 compiler-API oracle that reads source and compiler symbols but never graph
 output. A hand-enumerated fixture passed 5/5. Across Ky, Chainlit's frontend,
 and free-style at immutable revisions, the prior graph emitted none of the 13
-expected relationships; v0.8.0-redacted.9 produced 10/10 `INHERITS` and 3/3
+expected relationships; v0.8.0-redacted.10 produced 10/10 `INHERITS` and 3/3
 `IMPLEMENTS` edges with zero false positives. This establishes project-local
 declared `extends`/`implements` in the measured scopes, including generic
 targets and interfaces extending local type aliases. It does not establish
 structural interface satisfaction, runtime prototype changes, or external-
 package relationships.
+
+Direct TypeScript/TSX method relationships have a separate TypeScript 5.9.3
+compiler-API oracle. On the hand fixture, v0.8.0-redacted.10 recovered both
+expected method relationships while retaining all five declared type
+relationships. Across frozen scopes in tsyringe, InversifyJS, free-style, and
+Nest core, the prior graph emitted none of 70 expected edges; the release
+produced 43 TP, 4 FP, and 27 FN (precision 0.915, recall 0.614, F1 0.735).
+Across the three repositories whose in-scope types are represented as graph
+class/interface nodes, it produced 43 TP, 4 FP, and 0 FN (precision 0.915,
+recall 1.000, F1 0.956). All 27 aggregate misses are function-local classes
+outside the current graph vocabulary. The four strict false positives are
+same-name overload families. This establishes direct declared method
+relationships in the measured scopes; it does not establish structural
+interface satisfaction, inherited interface members, signature-aware overload
+identity, local-class extraction, external declarations, mixins, or prototype
+mutation.
 
 ## Very-large-repository and storage measurement
 
@@ -301,10 +319,9 @@ next grade increase should come from product and measurement work:
    proof; compiler edges strengthen facts but do not make conceptual ranking
    competitive with semantic search.
 3. Extend independent relationship oracles only where users rely on the edge
-   kind next. TypeScript declared `INHERITS`/`IMPLEMENTS` is now measured in a
-   released graph; choose the next cell from observed demand—for example Go or
-   Rust IMPORTS—while retaining per-language and
-   per-relationship scores.
+   kind next. TypeScript declared types and direct methods are now measured in
+   a released graph; choose the next cell from observed demand—for example Go
+   or Rust IMPORTS—while retaining per-language and per-relationship scores.
 4. Use the new bounded clean/no-op/one-file-update lifecycle baseline before
    making the next resource-efficiency change. It identifies search clean
    indexing as the largest local time/RSS cell, but no declared resource gate
