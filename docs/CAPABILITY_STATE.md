@@ -9,7 +9,7 @@ relate, and prove code facts against an exact checkout while preserving the
 origin and assurance tier of every consequential observation.
 
 This grade is based on released and installed behavior, not development plans.
-Plugin 0.4.29 pins code-search v0.3.6 and code-graph
+Plugin 0.4.30 pins code-search v0.3.6 and code-graph
 v0.8.0-redacted.9. The graph release was built from commit
 `b110e6ac2e54682436b3776d90e93d606dcf06f1` with per-platform checksums and
 GitHub-hosted build provenance. The user-scoped plugin installation uses those
@@ -109,7 +109,7 @@ status responses report requested/effective tier, artifact digest, coverage,
 drift, replacements, insertions, and degradation. Missing or stale SCIP cannot
 silently present as compiler-grade success.
 
-Plugin 0.4.29 makes two automatic preparation paths operational:
+Plugin 0.4.30 makes two automatic preparation paths operational:
 
 - Go uses the BOM-pinned `scip-go` release on supported macOS arm64 and Linux
   amd64/arm64 hosts.

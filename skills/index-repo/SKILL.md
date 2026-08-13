@@ -123,6 +123,12 @@ or auto tier, and `--scip-policy` has no effect outside auto mode.
      incompatible response instead of guessing.
    - Reaching the deadline is a timeout failure.
 
+   Retain the completed result's backend-issued lifecycle counts when present:
+   `files_added`, `files_modified`, `files_removed`, `chunks_added`, and
+   `chunks_removed`. Report the values verbatim; code-search does not issue an
+   operation-mode label, so do not manufacture `full`, `noop`, or
+   `incremental` from those counts.
+
    **Do not run code-graph indexing. Do not start code-graph** and do not call
    `switch_project` unless the bound semantic job satisfied every
    completed-result gate above.
@@ -193,6 +199,15 @@ or auto tier, and `--scip-policy` has no effect outside auto mode.
    non-ready status, degraded identity, or missing project is a partial-index
    failure; report semantic success and graph failure, but do not claim the
    repository is ready.
+
+   Retain `index_delta` from the graph completion response when present. Report
+   `index_delta.mode` (`full`, `noop`, or `incremental`) plus
+   `files_discovered`, `files_changed`, and `files_unchanged` verbatim. These
+   fields are non-gating lifecycle telemetry: an absent or malformed delta is
+   reported as unavailable but does not override the readiness and identity
+   gates above. A `noop` delta means the backend observed no changed source
+   files; do not infer semantic equivalence from it. Semantic-equivalence and
+   resource measurements remain the bounded lifecycle harness's job.
 
 6. Verify both engines independently after indexing:
    ```
@@ -265,11 +280,12 @@ or auto tier, and `--scip-policy` has no effect outside auto mode.
    Require an explicit success response. A switch failure means indexing
    succeeded but the repository is not ready for immediate queries.
 
-8. Summarize semantic chunks/files/time, graph nodes/edges/time, requested and
-   effective graph precision with SCIP coverage/drift, the shared
-   `index_generation`, and the active project. Confirm readiness only when
-   every prior gate succeeded. Otherwise use the phrase **partial index** and
-   state the failed gate and safe retry action.
+8. Summarize semantic chunks/files/time and file/chunk deltas; graph
+   nodes/edges/time and its reported lifecycle mode plus discovered/changed/
+   unchanged counts; requested and effective graph precision with SCIP
+   coverage/drift; the shared `index_generation`; and the active project.
+   Confirm readiness only when every prior gate succeeded. Otherwise use the
+   phrase **partial index** and state the failed gate and safe retry action.
 
 ## Notes
 

@@ -9,6 +9,34 @@ SKILL = ROOT / "skills" / "index-repo" / "SKILL.md"
 
 
 class IndexRepoSkillContractTests(unittest.TestCase):
+    def test_reports_backend_lifecycle_deltas_without_making_them_readiness_gates(self):
+        text = SKILL.read_text(encoding="utf-8")
+        normalized = " ".join(text.split())
+
+        for semantic_delta in (
+            "files_added",
+            "files_modified",
+            "files_removed",
+            "chunks_added",
+            "chunks_removed",
+        ):
+            self.assertIn(semantic_delta, text)
+
+        for graph_delta in (
+            "index_delta.mode",
+            "full",
+            "noop",
+            "incremental",
+            "files_discovered",
+            "files_changed",
+            "files_unchanged",
+        ):
+            self.assertIn(graph_delta, text)
+
+        self.assertIn("non-gating lifecycle telemetry", normalized)
+        self.assertIn("do not infer semantic equivalence", normalized.lower())
+        self.assertNotIn("peak RSS", text)
+
     def test_auto_scip_is_explicit_pinned_and_never_silently_compiler_grade(self):
         text = SKILL.read_text(encoding="utf-8")
         normalized = " ".join(text.split())

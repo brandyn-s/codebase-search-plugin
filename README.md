@@ -367,7 +367,7 @@ release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
 code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
 and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.29 pins code-search v0.3.6 and
+a search- or graph-primary cascade. Plugin 0.4.30 pins code-search v0.3.6 and
 code-graph v0.8.0-redacted.9 and adds persistent
 per-project SCIP precision, an explicit reachability-versus-taint contract,
 isolated cross-project discovery, immutable graph-index comparison, automated
@@ -379,6 +379,11 @@ supported filesystems. These changes receive deterministic regression, exact
 installed-component readiness, and direct public/scale measurement rather than
 another model holdout. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
+
+Plugin 0.4.30 also updates `/index-repo` to report backend-issued semantic
+file/chunk deltas and code-graph's explicit `full`/`noop`/`incremental`
+lifecycle mode. This is operator telemetry, not a new readiness gate or a
+substitute for the bounded resource and semantic-equivalence harness.
 
 Plugin 0.4.29 also adds a zero-LLM clean/no-op/one-file-update lifecycle
 instrument and a compact released-component resource baseline. On pinned
