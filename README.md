@@ -106,7 +106,11 @@ gates. On 80 balanced public LocBench cases, code-search reached 0.375 Acc@1
 versus Sourcegraph's 0.150; the paired 22-4 result was significant
 (p=0.00053), supporting narrow file-localization superiority only. Direct
 scale measurement covers a 39.2-million-line LLVM checkout plus a
-three-repository query. Final public and scale results are reported verbatim in
+three-repository query. Code-search v0.3.6 separately improved a paired
+same-index replay from 0.3625 to 0.3875 Acc@1 with 13 cases improved and none
+regressed. Code-graph v0.8.0-redacted.8 adds an independent TypeScript IMPORTS
+result of 456 TP with no FP or FN across Ky and Chainlit's frontend. Final
+public and scale results are reported verbatim in
 the capability state; they support only their bounded endpoints, not a claim
 of market-wide superiority. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the gradecard,
@@ -286,7 +290,7 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.3.5`](https://github.com/redacted-org/code-search/releases/tag/v0.3.5)
+[`v0.3.6`](https://github.com/redacted-org/code-search/releases/tag/v0.3.6)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
@@ -308,7 +312,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.7`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.7).
+[`v0.8.0-redacted.8`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.8).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -362,13 +366,14 @@ release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
 code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
 and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
 deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.27 pins code-search v0.3.5 and
-code-graph v0.8.0-redacted.7 and adds persistent
+a search- or graph-primary cascade. Plugin 0.4.28 pins code-search v0.3.6 and
+code-graph v0.8.0-redacted.8 and adds persistent
 per-project SCIP precision, an explicit reachability-versus-taint contract,
 isolated cross-project discovery, immutable graph-index comparison, automated
 Go and TypeScript SCIP preparation, independent Go SSA/RTA and TypeScript
-compiler-tier CALLS oracles, and a lower-memory graph-localization path. These
-changes receive deterministic regression, exact
+compiler-tier CALLS and IMPORTS oracles, a lower-memory graph-localization path,
+code-aware source-role ranking, and copy-on-write search publication on
+supported filesystems. These changes receive deterministic regression, exact
 installed-component readiness, and direct public/scale measurement rather than
 another model holdout. See
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
@@ -382,6 +387,11 @@ Acc@1 0.375, Acc@10 0.788, and MRR@10 0.503 versus Sourcegraph at
 narrow claim are recorded in
 [`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md); conceptual discovery
 remains search-primary regardless of the graph arm's result.
+
+A separate same-index replay isolated the v0.3.6 source-role prior and result
+diversification: Acc@1 improved from 0.3625 to 0.3875 and MRR@10 from 0.49147
+to 0.51608, with 13 improved cases and no regressions. It did not re-run the
+public comparator and is not a broader superiority result.
 
 Both released backends also completed a clean, revision-pinned LLVM checkout
 containing 39,222,246 UTF-8 source lines and 160,123 tracked files. Search
@@ -398,6 +408,13 @@ query over that preserved index. Median latency fell from 12.95 seconds to
 to 627 MB while preserving the ranked-output SHA-256 exactly. This improves the
 measured localization path; it does not retroactively change the historical
 full-indexing or broad warm-query measurements above.
+
+Search v0.3.6 also uses APFS copy-on-write clones for mutable compatibility
+mirrors of immutable generations. In a controlled 282,106,413-byte artifact
+replay, initial allocation fell from 282,017,792 bytes to 446,464 bytes while
+retaining distinct inodes and independent writes. Portable copy remains the
+fallback on unsupported filesystems; this is not a logical-size or mature-index
+compaction claim.
 
 The content-addressed five-arm localization instrument lives under
 `bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture

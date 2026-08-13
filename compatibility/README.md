@@ -10,7 +10,7 @@ published component and has been captured from `tools/list`.
 The current BOM's integrated readiness status is `ready`. Its
 `tested_capabilities` section declares complete version-1 `index_identity`
 outputs, semantic `index_ready`, graph `status: ready`, and the optional
-boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.7`. The
+boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.8`. The
 committed schema snapshots cover MCP input surfaces; they do not by themselves
 prove output behavior. `/index-repo` revalidates every live input-schema
 fingerprint before either index starts.
@@ -64,9 +64,10 @@ only emitted relationship references bound to that digest can satisfy
 This is bounded per-repository automation, not a general SCIP indexing fleet.
 
 The released Go compiler tier has an independent SSA/RTA CALLS oracle. The
-TypeScript path has deterministic generation and ingestion coverage but does
-not yet have a comparably independent compiler-tier accuracy oracle, so its
-presence must not be interpreted as a language-wide accuracy score.
+TypeScript tier has independent compiler-API results for CALLS and project-local
+static IMPORTS/re-exports. These measurements remain scoped to their named
+fixtures and edge kinds; unmeasured relationships remain artifact-bound rather
+than globally graded.
 
 A blocked BOM remains fail-closed. The smoke generator refuses to start either
 server for a blocked BOM unless a reviewer explicitly supplies
@@ -75,7 +76,7 @@ server for a blocked BOM unless a reviewer explicitly supplies
 ## Code-search release promotion
 
 The production BOM pins code-search release
-[`v0.3.5`](https://github.com/redacted-org/code-search/releases/tag/v0.3.5),
+[`v0.3.6`](https://github.com/redacted-org/code-search/releases/tag/v0.3.6),
 its exact source commit, wheel, and offline attestation bundle. Contract
 capture and validation support future GitHub Release wheel candidates without
 weakening readiness: capture preserves the complete release descriptor,

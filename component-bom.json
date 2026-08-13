@@ -5,29 +5,29 @@
         "assets": {
           "darwin-amd64": {
             "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-            "sha256": "75a082b658824c29e000273682227829212506dc1259708d7243af15ae686f99"
+            "sha256": "2fb87b65ecd1d953f90a411f4099b3f544008ebf8848eea2df1f43df937d8c00"
           },
           "darwin-arm64": {
             "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-            "sha256": "87662fa9d480b33ea22ead89205405587882bd2bb6f3321212bcac949e36e3bc"
+            "sha256": "d813419c468b01f30ada8303a1d025a637f0e2184ba99665a4d311183163372a"
           },
           "linux-amd64": {
             "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-            "sha256": "2fd7ae7ac78eacd0a7b29d2d7cf4d34284bd5a0cfe7d0aa8523fd7642c080602"
+            "sha256": "92c875652522a39cadac1186cfbba69987655936a72d9facbb8c5a811119178c"
           },
           "linux-arm64": {
             "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-            "sha256": "214a1a87e5e8c08fbb5d7414cf3b9fe63e70da7ed77230696f1f251b2fae8763"
+            "sha256": "3ac70e2f5a97d859eb51c9a359b3d044c03f92ce5665c95e0c266ccd03697757"
           },
           "windows-amd64": {
             "name": "codebase-memory-mcp-windows-amd64.zip",
-            "sha256": "4fe42406d43b1a738f86563c4f69c1e58dae0bda72accb16731a408045f17394"
+            "sha256": "db97fa5e1a0aabc25ed04461897e90eddf9318ea07e13ae120616ecb23d98a4b"
           }
         },
         "attestation": {
           "bundle": {
-            "path": "compatibility/attestations/code-graph-v0.8.0-redacted.7-provenance.jsonl",
-            "sha256": "c929eb62a257accf5e02b4cdfc462352a8227943f9b35d164ce1d567b03c66e3"
+            "path": "compatibility/attestations/code-graph-v0.8.0-redacted.8-provenance.jsonl",
+            "sha256": "4e04645f15ff9473acfa02f4c7b73ca33e292b77e52910383618bf0a1cd125b4"
           },
           "deny_self_hosted_runners": true,
           "signer_workflow": "redacted-org/code-graph/.github/workflows/release.yml",
@@ -35,12 +35,12 @@
         },
         "checksums": {
           "name": "checksums.txt",
-          "sha256": "14c5e79571ff91be899eed1e1c5aa8e1d11bf5aa50b4faddc2f77a35a5803847"
+          "sha256": "fceffda23020adcde6087bd498f2ff46cc46f0ac8f204a1046a2021ddbe8a3a9"
         },
         "kind": "github-release",
         "repository": "redacted-org/code-graph",
-        "source_revision": "d10625db5b63ea8df4bfac924a11693c949fa19f",
-        "tag": "v0.8.0-redacted.7"
+        "source_revision": "de34f1bf965f8d82649c7b9071ee765e5a037ca2",
+        "tag": "v0.8.0-redacted.8"
       },
       "schema_snapshot": "compatibility/code-graph-tools.json",
       "tested_capabilities": {
@@ -67,13 +67,13 @@
     "code-search": {
       "install": {
         "asset": {
-          "name": "redacted_code_search-0.3.5-py3-none-any.whl",
-          "sha256": "6d0b7475eab8d53b55f0c1457848edf813d66368ff412fc662ab824eef17a82f"
+          "name": "redacted_code_search-0.3.6-py3-none-any.whl",
+          "sha256": "2bc9837404b56864fd3349686842edcb02edec5f0a355f584be5b12e70c50554"
         },
         "attestation": {
           "bundle": {
-            "name": "redacted_code_search-0.3.5-provenance.jsonl",
-            "sha256": "c3225e28e13d4251d1a6f7d1a23eb3f9002cd8f860fa455f323a0f281df2bde2"
+            "name": "redacted_code_search-0.3.6-provenance.jsonl",
+            "sha256": "eb82d10c8de043177068a7f646bd5f2b0f721fe72f707010ed456d57462526c1"
           },
           "deny_self_hosted_runners": true,
           "signer_workflow": "redacted-org/code-search/.github/workflows/release.yml",
@@ -81,12 +81,12 @@
         },
         "checksums": {
           "name": "SHA256SUMS",
-          "sha256": "01c0a96d37dc16b569fde6de1e38dcce90c3a4a4a57d2dcea87221b77f6b74d9"
+          "sha256": "44b0fab5207397ba6c1ffa4a29b00ca49052ee39ef809cb4f91833260a475eec"
         },
         "kind": "github-release",
         "repository": "redacted-org/code-search",
-        "source_revision": "71764535b7bbf8f2f2d9c113f76f955fa48dda59",
-        "tag": "v0.3.5"
+        "source_revision": "cbdb9bdedd2f296ec7235cf810b7e5c471b415ea",
+        "tag": "v0.3.6"
       },
       "schema_snapshot": "compatibility/code-search-tools.json",
       "tested_capabilities": {

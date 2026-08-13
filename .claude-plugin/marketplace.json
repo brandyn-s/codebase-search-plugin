@@ -9,7 +9,7 @@
       "name": "codebase-search",
       "source": "./",
       "description": "Verifiable code intelligence over an exact checkout with semantic discovery, structural understanding, and deterministic proofs.",
-      "version": "0.4.27",
+      "version": "0.4.28",
       "author": {
         "name": "redacted Security"
       },
