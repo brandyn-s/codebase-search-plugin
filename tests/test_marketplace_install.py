@@ -30,7 +30,7 @@ class MarketplaceInstallTests(unittest.TestCase):
 
         self.assertIn(
             "claude plugin marketplace add "
-            "redacted-org/codebase-search-plugin",
+            "brandyn-s/codebase-search-plugin",
             readme,
         )
         self.assertIn(

@@ -64,6 +64,8 @@ NODE_RUNTIME_ASSET_NAMES = {
 CODE_SEARCH_GIT_REPOSITORY = (
     "https://github.com/redacted-org/code-search.git"
 )
+# TODO(brandyn-s primary): component pins still reference the redacted-org
+# releases they were built from; re-point when the first brandyn-s releases are promoted.
 CODE_SEARCH_RELEASE_REPOSITORY = "redacted-org/code-search"
 CODE_SEARCH_RELEASE_SIGNER_WORKFLOW = (
     "redacted-org/code-search/.github/workflows/release.yml"

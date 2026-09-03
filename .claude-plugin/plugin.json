@@ -5,6 +5,6 @@
   "author": {
     "name": "redacted Security"
   },
-  "repository": "https://github.com/redacted-org/codebase-search-plugin",
+  "repository": "https://github.com/brandyn-s/codebase-search-plugin",
   "keywords": ["code-search", "code-graph", "semantic-search", "codebase-analysis"]
 }

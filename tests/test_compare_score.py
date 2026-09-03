@@ -609,7 +609,7 @@ class ComparisonScoreTests(unittest.TestCase):
         )
 
         canonical_repository = (
-            "https://github.com/redacted-org/"
+            "https://github.com/brandyn-s/"
             "codebase-search-plugin.git"
         )
         self.assertEqual(

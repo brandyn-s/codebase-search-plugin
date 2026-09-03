@@ -256,7 +256,7 @@ HARNESS_SOURCE_FILES = (
     "bench/compare/token_accounting.py",
 )
 PLUGIN_REPOSITORY = (
-    "https://github.com/redacted-org/codebase-search-plugin.git"
+    "https://github.com/brandyn-s/codebase-search-plugin.git"
 )
 
 

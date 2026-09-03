@@ -20,7 +20,7 @@ structural indexing workflow.
 
 ```bash
 # 1. Add the GitHub-backed marketplace
-claude plugin marketplace add redacted-org/codebase-search-plugin
+claude plugin marketplace add brandyn-s/codebase-search-plugin
 
 # 2. Install the namespaced plugin for your user
 claude plugin install codebase-search@redacted-code-intelligence --scope user
@@ -294,7 +294,7 @@ The `install.sh` script handles everything else — no need to manually clone or
 ### Manual install (alternative)
 
 The production BOM pins code-search release
-[`v0.3.6`](https://github.com/redacted-org/code-search/releases/tag/v0.3.6)
+[`v0.3.6`](https://github.com/brandyn-s/code-search/releases/tag/v0.3.6)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
@@ -316,7 +316,7 @@ For a manual install, follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use release
-[`v0.8.0-redacted.11`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.11).
+[`v0.8.0-redacted.11`](https://github.com/brandyn-s/code-graph/releases/tag/v0.8.0-redacted.11).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
@@ -500,7 +500,7 @@ binary digests, and runs the generator verifier. It runs only from a trusted
 `main` push or a manual default-branch dispatch, never on `pull_request`.
 `CODE_INTEL_COMPONENT_TOKEN` is a required post-merge validation secret:
 configure a fine-grained token with read access to
-`redacted-org/code-search` and `redacted-org/code-graph`.
+`brandyn-s/code-search` and `brandyn-s/code-graph`.
 The validator exposes it only to authenticated GitHub fetch/tag-resolution
 commands and removes it before package builds or MCP processes start.
 The installed-component smoke also performs a lexical evidence query against
@@ -719,9 +719,9 @@ Set via `LOCAL_EMBEDDING_MODEL=jinaai/jina-code-embeddings-1.5b`. Both support M
 
 **code-graph** (structural): Rust, Python, TypeScript, JavaScript, Go, Java, C, C++, C#, Nix, HCL, Ruby, Swift, Kotlin, Scala, and more.
 
-## Lessons Learned: prototype-software-merry
+## Lessons Learned: large monorepos
 
-Practical advice from running this plugin on the Corsair monorepo (~4,800 files, 34K chunks, Rust/Nix/TypeScript/Python/HCL).
+Practical advice from running this plugin on a large private monorepo (~4,800 files, 34K chunks, Rust/Nix/TypeScript/Python/HCL).
 These are historical component observations and workflow guidance, not the
 readiness evidence for the current BOM.
 
@@ -734,9 +734,9 @@ working on:
 
 ```
 /index-repo /path/to/monorepo/nix           # NixOS system config
-/index-repo /path/to/monorepo/assetman      # Asset management service (Rust)
+/index-repo /path/to/monorepo/asset-service # Asset management service (Rust)
 /index-repo /path/to/monorepo/libnet        # Networking library (Rust)
-/index-repo /path/to/monorepo/mithrandir    # Web UI (TypeScript)
+/index-repo /path/to/monorepo/web-ui        # Web UI (TypeScript)
 ```
 
 The active project auto-switches when you ask questions. If you're working on the Rust networking library, the results come from `libnet` — not the entire monorepo.
@@ -853,3 +853,21 @@ deltas without treating retrieval scores as comparable.
   MCP to prevent all graph Voyage calls. `CODE_GRAPH_SKIP_EMBEDDINGS=1`
   prevents node-embedding generation but does not by itself prevent query
   embedding against a pre-existing graph index while the key remains present.
+
+## License
+
+The plugin itself (this repository: skills, installer, validators, benchmark
+harness) is licensed under the MIT License; see `LICENSE`.
+
+### Third-party components
+
+The installer downloads two separately licensed components that remain under
+their own licenses:
+
+- **code-search** ([brandyn-s/code-search](https://github.com/brandyn-s/code-search))
+  is licensed under the GNU General Public License v3.0. It is derived from
+  [FarhanAliRaza/claude-context-local](https://github.com/FarhanAliRaza/claude-context-local).
+- **code-graph** ([brandyn-s/code-graph](https://github.com/brandyn-s/code-graph))
+  is licensed under the MIT License. It is derived from
+  [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)
+  and bundles tree-sitter grammars under their respective licenses.
