@@ -757,6 +757,10 @@ Write-Output "token-isolation-ok"
             + "\n"
             + f"""
 $ErrorActionPreference = "Stop"
+# Invoke-GitHubApiJson consults Test-GitHubCliAuthenticated (defined elsewhere
+# in install.ps1) to choose between gh and the REST API; the probe forces the
+# gh path so the mocked gh below serves every response.
+function Test-GitHubCliAuthenticated {{ return $true }}
 $script:Responses = [System.Collections.Generic.Queue[object]]::new()
 $script:Responses.Enqueue([string[]]@(
     '{{"object": {{',
