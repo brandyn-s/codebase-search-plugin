@@ -143,7 +143,7 @@ or auto tier, and `--scip-policy` has no effect outside auto mode.
     ```
     python "${CLAUDE_PLUGIN_ROOT}/scripts/prepare_scip_index.py" prepare \
       <resolved-root> \
-      --generator "${CLAUDE_PLUGIN_ROOT}/bin/scip-go" \
+      --generator "${CLAUDE_PLUGIN_ROOT}/.runtime/bin/scip-go" \
       --component-bom "${CLAUDE_PLUGIN_ROOT}/component-bom.json" \
       --cache-root "$HOME/.cache/redacted-code-intel/scip"
     ```
@@ -154,8 +154,8 @@ or auto tier, and `--scip-policy` has no effect outside auto mode.
     python "${CLAUDE_PLUGIN_ROOT}/scripts/prepare_scip_index.py" prepare \
       <resolved-root> \
       --language typescript \
-      --runtime "${CLAUDE_PLUGIN_ROOT}/bin/scip-typescript-runtime/node/bin/node" \
-      --generator "${CLAUDE_PLUGIN_ROOT}/bin/scip-typescript-runtime/package/node_modules/@sourcegraph/scip-typescript/dist/src/main.js" \
+      --runtime "${CLAUDE_PLUGIN_ROOT}/.runtime/bin/scip-typescript-runtime/node/bin/node" \
+      --generator "${CLAUDE_PLUGIN_ROOT}/.runtime/bin/scip-typescript-runtime/package/node_modules/@sourcegraph/scip-typescript/dist/src/main.js" \
       --component-bom "${CLAUDE_PLUGIN_ROOT}/component-bom.json" \
       --cache-root "$HOME/.cache/redacted-code-intel/scip"
     ```

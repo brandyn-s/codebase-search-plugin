@@ -1389,10 +1389,12 @@ if bom and isinstance(bom.get("components"), dict):
         for required_text in ("component-bom.json", "validate_installed.py"):
             if required_text not in installer:
                 errors.append(f"{installer_rel}: does not use {required_text}")
+        # Installers may talk to the GitHub API to resolve the pinned tag, but
+        # must never pick a moving release.
         for forbidden_text in (
             "gh release list",
-            "api.github.com",
-            "Invoke-RestMethod",
+            "releases/latest",
+            "/releases?",
         ):
             if forbidden_text in installer:
                 errors.append(

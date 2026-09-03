@@ -16,7 +16,7 @@ import sys
 from typing import Any
 
 
-PLUGIN_ID = "codebase-search@redacted-code-intelligence"
+PLUGIN_ID = "codebase-search@code-intelligence"
 SEMANTIC_TOOL = (
     "mcp__plugin_codebase-search_code-search__search_code_evidence"
 )

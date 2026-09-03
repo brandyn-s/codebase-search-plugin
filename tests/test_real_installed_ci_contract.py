@@ -122,7 +122,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("--local-model", helper)
         self.assertTrue(MODEL_BUILDER.is_file(), MODEL_BUILDER)
 
-        readme = README.read_text(encoding="utf-8")
+        readme = (ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
         self.assertIn("CODE_INTEL_COMPONENT_TOKEN", readme)
         normalized_readme = " ".join(readme.lower().split())
         self.assertIn("trusted `main` push", normalized_readme)

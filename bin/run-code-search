@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# MCP launcher for code-search. Referenced by .mcp.json; installs the pinned
+# component on first launch (see bin/_bootstrap.sh), then execs it.
+set -euo pipefail
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=bin/_bootstrap.sh
+. "$PLUGIN_DIR/bin/_bootstrap.sh"
+ensure_components_installed "$PLUGIN_DIR"
+exec "$(code_search_executable "$PLUGIN_DIR")" "$@"

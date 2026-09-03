@@ -1,0 +1,33 @@
+name: Bug report
+description: Something in the plugin, installer, or skills does not work
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: From `claude plugin list`
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [install / bootstrap, /index-repo, /code-intel or /code-explore, code-search server, code-graph server, docs]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the command or prompt and the exact output. For install problems attach `.runtime/bootstrap.log`.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: input
+    id: platform
+    attributes:
+      label: OS, architecture, Python version

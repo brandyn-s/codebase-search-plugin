@@ -95,13 +95,12 @@ class InstalledContractTests(unittest.TestCase):
             self.assertIn("validate_installed.py", installer)
             self.assertIn("verify_code_search_revision.py", installer)
             self.assertNotIn("release list", installer)
-            self.assertNotIn("api.github.com", installer)
-            self.assertNotIn("Invoke-RestMethod", installer)
+            self.assertNotIn("releases/latest", installer)
             self.assertNotIn(code_search_version, installer)
             self.assertNotIn(graph_tag, installer)
             self.assertLess(
                 installer.index("validate_plugin.py"),
-                installer.index("Installing redacted-code-search"),
+                installer.index("Installing code-search"),
             )
 
         self.assertIn(
@@ -145,7 +144,7 @@ class InstalledContractTests(unittest.TestCase):
         )[1].split("# ------------------------------------------------------------------", 1)[0]
         for contract in (
             "resolve_release_tag_commit",
-            "gh release download",
+            "download_release_asset",
             "verify_sha256",
             "tar xzf",
             "prepare_scip_index.py\" verify",
@@ -230,9 +229,9 @@ class InstalledContractTests(unittest.TestCase):
         )
 
     def test_manual_install_uses_bom_release_and_verifies_provenance(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        manual = readme.split("### Manual install (alternative)", 1)[1].split(
-            "## Routing and Evidence Evaluation", 1
+        install_doc = (ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+        manual = install_doc.split("## Manual install (alternative)", 1)[1].split(
+            "## Trusted component validation", 1
         )[0]
 
         self.assertIn("github-release", manual)

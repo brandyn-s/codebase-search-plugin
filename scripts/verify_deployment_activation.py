@@ -14,7 +14,7 @@ import subprocess
 import sys
 
 
-PLUGIN_ID = "codebase-search@redacted-code-intelligence"
+PLUGIN_ID = "codebase-search@code-intelligence"
 SEMANTIC_TOOL = "mcp__plugin_codebase-search_code-search__search_code_evidence"
 RELATIONSHIP_TOOL = "mcp__plugin_codebase-search_code-graph__trace_call_path"
 ALLOWED_RUNTIME_TOOLS = {"ToolSearch", SEMANTIC_TOOL, RELATIONSHIP_TOOL}
@@ -57,7 +57,7 @@ def _durable_runtime_connected(
     marketplace_root = marketplace.get("installLocation")
     install_root = plugin.get("installPath")
     expected_install_suffix = (
-        "/.claude/plugins/cache/redacted-code-intelligence/"
+        "/.claude/plugins/cache/code-intelligence/"
         f"codebase-search/{expected_version}"
     )
     if (
@@ -75,7 +75,7 @@ def _durable_runtime_connected(
         return False
     expected = {
         "code-search": f"{install_root.rstrip('/')}/bin/run-code-search",
-        "code-graph": f"{install_root.rstrip('/')}/bin/codebase-memory-mcp",
+        "code-graph": f"{install_root.rstrip('/')}/bin/code-graph",
     }
     for component, command in expected.items():
         matching = [
@@ -588,7 +588,7 @@ def deployment_stage(repo: Path, evidence_root: Path, claude: Path) -> int:
     sources = [
         item
         for item in marketplaces
-        if item.get("name") == "redacted-code-intelligence"
+        if item.get("name") == "code-intelligence"
     ]
     if len(installed) != 1 or len(sources) != 1:
         return 1

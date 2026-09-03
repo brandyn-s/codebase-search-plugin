@@ -6,7 +6,7 @@
       "type": "stdio"
     },
     "code-graph": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/bin/codebase-memory-mcp",
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/code-graph",
       "args": [],
       "type": "stdio"
     }

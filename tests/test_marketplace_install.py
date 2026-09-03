@@ -15,8 +15,8 @@ class MarketplaceInstallTests(unittest.TestCase):
             (ROOT / ".claude-plugin" / "plugin.json").read_text()
         )
 
-        self.assertEqual(plugin["version"], "0.4.32")
-        self.assertEqual(marketplace["name"], "redacted-code-intelligence")
+        self.assertEqual(plugin["version"], "0.5.0")
+        self.assertEqual(marketplace["name"], "code-intelligence")
         self.assertEqual(len(marketplace["plugins"]), 1)
         entry = marketplace["plugins"][0]
         self.assertEqual(entry["name"], plugin["name"])
@@ -28,58 +28,47 @@ class MarketplaceInstallTests(unittest.TestCase):
         shell_installer = (ROOT / "install.sh").read_text()
         powershell_installer = (ROOT / "install.ps1").read_text()
 
-        self.assertIn(
-            "claude plugin marketplace add "
-            "brandyn-s/codebase-search-plugin",
-            readme,
+        marketplace_add = (
+            "claude plugin marketplace add brandyn-s/codebase-search-plugin"
         )
-        self.assertIn(
-            "claude plugin install codebase-search@redacted-code-intelligence",
-            readme,
+        plugin_install = (
+            "claude plugin install codebase-search@code-intelligence --scope user"
         )
+        self.assertIn(marketplace_add, readme)
+        self.assertIn(plugin_install, readme)
         self.assertNotIn('claude plugin marketplace add "$PWD"', readme)
         self.assertNotIn("/install-plugin", readme)
         self.assertNotIn("/install-plugin", shell_installer)
         self.assertNotIn("/install-plugin", powershell_installer)
 
-        quick_start = readme.split("## Quick Start", 1)[1].split(
-            "This runs both semantic", 1
-        )[0]
-        plugin_install = (
-            "claude plugin install "
-            "codebase-search@redacted-code-intelligence --scope user"
-        )
-        installed_path = 'next(x["installPath"]'
-        native_install = 'bash "$PLUGIN_DIR/install.sh"'
-        self.assertLess(quick_start.index(plugin_install), quick_start.index(installed_path))
-        self.assertLess(quick_start.index(installed_path), quick_start.index(native_install))
-        self.assertNotIn('next(x["installLocation"]', quick_start)
+        install = readme.split("## Install", 1)[1].split("## Use", 1)[0]
+        self.assertLess(install.index(marketplace_add), install.index(plugin_install))
+        # The launchers bootstrap the components; the README must not ask
+        # users to locate the plugin cache or run the installer by hand.
+        self.assertNotIn('next(x["installPath"]', readme)
+        self.assertNotIn('next(x["installLocation"]', readme)
+        self.assertNotIn('bash "$PLUGIN_DIR/install.sh"', readme)
+        self.assertIn("install themselves", install)
+        self.assertIn(".runtime/bootstrap.log", install)
+        for installer in (shell_installer, powershell_installer):
+            self.assertIn(marketplace_add, installer)
+            self.assertIn(plugin_install, installer)
 
-    def test_upgrade_installs_native_components_inside_exact_plugin_cache(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        upgrade = readme.split("## Upgrade", 1)[1].split(
-            "## Current measured state", 1
+    def test_upgrade_refreshes_native_components_inside_exact_plugin_cache(self):
+        install_doc = (ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+        upgrade = install_doc.split("## Upgrade", 1)[1].split(
+            "## Readiness record", 1
         )[0]
 
-        marketplace_update = (
-            "claude plugin marketplace update redacted-code-intelligence"
-        )
+        marketplace_update = "claude plugin marketplace update code-intelligence"
         plugin_update = (
-            "claude plugin update "
-            "codebase-search@redacted-code-intelligence --scope user"
+            "claude plugin update codebase-search@code-intelligence --scope user"
         )
-        installed_path = 'next(x["installPath"]'
-        native_install = 'bash "$PLUGIN_DIR/install.sh"'
-        for command in (
-            marketplace_update,
-            plugin_update,
-            installed_path,
-            native_install,
-        ):
+        for command in (marketplace_update, plugin_update):
             self.assertIn(command, upgrade)
         self.assertLess(upgrade.index(marketplace_update), upgrade.index(plugin_update))
-        self.assertLess(upgrade.index(plugin_update), upgrade.index(installed_path))
-        self.assertLess(upgrade.index(installed_path), upgrade.index(native_install))
+        self.assertIn(".runtime/", upgrade)
+        self.assertIn("install.sh", upgrade)
         self.assertNotIn('next(x["installLocation"]', upgrade)
         self.assertIn("self-contained", upgrade)
         self.assertIn("Restart Claude Code", upgrade)

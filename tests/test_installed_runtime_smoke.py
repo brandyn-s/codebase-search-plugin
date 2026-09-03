@@ -55,7 +55,7 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                 "events = [\n"
                 " {'type':'system','subtype':'init','model':'claude-sonnet-5',"
                 "'plugins':[{'name':'codebase-search',"
-                "'source':'codebase-search@redacted-code-intelligence',"
+                "'source':'codebase-search@code-intelligence',"
                 "'version':'0.4.11'}],'mcp_servers':["
                 "{'name':'plugin:codebase-search:code-search','status':'connected'},"
                 "{'name':'plugin:codebase-search:code-graph','status':'connected'}]},\n"
@@ -114,7 +114,7 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
             receipt = json.loads((receipt_root / "receipt.json").read_text())
             self.assertEqual(
                 receipt["plugin_id"],
-                "codebase-search@redacted-code-intelligence",
+                "codebase-search@code-intelligence",
             )
             self.assertEqual(receipt["plugin_version"], "0.4.11")
             self.assertEqual(receipt["marketplace_root"], str(marketplace.resolve()))
@@ -139,7 +139,7 @@ class InstalledRuntimeSmokeTests(unittest.TestCase):
                 "plugins": [
                     {
                         "name": "codebase-search",
-                        "source": "codebase-search@redacted-code-intelligence",
+                        "source": "codebase-search@code-intelligence",
                         "version": "0.4.11",
                     }
                 ],

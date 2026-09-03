@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose a change to the plugin layer
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that the plugin makes hard?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does this belong?
+      description: Retrieval or graph behaviour belongs in code-search or code-graph, not here.
+      options: [plugin (skills, installer, launchers, validators), code-search, code-graph, not sure]

@@ -38,7 +38,7 @@ python3 bench/e2e/pilot/run.py \
   --max-budget-usd 1.0 \
   --output-dir /isolated/pilot-run \
   --code-search /verified/bin/code-search-mcp \
-  --code-graph /verified/bin/codebase-memory-mcp \
+  --code-graph /verified/bin/code-graph \
   --code-search-storage /isolated/search-storage \
   --local-model /verified/local-model
 ```
@@ -68,7 +68,7 @@ python3 bench/e2e/pilot/run.py \
   --preregistration bench/e2e/pilot/preregistration-v3.json \
   --output-dir /isolated/targeted-confirmation \
   --code-search /verified/bin/code-search-mcp \
-  --code-graph /verified/bin/codebase-memory-mcp \
+  --code-graph /verified/bin/code-graph \
   --code-search-storage /isolated/search-storage \
   --local-model /verified/local-model
 ```
@@ -90,7 +90,7 @@ routing-contract accuracy 1.0, unsupported asserted-claim rate 0.0, errors 0,
 and host canary violations 0. Its retained manifest SHA-256 is
 `92d290ef23811c00dd80b6545030a2896f54ff897c1b4f27b2db66f6b73121ac`.
 The raw operator output remains external and sealed; it is not committed here.
-See [`../../docs/CAPABILITY_STATE.md`](../../docs/CAPABILITY_STATE.md).
+See [`../../docs/MEASUREMENTS.md`](../../docs/MEASUREMENTS.md).
 
 ## Run it
 

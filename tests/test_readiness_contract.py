@@ -682,7 +682,10 @@ class ReadinessContractTests(unittest.TestCase):
         shell = (ROOT / "install.sh").read_text(encoding="utf-8")
         powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
 
-        self.assertIn("INTEGRATED READINESS: READY", readme)
+        install_doc = (ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+        self.assertIn("INTEGRATED READINESS: READY", shell)
+        self.assertIn("INTEGRATED READINESS: READY", powershell)
+        self.assertIn("## Readiness record", install_doc)
         self.assertIn("This runs both semantic and structural indexing", readme)
         self.assertIn("`voyage` maps to `voyage-4-large`", normalized_readme)
         self.assertIn("CODE_GRAPH_SKIP_EMBEDDINGS", readme)
@@ -701,7 +704,7 @@ class ReadinessContractTests(unittest.TestCase):
         self.assertIn("current BOM attests", skill)
         for installer in (shell, powershell):
             self.assertIn("INTEGRATED READINESS: READY", installer)
-            self.assertIn("3. Index a repo", installer)
+            self.assertIn("Then index a repo from Claude Code", installer)
 
 
 if __name__ == "__main__":

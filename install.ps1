@@ -6,7 +6,12 @@
 
 $ErrorActionPreference = "Stop"
 $PluginDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$TargetBinDir = Join-Path $PluginDir "bin"
+# Layout: bin\ holds the committed launchers referenced by .mcp.json (bash on
+# macOS/Linux; this installer adds .cmd shims for Windows). Installed
+# components are runtime state under .runtime\bin and .venv.
+$RuntimeDir = Join-Path $PluginDir ".runtime"
+$LauncherDir = Join-Path $PluginDir "bin"
+$TargetBinDir = Join-Path $RuntimeDir "bin"
 $TargetVenvDir = Join-Path $PluginDir ".venv"
 $BinDir = $TargetBinDir
 $VenvDir = $TargetVenvDir
@@ -22,7 +27,8 @@ Write-Host ""
 # Detect architecture
 $Arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "386" }
 $Platform = "windows"
-$GraphBinary = "codebase-memory-mcp.exe"
+# Installed under a stable name regardless of the name inside the archive.
+$GraphBinary = "code-graph.exe"
 $AssetKey = "$Platform-$Arch"
 
 Write-Host "Platform: $Platform-$Arch"
@@ -178,13 +184,87 @@ function Assert-ChecksumManifest {
     }
 }
 
-function Assert-GitHubCliAuthenticated {
-    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-        throw "GitHub CLI is required for private code-search releases"
+# GitHub CLI is optional. Public releases are fetched with Invoke-WebRequest;
+# gh is used when present and authenticated (private releases, provenance).
+$script:GitHubCliAuthenticated = $null
+function Test-GitHubCliAuthenticated {
+    if ($null -eq $script:GitHubCliAuthenticated) {
+        $script:GitHubCliAuthenticated = $false
+        if (Get-Command gh -ErrorAction SilentlyContinue) {
+            & gh auth status --hostname github.com *> $null
+            if ($LASTEXITCODE -eq 0) {
+                $script:GitHubCliAuthenticated = $true
+            }
+        }
     }
-    & gh auth status --hostname github.com *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw "authenticate GitHub CLI with gh auth login or GH_TOKEN"
+    return $script:GitHubCliAuthenticated
+}
+
+# Download one release asset. Public releases download directly; gh is the
+# fallback for private releases.
+function Save-ReleaseAsset {
+    param(
+        [Parameter(Mandatory = $true)][string]$Repository,
+        [Parameter(Mandatory = $true)][string]$Tag,
+        [Parameter(Mandatory = $true)][string]$Asset,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    $Target = Join-Path $Destination $Asset
+    $Url = "https://github.com/$Repository/releases/download/$Tag/$Asset"
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $Target -UseBasicParsing
+        return
+    } catch {
+        Remove-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-GitHubCliAuthenticated) {
+        & gh release download $Tag `
+            --repo $Repository `
+            --pattern $Asset `
+            --dir $Destination `
+            --clobber
+        if ($LASTEXITCODE -ne 0) {
+            throw "gh release download exited with status $LASTEXITCODE"
+        }
+        return
+    }
+    throw (
+        "could not download $Asset from $Repository ($Tag): the public release " +
+        "URL was unavailable and the GitHub CLI is not authenticated. For private " +
+        "releases install gh, run 'gh auth login' (or set GH_TOKEN), and re-run."
+    )
+}
+
+# Verify build provenance when gh is available. Checksums against the BOM are
+# always mandatory (Assert-Sha256); provenance additionally needs gh.
+function Invoke-ReleaseAttestation {
+    param(
+        [Parameter(Mandatory = $true)][string]$Artifact,
+        [Parameter(Mandatory = $true)][string]$Bundle,
+        [Parameter(Mandatory = $true)][string]$Repository,
+        [Parameter(Mandatory = $true)][string]$SignerWorkflow,
+        [Parameter(Mandatory = $true)][string]$SourceDigest,
+        [Parameter(Mandatory = $true)][string]$SourceRef
+    )
+
+    if (-not (Test-GitHubCliAuthenticated)) {
+        Write-Host "  Provenance attestation not verified for $Artifact`: GitHub CLI is not available or not authenticated." -ForegroundColor Yellow
+        Write-Host "  Checksums matched the tested BOM. To also verify build provenance, install gh, run 'gh auth login', and re-run install.ps1."
+        return
+    }
+    Invoke-WithAllowedEnvironment {
+        & gh attestation verify $Artifact `
+            --bundle $Bundle `
+            --repo $Repository `
+            --signer-workflow $SignerWorkflow `
+            --source-digest $SourceDigest `
+            --source-ref $SourceRef `
+            --deny-self-hosted-runners
+        if ($LASTEXITCODE -ne 0) {
+            throw "gh attestation verify exited with status $LASTEXITCODE"
+        }
     }
 }
 
@@ -247,14 +327,25 @@ function Invoke-GitHubApiJson {
         [Parameter(Mandatory = $true)][string]$Endpoint
     )
 
-    $RawResponse = & gh api --method GET $Endpoint
-    if ($LASTEXITCODE -ne 0) {
-        throw "gh api failed for $Endpoint with status $LASTEXITCODE"
+    if (Test-GitHubCliAuthenticated) {
+        $RawResponse = & gh api --method GET $Endpoint
+        if ($LASTEXITCODE -ne 0) {
+            throw "gh api failed for $Endpoint with status $LASTEXITCODE"
+        }
+        try {
+            return $RawResponse | ConvertFrom-Json
+        } catch {
+            throw "GitHub API returned malformed JSON for $Endpoint"
+        }
+    }
+    $Headers = @{ Accept = "application/vnd.github+json" }
+    if ($env:GH_TOKEN) {
+        $Headers["Authorization"] = "Bearer $($env:GH_TOKEN)"
     }
     try {
-        return $RawResponse | ConvertFrom-Json
+        return Invoke-RestMethod -Uri "https://api.github.com/$Endpoint" -Headers $Headers -UseBasicParsing
     } catch {
-        throw "GitHub API returned malformed JSON for $Endpoint"
+        throw "GitHub API request failed for $Endpoint`: $_"
     }
 }
 
@@ -381,8 +472,14 @@ if (-not (Test-Path $VenvPip)) {
 switch ($CodeSearchKind) {
     "git" {
         $CodeSearchRef = $CodeSearchInstall.revision
-        Write-Host "  Installing redacted-code-search from GitHub..."
-        $CodeSearchRequirement = "redacted-code-search @ git+{0}@{1}" -f $CodeSearchRepository, $CodeSearchRef
+        # Distribution name of the pinned source; older pins used redacted-code-search.
+        $CodeSearchDist = if ($CodeSearchInstall.PSObject.Properties["distribution"]) {
+            $CodeSearchInstall.distribution
+        } else {
+            "redacted-code-search"
+        }
+        Write-Host "  Installing code-search from GitHub..."
+        $CodeSearchRequirement = "$CodeSearchDist @ git+{0}@{1}" -f $CodeSearchRepository, $CodeSearchRef
         & $VenvPip install --quiet $CodeSearchRequirement
         if ($LASTEXITCODE -ne 0) {
             $PipExitCode = $LASTEXITCODE
@@ -424,7 +521,6 @@ switch ($CodeSearchKind) {
         $CodeSearchChecksumsPath = Join-Path $CodeSearchDownloadDir $CodeSearchChecksums
 
         try {
-            Assert-GitHubCliAuthenticated
             $ResolvedCodeSearchRevision = Resolve-ReleaseTagCommit `
                 -Repository $CodeSearchRepository `
                 -Tag $CodeSearchTag
@@ -436,15 +532,12 @@ switch ($CodeSearchKind) {
                 )
             }
             Write-Host "  Downloading tested code-search wheel and attestation bundle..."
-            & gh release download $CodeSearchTag `
-                --repo $CodeSearchRepository `
-                --pattern $CodeSearchWheel `
-                --pattern $CodeSearchBundle `
-                --pattern $CodeSearchChecksums `
-                --dir $CodeSearchDownloadDir `
-                --clobber
-            if ($LASTEXITCODE -ne 0) {
-                throw "gh release download exited with status $LASTEXITCODE"
+            foreach ($ReleaseFile in @($CodeSearchWheel, $CodeSearchBundle, $CodeSearchChecksums)) {
+                Save-ReleaseAsset `
+                    -Repository $CodeSearchRepository `
+                    -Tag $CodeSearchTag `
+                    -Asset $ReleaseFile `
+                    -Destination $CodeSearchDownloadDir
             }
 
             Assert-Sha256 `
@@ -467,23 +560,18 @@ switch ($CodeSearchKind) {
             Write-Host "  Verifying offline build provenance..."
             Push-Location $CodeSearchDownloadDir
             try {
-                Invoke-WithAllowedEnvironment {
-                    & gh attestation verify $CodeSearchWheel `
-                        --bundle $CodeSearchBundle `
-                        --repo $CodeSearchRepository `
-                        --signer-workflow $CodeSearchSignerWorkflow `
-                        --source-digest $CodeSearchSourceRevision `
-                        --source-ref $CodeSearchSourceRef `
-                        --deny-self-hosted-runners
-                    if ($LASTEXITCODE -ne 0) {
-                        throw "gh attestation verify exited with status $LASTEXITCODE"
-                    }
-                }
+                Invoke-ReleaseAttestation `
+                    -Artifact $CodeSearchWheel `
+                    -Bundle $CodeSearchBundle `
+                    -Repository $CodeSearchRepository `
+                    -SignerWorkflow $CodeSearchSignerWorkflow `
+                    -SourceDigest $CodeSearchSourceRevision `
+                    -SourceRef $CodeSearchSourceRef
             } finally {
                 Pop-Location
             }
 
-            Write-Host "  Installing the verified local redacted-code-search wheel..."
+            Write-Host "  Installing the verified local code-search wheel..."
             Invoke-WithAllowedEnvironment {
                 & $VenvPip install --quiet --force-reinstall $CodeSearchWheelPath
                 if ($LASTEXITCODE -ne 0) {
@@ -530,7 +618,6 @@ $GraphChecksumsPath = Join-Path $GraphDownloadDir $GraphChecksums
 
 Write-Host "  Downloading code-graph $ReleaseTag for $Platform-$Arch..."
 try {
-    Assert-GitHubCliAuthenticated
     $ResolvedGraphRevision = Resolve-ReleaseTagCommit `
         -Repository $GraphRepository `
         -Tag $ReleaseTag
@@ -540,18 +627,15 @@ try {
             "expected $GraphSourceRevision, got $ResolvedGraphRevision"
         )
     }
-    & gh release download $ReleaseTag `
-        --repo $GraphRepository `
-        --pattern $AssetName `
-        --pattern $GraphChecksums `
-        --dir $GraphDownloadDir `
-        --clobber
-    if ($LASTEXITCODE -ne 0) {
-        throw "gh release download exited with status $LASTEXITCODE"
+    foreach ($ReleaseFile in @($AssetName, $GraphChecksums)) {
+        Save-ReleaseAsset `
+            -Repository $GraphRepository `
+            -Tag $ReleaseTag `
+            -Asset $ReleaseFile `
+            -Destination $GraphDownloadDir
     }
 } catch {
-    Write-Host "Error: failed to download code-graph binary." -ForegroundColor Red
-    Write-Host "  Authenticate gh or set GH_TOKEN with repository read access."
+    Write-Host "Error: failed to download code-graph binary: $_" -ForegroundColor Red
     exit 1
 }
 
@@ -589,27 +673,35 @@ try {
 Write-Host "  Verifying code-graph build provenance..."
 Push-Location $GraphDownloadDir
 try {
-    Invoke-WithAllowedEnvironment {
-        & gh attestation verify $AssetName `
-            --bundle $GraphAttestationBundlePath `
-            --repo $GraphRepository `
-            --signer-workflow $GraphSignerWorkflow `
-            --source-digest $GraphSourceRevision `
-            --source-ref $GraphSourceRef `
-            --deny-self-hosted-runners
-        if ($LASTEXITCODE -ne 0) {
-            throw "gh attestation verify exited with status $LASTEXITCODE"
-        }
-    }
+    Invoke-ReleaseAttestation `
+        -Artifact $AssetName `
+        -Bundle $GraphAttestationBundlePath `
+        -Repository $GraphRepository `
+        -SignerWorkflow $GraphSignerWorkflow `
+        -SourceDigest $GraphSourceRevision `
+        -SourceRef $GraphSourceRef
 } finally {
     Pop-Location
 }
 
-Expand-Archive -Path $ZipPath -DestinationPath $BinDir -Force
-Remove-Item -LiteralPath `
-    $ZipPath, `
-    $GraphChecksumsPath
-Remove-Item -LiteralPath $GraphDownloadDir -ErrorAction SilentlyContinue
+# Release archives contain exactly one binary. Current releases name it
+# code-graph.exe; releases before the rename shipped codebase-memory-mcp.exe.
+# Install it under the stable name the launcher expects.
+$GraphExtractDir = Join-Path $GraphDownloadDir "extracted"
+Expand-Archive -Path $ZipPath -DestinationPath $GraphExtractDir -Force
+$ExtractedGraphBinary = $null
+foreach ($Candidate in @("code-graph.exe", "codebase-memory-mcp.exe")) {
+    if (Test-Path -LiteralPath (Join-Path $GraphExtractDir $Candidate)) {
+        $ExtractedGraphBinary = Join-Path $GraphExtractDir $Candidate
+        break
+    }
+}
+if (-not $ExtractedGraphBinary) {
+    Write-Host "Error: release archive $AssetName does not contain a code-graph binary." -ForegroundColor Red
+    exit 1
+}
+Move-Item -LiteralPath $ExtractedGraphBinary -Destination (Join-Path $BinDir $GraphBinary)
+Remove-Item -LiteralPath $GraphDownloadDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host "  code-graph installed."
 Write-Host ""
@@ -627,14 +719,11 @@ if ($GoScipSupported) {
     }
     $GoScipDownloadDir = Join-Path $BinDir ".go-scip-download"
     New-Item -ItemType Directory -Path $GoScipDownloadDir | Out-Null
-    & gh release download $GoScip.tag `
-        --repo $GoScip.repository `
-        --pattern $GoScipAsset.name `
-        --dir $GoScipDownloadDir `
-        --clobber
-    if ($LASTEXITCODE -ne 0) {
-        throw "go-scip release download failed"
-    }
+    Save-ReleaseAsset `
+        -Repository $GoScip.repository `
+        -Tag $GoScip.tag `
+        -Asset $GoScipAsset.name `
+        -Destination $GoScipDownloadDir
     $GoScipArchive = Join-Path $GoScipDownloadDir $GoScipAsset.name
     Assert-Sha256 `
         -Path $GoScipArchive `
@@ -787,50 +876,34 @@ Write-Host ""
 # ------------------------------------------------------------------
 Write-Host "[4/5] Creating launcher scripts..." -ForegroundColor Yellow
 
-# code-search launcher (.cmd) — .mcp.json references bin/run-code-search;
-# Windows resolves that base name to run-code-search.cmd via PATHEXT.
-$LauncherContent = @"
+# The bash launchers bin\run-code-search and bin\code-graph are committed and
+# referenced by .mcp.json. Windows spawners resolve those base names to the
+# .cmd shims below via PATHEXT; the shims exec the installed components.
+$SearchLauncher = @"
 @echo off
 setlocal
-set "SCRIPT_DIR=%~dp0.."
-if exist "%SCRIPT_DIR%\.venv\Scripts\code-search-mcp.exe" (
-    "%SCRIPT_DIR%\.venv\Scripts\code-search-mcp.exe" %*
+set "PLUGIN_DIR=%~dp0.."
+if exist "%PLUGIN_DIR%\.venv\Scripts\code-search-mcp.exe" (
+    "%PLUGIN_DIR%\.venv\Scripts\code-search-mcp.exe" %*
 ) else (
-    echo Error: code-search-mcp not found. Run install.ps1 first. >&2
+    echo Error: code-search-mcp not found. Run install.ps1 from the plugin directory. >&2
     exit /b 1
 )
 "@
+Set-Content -Path (Join-Path $LauncherDir "run-code-search.cmd") -Value $SearchLauncher -Encoding ASCII
 
-$LauncherPath = Join-Path $BinDir "run-code-search.cmd"
-Set-Content -Path $LauncherPath -Value $LauncherContent -Encoding ASCII
-
-# code-graph launcher (.cmd) — .mcp.json references bin/codebase-memory-mcp.
-# The extracted binary is codebase-memory-mcp.exe; this .cmd shim ensures the
-# base name resolves for spawners that search .cmd/.bat (not just .exe).
 $GraphLauncher = @"
 @echo off
-"%~dp0codebase-memory-mcp.exe" %*
+setlocal
+set "PLUGIN_DIR=%~dp0.."
+if exist "%PLUGIN_DIR%\.runtime\bin\code-graph.exe" (
+    "%PLUGIN_DIR%\.runtime\bin\code-graph.exe" %*
+) else (
+    echo Error: code-graph not found. Run install.ps1 from the plugin directory. >&2
+    exit /b 1
+)
 "@
-
-$GraphLauncherPath = Join-Path $BinDir "codebase-memory-mcp.cmd"
-Set-Content -Path $GraphLauncherPath -Value $GraphLauncher -Encoding ASCII
-
-# Also create a bash launcher for Git Bash / WSL users on Windows
-$BashContent = @"
-#!/usr/bin/env bash
-SCRIPT_DIR="`$(cd "`$(dirname "`$0")/.." && pwd)"
-if [ -f "`$SCRIPT_DIR/.venv/Scripts/code-search-mcp.exe" ]; then
-    exec "`$SCRIPT_DIR/.venv/Scripts/code-search-mcp.exe" "`$@"
-elif [ -f "`$SCRIPT_DIR/.venv/bin/code-search-mcp" ]; then
-    exec "`$SCRIPT_DIR/.venv/bin/code-search-mcp" "`$@"
-else
-    echo "Error: code-search-mcp not found. Run install.ps1 first." >&2
-    exit 1
-fi
-"@
-
-$BashPath = Join-Path $BinDir "run-code-search"
-Set-Content -Path $BashPath -Value $BashContent -Encoding UTF8
+Set-Content -Path (Join-Path $LauncherDir "code-graph.cmd") -Value $GraphLauncher -Encoding ASCII
 
 Write-Host "  Launchers created."
 Write-Host ""
@@ -860,6 +933,7 @@ try {
 Write-Host ""
 
 Write-Host "Promoting validated installation..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Path $RuntimeDir -Force | Out-Null
 if (Test-Path -LiteralPath $TargetBinDir) {
     Move-Item -LiteralPath $TargetBinDir -Destination $RollbackBinDir
     $HadTargetBin = $true
@@ -905,10 +979,11 @@ switch ($ReadinessStatus) {
     }
     "ready" {
         Write-Host "=== INTEGRATED READINESS: READY ===" -ForegroundColor Green
-        Write-Host "1. Install the plugin in Claude Code:"
-        Write-Host "  claude plugin install codebase-search@redacted-code-intelligence --scope user"
-        Write-Host "2. Configure the embedding provider as described in README.md."
-        Write-Host "3. Index a repo:"
+        Write-Host "Components installed under .venv\ and .runtime\bin\; bin\ launchers are ready."
+        Write-Host "If the plugin is not installed yet:"
+        Write-Host "  claude plugin marketplace add brandyn-s/codebase-search-plugin"
+        Write-Host "  claude plugin install codebase-search@code-intelligence --scope user"
+        Write-Host "Then index a repo from Claude Code:"
         Write-Host "  /index-repo <repo-path>"
     }
     default {

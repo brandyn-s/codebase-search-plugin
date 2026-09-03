@@ -291,13 +291,12 @@ class ComponentAssetChecksumTests(unittest.TestCase):
                         artifact_digest,
                     )
 
-    def test_graph_installers_fail_closed_and_attest_before_extraction(self):
+    def test_graph_installers_verify_checksums_and_attest_before_extraction(self):
         shell = (ROOT / "install.sh").read_text(encoding="utf-8")
         powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
 
         for installer in (shell, powershell):
             self.assertIn("GH_TOKEN", installer)
-            self.assertIn("gh release download", installer)
             self.assertIn("assets", installer)
             self.assertIn("checksums", installer)
             self.assertIn("source_revision", installer)
@@ -306,56 +305,72 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             self.assertIn("--deny-self-hosted-runners", installer)
             self.assertIn("checksum mismatch", installer)
             self.assertIn("checksums.txt", installer)
-            self.assertNotIn("skipping verification", installer)
-            self.assertNotIn("public release URL fallback", installer)
+            self.assertNotIn("releases/latest", installer)
+            # Public releases download directly; gh is only the private fallback.
+            self.assertIn("/releases/download/", installer)
+            self.assertIn("gh release download", installer)
+            # Checksums are mandatory; only provenance may be skipped, loudly.
+            self.assertIn("Provenance attestation not verified", installer)
+            self.assertNotIn("skipping checksum", installer)
+            # The installed binary keeps a stable name across archive renames.
+            self.assertIn("codebase-memory-mcp", installer)
+            self.assertIn("does not contain a code-graph binary", installer)
 
         self.assertIn("sha256sum", shell)
         self.assertIn("shasum", shell)
         self.assertIn('["attestation"]["bundle"]', shell)
+        self.assertIn("curl --fail", shell)
         self.assertIn(".attestation.bundle", powershell)
         self.assertIn("Get-FileHash", powershell)
-        self.assertNotIn("Invoke-WebRequest", powershell)
+        self.assertIn("Invoke-WebRequest", powershell)
 
         shell_graph = shell.split(
             "[3/5] Installing code-graph (structural analysis)...",
             1,
-        )[1].split("[4/5] Creating launcher scripts...", 1)[0]
+        )[1].split("[4/5] Preparing launcher scripts...", 1)[0]
         powershell_graph = powershell.split(
             "[3/5] Installing code-graph (structural analysis)...",
             1,
         )[1].split("[4/5] Creating launcher scripts", 1)[0]
-        for graph, resolver, checksum_verifier, extraction in (
+        for graph, resolver, download, checksum_verifier, attestation, extraction in (
             (
                 shell_graph,
                 "resolve_release_tag_commit",
+                "download_release_asset",
                 "verify_checksum_manifest",
+                "verify_release_attestation",
                 "tar xzf",
             ),
             (
                 powershell_graph,
                 "Resolve-ReleaseTagCommit",
+                "Save-ReleaseAsset",
                 "Assert-ChecksumManifest",
+                "Invoke-ReleaseAttestation",
                 "Expand-Archive",
             ),
         ):
-            self.assertIn(resolver, graph)
-            self.assertIn(checksum_verifier, graph)
+            for required in (resolver, download, checksum_verifier, attestation, extraction):
+                self.assertIn(required, graph)
             self.assertNotIn("gh attestation download", graph)
-            self.assertIn("gh attestation verify", graph)
-            self.assertIn("--bundle", graph)
-            self.assertLess(graph.index(resolver), graph.index("gh release download"))
-            self.assertLess(
-                graph.index(checksum_verifier),
-                graph.index("gh attestation verify"),
-            )
-            self.assertLess(
-                graph.index("gh attestation verify"),
-                graph.index(extraction),
-            )
+            self.assertLess(graph.index(resolver), graph.index(download))
+            self.assertLess(graph.index(download), graph.index(checksum_verifier))
+            self.assertLess(graph.index(checksum_verifier), graph.index(attestation))
+            self.assertLess(graph.index(attestation), graph.index(extraction))
         self.assertIn("GRAPH_ATTESTATION_BUNDLE_PATH", shell_graph)
         self.assertIn("GRAPH_ATTESTATION_BUNDLE_SHA256", shell_graph)
         self.assertIn("$GraphAttestationBundlePath", powershell_graph)
         self.assertIn("$GraphAttestationBundleSha256", powershell_graph)
+
+        # The attestation helpers themselves run gh with the offline bundle.
+        for installer, helper in (
+            (shell, "verify_release_attestation() {"),
+            (powershell, "function Invoke-ReleaseAttestation {"),
+        ):
+            body = installer.split(helper, 1)[1].split("\n}\n", 1)[0]
+            self.assertIn("gh attestation verify", body)
+            self.assertIn("--bundle", body)
+            self.assertIn("--deny-self-hosted-runners", body)
 
     def test_installers_verify_release_wheel_offline_before_install(
         self,
@@ -391,51 +406,50 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             self.assertIn("checksum manifest", installer)
             self.assertNotIn("gh release verify-asset", installer)
             self.assertNotIn("release membership", installer)
-            self.assertLess(
-                installer.index("gh api"),
-                installer.index("gh release download"),
-            )
-            self.assertLess(
-                installer.index("gh release download"),
-                installer.index("gh attestation verify"),
-            )
-            self.assertLess(
-                installer.index("gh attestation verify"),
-                installer.index("--force-reinstall"),
-            )
-            self.assertLess(
-                installer.index("--force-reinstall"),
-                installer.index("verify_code_search_wheel.py"),
-            )
 
         shell_release = shell.split("github-release)", 1)[1].split(";;", 1)[0]
         powershell_release = powershell.split('"github-release" {', 1)[1].split(
             "\n    default {",
             1,
         )[0]
+        for release, resolver, download, checksum_verifier, attestation in (
+            (
+                shell_release,
+                "resolve_release_tag_commit",
+                "download_release_asset",
+                "verify_checksum_manifest",
+                "verify_release_attestation",
+            ),
+            (
+                powershell_release,
+                "Resolve-ReleaseTagCommit",
+                "Save-ReleaseAsset",
+                "Assert-ChecksumManifest",
+                "Invoke-ReleaseAttestation",
+            ),
+        ):
+            for required in (
+                resolver,
+                download,
+                checksum_verifier,
+                attestation,
+                "--force-reinstall",
+                "verify_code_search_wheel.py",
+            ):
+                self.assertIn(required, release)
+            self.assertLess(release.index(resolver), release.index(download))
+            self.assertLess(release.index(download), release.index(checksum_verifier))
+            self.assertLess(release.index(checksum_verifier), release.index(attestation))
+            self.assertLess(release.index(attestation), release.index("--force-reinstall"))
+            self.assertLess(
+                release.index("--force-reinstall"),
+                release.index("verify_code_search_wheel.py"),
+            )
         self.assertIn("CODE_SEARCH_CHECKSUMS", shell_release)
-        self.assertIn("verify_checksum_manifest", shell_release)
-        self.assertLess(
-            shell_release.index("gh release download"),
-            shell_release.index("verify_checksum_manifest"),
-        )
-        self.assertLess(
-            shell_release.index("verify_checksum_manifest"),
-            shell_release.index("gh attestation verify"),
-        )
         self.assertIn("CodeSearchChecksums", powershell_release)
-        self.assertIn("Assert-ChecksumManifest", powershell_release)
-        self.assertLess(
-            powershell_release.index("gh release download"),
-            powershell_release.index("Assert-ChecksumManifest"),
-        )
-        self.assertLess(
-            powershell_release.index("Assert-ChecksumManifest"),
-            powershell_release.index("gh attestation verify"),
-        )
 
     def test_release_wheel_promotion_and_token_scope_are_documented(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = (ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
         compatibility = (
             ROOT / "compatibility" / "README.md"
         ).read_text(encoding="utf-8")
@@ -472,15 +486,13 @@ class ComponentAssetChecksumTests(unittest.TestCase):
             normalized_readme,
         )
         prerequisites = readme.split("## Prerequisites", 1)[1].split(
-            "### Manual install",
+            "## What install.sh does",
             1,
         )[0]
         normalized_prerequisites = " ".join(prerequisites.split())
-        self.assertIn(
-            "both private component repositories",
-            normalized_prerequisites,
-        )
-        self.assertNotIn("curl", prerequisites)
+        self.assertIn("optional", normalized_prerequisites)
+        self.assertIn("provenance", normalized_prerequisites)
+        self.assertIn("`curl`", prerequisites)
         self.assertIn("`tar`", prerequisites)
         self.assertNotIn(
             "only to authenticated `gh` clone/download commands",
@@ -500,10 +512,13 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         )[0]
         self.assertGreaterEqual(
             release_branch.count("Invoke-WithAllowedEnvironment"),
-            2,
+            1,
         )
+        attestation_helper = powershell.split(
+            "function Invoke-ReleaseAttestation {", 1
+        )[1].split("\n}\n", 1)[0]
         self.assertRegex(
-            release_branch,
+            attestation_helper,
             re.compile(
                 r"Invoke-WithAllowedEnvironment\s*\{\s*"
                 r"& gh attestation verify",

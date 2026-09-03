@@ -23,8 +23,8 @@ def write_fake_claude(
     marketplace_source: str,
     marketplace_root: str,
     install_root: str = (
-        "/Users/example/.claude/plugins/cache/redacted-code-intelligence/"
-        "codebase-search/0.4.32"
+        "/Users/example/.claude/plugins/cache/code-intelligence/"
+        "codebase-search/0.5.0"
     ),
 ) -> None:
     path.write_text(
@@ -32,12 +32,12 @@ def write_fake_claude(
         "import json, sys\n"
         "args = sys.argv[1:]\n"
         "if args == ['plugin', 'list', '--json']:\n"
-        f"    print(json.dumps([{{'id':'codebase-search@redacted-code-intelligence','version':'0.4.32','scope':'user','enabled':True,'installPath':'{install_root}'}}]))\n"
+        f"    print(json.dumps([{{'id':'codebase-search@code-intelligence','version':'0.5.0','scope':'user','enabled':True,'installPath':'{install_root}'}}]))\n"
         "elif args == ['plugin', 'marketplace', 'list', '--json']:\n"
-        f"    print(json.dumps([{{'name':'redacted-code-intelligence','source':'{marketplace_source}','installLocation':'{marketplace_root}'}}]))\n"
+        f"    print(json.dumps([{{'name':'code-intelligence','source':'{marketplace_source}','installLocation':'{marketplace_root}'}}]))\n"
         "elif args == ['mcp', 'list']:\n"
         f"    print('plugin:codebase-search:code-search: {install_root}/bin/run-code-search  - ✔ Connected')\n"
-        f"    print('plugin:codebase-search:code-graph: {install_root}/bin/codebase-memory-mcp  - ✔ Connected')\n"
+        f"    print('plugin:codebase-search:code-graph: {install_root}/bin/code-graph  - ✔ Connected')\n"
         "else:\n"
         "    raise SystemExit(2)\n",
         encoding="utf-8",
@@ -62,7 +62,7 @@ def write_deployment_receipt(
             {
                 "schema_version": 1,
                 "receipt_type": "code-intelligence-deployment",
-                "plugin_version": "0.4.32",
+                "plugin_version": "0.5.0",
                 "runtime_manifest": binding(runtime_manifest),
                 "holdout_manifest": (
                     binding(holdout_manifest)
@@ -90,7 +90,7 @@ def write_runtime_receipt(
             "subtype": "init",
             "model": "claude-sonnet-5",
             "plugins": [
-                {"id": "codebase-search@redacted-code-intelligence", "version": "0.4.32"}
+                {"id": "codebase-search@code-intelligence", "version": "0.5.0"}
             ],
             "mcp_servers": [
                 {"name": "plugin:codebase-search:code-search", "status": "connected"},
@@ -145,8 +145,8 @@ def write_runtime_receipt(
             {
                 "schema_version": 1,
                 "receipt_type": "installed-plugin-runtime",
-                "plugin_id": "codebase-search@redacted-code-intelligence",
-                "plugin_version": "0.4.32",
+                "plugin_id": "codebase-search@code-intelligence",
+                "plugin_version": "0.5.0",
                 "marketplace_root": marketplace_root,
                 "checkout_unchanged": True,
                 "canary_violations": 0,
@@ -455,7 +455,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
             evidence_root.mkdir()
             marketplace_root = (
                 "/Users/example/.claude/plugins/marketplaces/"
-                "redacted-code-intelligence"
+                "code-intelligence"
             )
             runtime_root = write_runtime_receipt(
                 evidence_root,
@@ -506,7 +506,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
             evidence_root.mkdir()
             marketplace_root = (
                 "/Users/example/.claude/plugins/marketplaces/"
-                "redacted-code-intelligence"
+                "code-intelligence"
             )
             runtime_root = write_runtime_receipt(
                 evidence_root,
@@ -560,7 +560,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
             evidence_root.mkdir()
             marketplace_root = (
                 "/Users/example/.claude/plugins/marketplaces/"
-                "redacted-code-intelligence"
+                "code-intelligence"
             )
             write_runtime_receipt(evidence_root, marketplace_root=marketplace_root)
             (evidence_root / "deployment-receipt.json").unlink()
@@ -636,7 +636,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
                 marketplace_source="github",
                 marketplace_root=(
                     "/Users/example/.claude/plugins/marketplaces/"
-                    "redacted-code-intelligence"
+                    "code-intelligence"
                 ),
             )
 
@@ -668,7 +668,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
             evidence_root.mkdir()
             marketplace_root = (
                 "/Users/example/.claude/plugins/marketplaces/"
-                "redacted-code-intelligence"
+                "code-intelligence"
             )
             write_runtime_receipt(evidence_root, marketplace_root=marketplace_root)
             fake_claude = root / "claude"
@@ -708,7 +708,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
             evidence_root.mkdir()
             marketplace_root = (
                 "/Users/example/.claude/plugins/marketplaces/"
-                "redacted-code-intelligence"
+                "code-intelligence"
             )
             runtime_root = write_runtime_receipt(
                 evidence_root, marketplace_root=marketplace_root
@@ -767,7 +767,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
             evidence_root.mkdir()
             marketplace_root = (
                 "/Users/example/.claude/plugins/marketplaces/"
-                "redacted-code-intelligence"
+                "code-intelligence"
             )
             runtime_root = write_runtime_receipt(
                 evidence_root, marketplace_root=marketplace_root
@@ -826,7 +826,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
                 evidence_root,
                 marketplace_root=(
                     "/Users/example/.claude/plugins/marketplaces/"
-                    "redacted-code-intelligence"
+                    "code-intelligence"
                 ),
             )
             raw = runtime_root / "raw.jsonl"
@@ -853,7 +853,7 @@ class DeploymentActivationVerifierTests(unittest.TestCase):
             evidence_root.mkdir()
             marketplace_root = (
                 "/Users/example/.claude/plugins/marketplaces/"
-                "redacted-code-intelligence"
+                "code-intelligence"
             )
             runtime_root = write_runtime_receipt(
                 evidence_root, marketplace_root=marketplace_root

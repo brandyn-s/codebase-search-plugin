@@ -1,858 +1,109 @@
-# Verifiable Code Intelligence Plugin
+# codebase-search plugin for Claude Code
 
-This plugin combines semantic discovery and structural analysis behind three
-stable primitives: **FIND**, **UNDERSTAND**, and **PROVE**. Its differentiator
-is not an unbounded accuracy claim. It is an evidence contract: coherent
-indexes for one exact checkout, generation-bound references, explicit
-contradiction and coverage checks, and deterministic proof verdicts that can
-be exported and independently verified.
+A Claude Code plugin that bundles [code-search](https://github.com/brandyn-s/code-search)
+and [code-graph](https://github.com/brandyn-s/code-graph) so an agent can
+**find**, **understand**, and **prove** claims about a codebase, with evidence
+it can show you.
 
-**INTEGRATED READINESS: READY**
+Most code-intelligence tools hand the model a ranked list and hope. This plugin
+adds an evidence contract: both indexes are bound to one exact checkout, every
+citation carries an immutable generation-bound reference, security and
+"every path" claims must pass contradiction and coverage checks, and the result
+is a deterministic verdict you can export and re-verify. See
+[docs/EVIDENCE.md](docs/EVIDENCE.md).
 
-The current BOM declares the pinned components ready for coherent dual
-indexing. The committed `promotion-candidate` record is repository-controlled
-review input; on every trusted `main` revision, post-merge CI must install the
-exact pins and generate a fresh `ready-validation` record before that revision
-is accepted as runtime-validated. `/index-repo` is the integrated semantic and
-structural indexing workflow.
-
-## Quick Start
+## Install
 
 ```bash
-# 1. Add the GitHub-backed marketplace
 claude plugin marketplace add brandyn-s/codebase-search-plugin
+claude plugin install codebase-search@code-intelligence --scope user
+```
 
-# 2. Install the namespaced plugin for your user
-claude plugin install codebase-search@redacted-code-intelligence --scope user
+That is all. The two MCP servers install themselves the first time Claude Code
+launches them: the launchers in `bin/` fetch the exact component releases
+pinned in `component-bom.json`, verify SHA-256 checksums, and start the
+servers. The first launch downloads a Python environment and a Go binary, so it
+can take a few minutes; if Claude Code reports the servers as failed on that
+first start, wait for `.runtime/bootstrap.log` in the plugin directory to
+finish and reconnect with `/mcp`. Windows users run `install.ps1` from the
+installed plugin directory once instead.
 
-# 3. Resolve that exact installed version and install both MCP servers (Linux/Mac)
-PLUGIN_DIR="$(claude plugin list --json | python3 -c \
-  'import json,sys; print(next(x["installPath"] for x in json.load(sys.stdin) if x["id"] == "codebase-search@redacted-code-intelligence" and x["scope"] == "user"))')"
-bash "$PLUGIN_DIR/install.sh"
+No API keys are required. Without keys, code-search embeds locally and skips
+LLM reranking, and code-graph stays fully on-device.
 
-# 4. Set your embedding provider
-export EMBEDDING_PROVIDER="voyage"          # Voyage 4 Large (cloud)
-export VOYAGE_API_KEY="your-key"
-# OR, keep both indexes on-device
-unset VOYAGE_API_KEY
-export EMBEDDING_PROVIDER="jina"            # local code-search embeddings
-export CODE_GRAPH_SKIP_EMBEDDINGS=1         # disable graph cloud embeddings
+| Optional variable | Effect |
+|---|---|
+| `VOYAGE_API_KEY` | Cloud embeddings for code-search (`voyage` maps to `voyage-4-large`); code-graph also uses it for optional node embeddings unless `CODE_GRAPH_SKIP_EMBEDDINGS=1` |
+| `ANTHROPIC_API_KEY` | Enables the Sonnet reranker in code-search (`RERANKER=sonnet`) |
+| `EMBEDDING_PROVIDER` | Force `voyage`, `voyage-context`, `jina` (local, best offline), or `local` (small, fast) |
 
-# 5. Build and verify both indexes
+Switching embedding providers requires a re-index. Details, model choices, and
+cost/latency numbers are in [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md).
+
+## Use
+
+```text
 /index-repo /path/to/your/repo
-
-# Optional for a clean Go or TypeScript repository: require the pinned compiler indexer
-/index-repo /path/to/your/repo --graph-precision auto --scip-policy required
-
-# 6. Ask through the stable FIND / UNDERSTAND / PROVE facade
 /code-intel Find the request authentication entry points
+/code-intel What calls processOrder, and what breaks if its signature changes?
+/code-intel Prove every HTTP route passes through the authorization middleware
 ```
 
-This runs both semantic and structural indexing, suppresses graph report
-writes, and verifies that both engines indexed the same unchanged checkout.
-`EMBEDDING_PROVIDER` controls code-search only. If code-graph inherits
-`VOYAGE_API_KEY`, it independently sends selected node and query text to
-Voyage unless `CODE_GRAPH_SKIP_EMBEDDINGS=1`.
-
-The install script:
-- Creates a Python venv and installs the exact code-search source declared by
-  the BOM: either a pinned Git commit or an attested GitHub Release wheel
-- Downloads the pre-built code-graph binary for your platform from GitHub releases
-- Installs the optional, BOM-pinned `scip-go` generator on supported macOS
-  arm64 and Linux amd64/arm64 hosts and an isolated, lockfile-pinned
-  `scip-typescript` plus Node runtime on supported macOS, Linux, and Windows
-  amd64 hosts; unsupported platforms retain heuristic and user-supplied SCIP
-  modes
-- Reads exact tested versions from `component-bom.json` instead of selecting a moving latest release
-- Starts both installed stdio MCPs and rejects missing or schema-drifted tools before reporting success
-- No manual cloning, building, or path configuration needed
-
-> **Current compatibility contract:** the BOM declares complete v1
-> `index_identity` outputs, semantic and graph readiness, and graph
-> `skip_report` support. The committed promotion candidate is supporting
-> review evidence, not a trusted run-specific attestation. Trusted post-merge
-> CI must reproduce readiness from the exact pins. See
-> `compatibility/README.md`.
-
-## Upgrade
-
-The native MCP binaries and Python environment are installed runtime state;
-they are intentionally excluded from Git and are not refreshed by
-`claude plugin update` alone. Upgrade in this order so the plugin cache cannot
-carry a schema-compatible but older binary forward:
-
-```bash
-claude plugin marketplace update redacted-code-intelligence
-claude plugin update codebase-search@redacted-code-intelligence --scope user
-PLUGIN_DIR="$(claude plugin list --json | python3 -c \
-  'import json,sys; print(next(x["installPath"] for x in json.load(sys.stdin) if x["id"] == "codebase-search@redacted-code-intelligence" and x["scope"] == "user"))')"
-bash "$PLUGIN_DIR/install.sh"
-```
-
-On Windows, run `install.ps1` from the resolved installed plugin path instead
-of `install.sh`. Installing inside the exact cache version keeps Python console
-script shebangs and both MCP launchers self-contained; do not copy an ignored
-marketplace `bin/` or `.venv/` into the cache. The installer stages, verifies,
-and atomically promotes the exact BOM components. Restart Claude Code after the
-plugin update so existing sessions do not retain the prior MCP processes, then
-confirm both plugin MCPs are connected with `claude mcp list`.
-
-## Current measured state
-
-The current internal grade is **A- overall** and **A for verifiable code
-intelligence**. A sealed five-route Stage-4 successor passed 10/10 units with
-perfect evidence, adjudication, routing, unsupported-claim, error, and canary
-gates. On 80 balanced public LocBench cases, code-search reached 0.375 Acc@1
-versus Sourcegraph's 0.150; the paired 22-4 result was significant
-(p=0.00053), supporting narrow file-localization superiority only. Direct
-scale measurement covers a 39.2-million-line LLVM checkout plus a
-three-repository query. Code-search v0.3.6 separately improved a paired
-same-index replay from 0.3625 to 0.3875 Acc@1 with 13 cases improved and none
-regressed. Code-graph v0.8.0-redacted.11 preserves the 13/13 TypeScript declared
-type, 456/456 TypeScript IMPORTS, and direct-method relationship results. It
-also preserves lexical seed quality during graph expansion; a paired same-index
-n=80 replay improved graph-only Acc@1 from 0.175 to 0.200, Acc@10 from 0.350 to
-0.400, and MRR@10 from 0.219 to 0.260. The absolute graph-only result remains
-below code-search, so conceptual discovery stays search-primary. Final public
-and scale results are reported verbatim in
-the capability state; they support only their bounded endpoints, not a claim
-of market-wide superiority. See
-[`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the gradecard,
-exact measurements, limitations, and next work.
-
-## How It Works
-
-The ready integrated design combines two different search technologies.
-
-### Semantic Search (code-search)
-
-**What it does:** Finds code by *meaning*, not just keywords. When you search "authentication middleware," it returns functions related to auth even if they're named `verify_jwt_token` or `check_session`.
-
-**How:** Your code is split into chunks (functions, classes, modules) using
-tree-sitter AST parsing. Each chunk is converted into a numeric vector
-(embedding) that captures its meaning. A keyword index (BM25) runs in
-parallel. Hybrid search detects explicit code signals such as identifiers,
-qualified names, and file paths, widens the candidate pool, reranks each arm,
-then applies bounded fusion and signal boosts.
-
-**When to use:**
-- "How does X work?" — conceptual understanding
-- "Find the rate limiting implementation" — discovery by meaning
-- "Where is the config for Y?" — locating code you know exists but can't grep for
-
-### Structural Graph (code-graph)
-
-**What it does:** Maps the *structure* of your code — which functions call which, what imports what, how modules connect. Answers questions about relationships and impact, not content.
-
-**How:** Tree-sitter parses your code into an AST, extracts symbols (functions,
-classes, routes, imports), and builds a knowledge graph stored in SQLite. That
-structural extraction is local. When `VOYAGE_API_KEY` is present, code-graph
-also sends selected node text to Voyage during indexing and sends query text
-for embedding-backed graph searches. Set `CODE_GRAPH_SKIP_EMBEDDINGS=1` before
-launching the MCP to disable graph embedding generation. Queries use a
-Cypher-like language to traverse call chains, find dead code, and calculate
-blast radius. Seed truncation, adjacency traversal, and equal-score result
-ordering are canonicalized so repeated queries do not depend on map or edge
-iteration order.
-
-The default graph tier is tree-sitter plus heuristic static resolution. It is
-not compiler-grade. Projects that have a current SCIP index can explicitly
-select the persistent `scip` precision tier; clean Go and TypeScript
-repositories can opt into the BOM-pinned generators and isolated runtimes with
-`--graph-precision auto`. Index status reports
-effective tier, artifact digest, coverage, drift, replacements, and insertions.
-Uncovered or drifted files remain heuristic and are labeled accordingly. A
-relationship satisfies compiler assurance only when its immutable evidence
-reference carries `resolution_source=scip-ingest` and the exact SCIP artifact
-digest; enabling the tier does not upgrade every edge.
-
-**When to use:**
-- "What calls processOrder?" — tracing call chains
-- "Blast radius of changing UserService?" — impact analysis
-- "Find dead code" — functions with zero callers
-- "Show all API endpoints" — structural inventory
-
-### How They Work Together
-
-`/code-intel` presents three stable public primitives while preserving the
-same automatic backend routing and cross-engine coherence checks:
-
-| Public primitive | Routed capability | Example |
-|------------------|-------------------|---------|
-| FIND | Semantic or lexical code-search | "Find the authentication middleware" |
-| UNDERSTAND | Structural code-graph, optionally chained from FIND | "What calls processOrder?" |
-| PROVE | Coherent evidence from both engines plus deterministic contradiction and coverage evaluation | "Prove every request path passes through authorization" |
-
-You do not need to select a backend. Conceptual discovery keeps code-search
-primary; explicit caller, callee, trace, dependency, relationship, and impact
-questions keep code-graph primary. A complete primary result is not
-automatically diluted by the other backend; the secondary engine fills only
-missing paths when composition is useful. `/code-explore` remains available as
-the compact natural-language workflow and preserves canonical evidence when
-the installed components expose it.
-
-### Verification boundary
-
-Evidence-capable backend tools issue typed, immutable `ev:v1` identifiers that
-bind exact source coordinates and index generation. The model selects those
-identifiers; it does not create or edit line ranges. One host-owned state
-machine enforces the required route, directed trace, observed evidence IDs, and
-terminal-output contract before an answer can complete.
-
-Deployment verification follows one canonical, hash-bound receipt containing
-explicit runtime and holdout manifest paths. Holdout manifests declare artifact
-roles directly, so verification does not infer control files from directory or
-filename patterns. Broad deterministic tests run in CI; a release uses one
-bounded five-route, two-repetition empirical holdout after installation.
-
-### Skills
-
-| Skill | Purpose |
-|-------|---------|
-| **`/index-repo`** | Index both engines and verify their readiness and checkout identities |
-| **`/code-intel`** | Stable FIND / UNDERSTAND / PROVE facade with coherence, contradiction, and coverage rules |
-| **`/code-explore`** | Ask natural language questions — auto-routes to the right search tool |
-
-## Offline vs Online Embedding Models
-
-"Embedding" means converting code into numeric vectors for similarity search. The plugin supports both **online** (cloud API) and **offline** (local) models.
-
-### Online: Voyage AI
-
-For code-search, source chunks and search queries are sent to Voyage AI's API
-over HTTPS and returned as vectors. The pinned code-search release exposes
-three distinct Voyage selectors:
-
-| Provider | Model | Current role |
-|----------|-------|--------------|
-| **`voyage`** | **`voyage-4-large`** | Default for code when `VOYAGE_API_KEY` is present |
-| `voyage-context` | `voyage-context-3` | Contextualized provider; auto-selected for documentation mode |
-| `voyage-code-3` | `voyage-code-3` | Separate legacy, non-default provider retained for older and TypeScript-specific workflows |
-
-`voyage` is not an alias for `voyage-code-3`. All three providers send code
-and query text off-device.
-
-- Requires internet connection and a Voyage API key
-- ~$0.06 per 1M tokens (~$2-5 to index a large monorepo)
-- Indexing speed limited by API rate limits (~5-10 min per 3K chunks)
-
-Code-graph does not use `EMBEDDING_PROVIDER`, but it does independently use
-`VOYAGE_API_KEY` for optional node embeddings during indexing and for
-embedding-backed graph queries. Its default Voyage model is separate from
-code-search's provider mapping. `CODE_GRAPH_SKIP_EMBEDDINGS=1` prevents graph
-node-embedding generation even if the key is present; remove the key from the
-MCP environment to prevent all graph Voyage calls, including query embedding.
-
-**Use cloud embeddings only when:** Your code and query text are permitted to
-leave the machine.
-
-### Offline: Jina Code Embeddings (`jina`)
-
-A 494M parameter model runs code-search embeddings entirely on your CPU. The
-model weights are downloaded once (~1GB) from HuggingFace on first use, then
-code-search embedding and query operations are local.
-
-- Historical component measurements below put Jina near or above the older
-  `voyage-code-3` run on the measured subprojects; they do not compare Jina
-  with the current `voyage-4-large` mapping
-- No API key, no internet (after first download), no cost
-- Indexing is CPU-bound (~50 min per 3K chunks without GPU)
-- Query latency ~5s vs ~1s for Voyage
-
-**Use when:** Code cannot leave the machine, you don't want API keys, or you're
-evaluating the plugin before committing to a paid provider. For a fully
-on-device plugin run, remove `VOYAGE_API_KEY` from code-graph's environment;
-setting `CODE_GRAPH_SKIP_EMBEDDINGS=1` additionally prevents node-embedding
-generation if a key is later inherited.
-
-### Switching Between Providers
-
-The provider is selected at **runtime** via environment variable — not at install time. You can switch freely:
-
-```bash
-# Switch to local
-export EMBEDDING_PROVIDER="jina"
-
-# Switch code-search to the current cloud default
-export EMBEDDING_PROVIDER="voyage"
-export VOYAGE_API_KEY="pa-..."
-```
-
-**Important:** Switching providers requires re-indexing because indexes are
-provider-specific and are not interchangeable.
-
-## Prerequisites
-
-- **Python 3.12+** (for code-search)
-- **GitHub CLI (`gh`) with authenticated read access** to both private
-  component repositories
-- **Linux/Mac**: `tar` (for extracting the verified code-graph archive)
-- **Windows**: PowerShell 5.1+ (built-in) — use `install.ps1` instead of `install.sh`
-
-The `install.sh` script handles everything else — no need to manually clone or build anything.
-
-### Manual install (alternative)
-
-The production BOM pins code-search release
-[`v0.3.6`](https://github.com/brandyn-s/code-search/releases/tag/v0.3.6)
-with `install.kind: github-release`. Its descriptor fixes the source commit,
-wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
-attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
-use those values directly rather than selecting a moving release.
-
-For a manual install, follow the same order as the installers:
-
-1. Resolve the exact Git tag through the Git refs API, peel annotated tags,
-   and require that the tag resolves to the pinned source commit.
-2. Use authenticated `gh release download` to fetch exactly the wheel,
-   checksum manifest, and attestation bundle named by the BOM and tag.
-3. Verify all three files against their separate BOM SHA-256 values, then
-   require exactly one manifest entry matching the wheel name and digest.
-4. Run `gh attestation verify` with the offline `--bundle`, pinned repository,
-   `--signer-workflow`, `--source-digest`, `--source-ref refs/heads/main`, and
-   `--deny-self-hosted-runners`.
-5. Only after those checks pass, pip-install the local wheel with
-   `--force-reinstall` and run `scripts/verify_code_search_wheel.py` to verify
-   its version, filename, checksum, and PEP 610 installation provenance.
-
-For code-graph, use release
-[`v0.8.0-redacted.11`](https://github.com/brandyn-s/code-graph/releases/tag/v0.8.0-redacted.11).
-Resolve its tag to the BOM's pinned source commit; download exactly the
-platform archive and `checksums.txt`; verify both BOM digests and the exact
-archive manifest entry; verify the operator-fetched, vendored JSONL bundle at
-the path and SHA-256 pinned by the BOM; then run secret-free
-`gh attestation verify --bundle` with the pinned repository, release workflow,
-source digest, `refs/heads/main`, and GitHub-hosted-runner policy. Extract only
-after every check passes. Configure the two verified MCP server paths manually
-in `.mcp.json`.
-
-Manual installs must match `component-bom.json`. Run the same fail-closed
-contract check used by the installers before enabling the plugin:
-
-```bash
-python3 scripts/validate_installed.py \
-  --server code-search=/path/to/code-search-mcp \
-  --server code-graph=/path/to/codebase-memory-mcp
-```
-
-## Routing and Evidence Evaluation
-
-`bench/e2e/` contains a deterministic standard-library harness for recorded
-host-model traces. It scores routing accuracy, evidence precision/recall,
-unsupported claims, tool calls, latency, and stale/mismatched-index handling.
-The bundled runs validate the fixture and CI gate only; they are explicitly
-not live performance results or comparative grades. See
-`bench/e2e/README.md` for the JSONL contract and live-run workflow.
-
-`bench/e2e/pilot/run.py` is the bounded operator runner used for a real
-four-arm smoke: native tools, code-search, code-graph, and the composed
-workflow. Its v2 preregistration fixes eight cases, two fresh-session
-repetitions, scoring rules, a directed-trace efficiency contract, one false
-candidate assertion, the model alias, and the activation bar before execution.
-Each run preserves raw model transcripts by repetition, scored projections, the
-exact component BOM, and SHA-256 bindings for every artifact. This small fixed
-fixture improves stability and falsification evidence; it is not a statistical
-superiority or broad accuracy claim.
-
-`preregistration-v3.json` separately binds one composed-only confirmation after
-the primary run exposed routing, endpoint-evidence, and exact-claim failures.
-Pass it with `--preregistration`. The confirmation keeps the original cases,
-model, repetitions, scoring, thresholds, and component binaries; it cannot
-rewrite the primary result or establish a broad ranking.
-
-Wave 4.2 and the intervening successor failures remain historical evidence of
-the defects that drove consolidation. The latest sealed Stage-4 successor for
-plugin 0.4.19 completed all ten five-route/two-repetition units and passed every
-fixed gate: 1.0 precision, recall, adjudication, routing, and routing-contract
-accuracy, with zero unsupported asserted claims, errors, or host canary
-violations. That single bounded result is sufficient for the current empirical
-release claim; it is not a statistical ranking. Plugin 0.4.20 fixed the
-code-search incremental refresh path. Plugin 0.4.21 pinned code-search v0.3.4
-and code-graph v0.8.0-redacted.3, added query-signal-aware hybrid ranking,
-deterministic graph traversal and tie ordering, and preserves route intent with
-a search- or graph-primary cascade. Plugin 0.4.32 pins code-search v0.3.6 and
-code-graph v0.8.0-redacted.11 and adds persistent
-per-project SCIP precision, an explicit reachability-versus-taint contract,
-isolated cross-project discovery, immutable graph-index comparison, automated
-Go and TypeScript SCIP preparation, independent Go SSA/RTA and TypeScript
-compiler-tier CALLS and IMPORTS oracles, independent normal-tier TypeScript
-type and direct method relationship oracles, a lower-memory graph-localization
-path, lexical seed-quality preservation through graph expansion, code-aware
-source-role ranking, and copy-on-write search publication on supported
-filesystems. These changes receive deterministic regression, exact installed-
-component readiness, and direct public/scale measurement rather than another
-model holdout. See
-[`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md).
-
-Plugin 0.4.32 also carries the updated `/index-repo` skill, which reports
-backend-issued semantic file/chunk deltas and code-graph's explicit
-`full`/`noop`/`incremental` lifecycle mode. This is operator telemetry, not a
-new readiness gate or a substitute for the bounded resource and
-semantic-equivalence harness.
-
-Plugin 0.4.29 also adds a zero-LLM clean/no-op/one-file-update lifecycle
-instrument and a compact released-component resource baseline. On pinned
-Chainlit (71,204 text lines), code-search measured 8.760 s / 0.410 s / 0.812 s
-and code-graph measured 0.704 s / 0.261 s / 0.655 s for those three phases.
-The graph's exact canonical fingerprint remained identical after the
-comment-only update; see
-[`bench/baselines/2026-08-13-index-lifecycle-resource-baseline.md`](bench/baselines/2026-08-13-index-lifecycle-resource-baseline.md)
-for RSS, allocated storage, p95 latency, inputs, and limits.
-
-The direct public and scale instrument lives under `bench/public_measure/`.
-The latest frozen balanced run contains 80 two-source-corroborated cases
-across bug, feature, performance, and security categories. Code-search reached
-Acc@1 0.375, Acc@10 0.788, and MRR@10 0.503 versus Sourcegraph at
-0.150/0.188/0.165 with zero request failures. The paired Acc@1 result was
-22 wins, 4 losses, and 54 ties (p=0.00053). Its full aggregate and allowed
-narrow claim are recorded in
-[`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md); conceptual discovery
-remains search-primary regardless of the graph arm's result.
-
-A separate same-index replay isolated the v0.3.6 source-role prior and result
-diversification: Acc@1 improved from 0.3625 to 0.3875 and MRR@10 from 0.49147
-to 0.51608, with 13 improved cases and no regressions. It did not re-run the
-public comparator and is not a broader superiority result.
-
-Both released backends also completed a clean, revision-pinned LLVM checkout
-containing 39,222,246 UTF-8 source lines and 160,123 tracked files. Search
-indexed it in 609.3 seconds with 3.65 GB peak RSS, a 4.98 GB index, and 3.77 s
-warm-query p50. Graph indexed it in 2,198.0 seconds with 9.43 GB peak RSS, a
-2.89 GB index, and 9.78 s warm-query p50. The combined 7.87 GB footprint is
-direct very-large-single-host evidence, not a distributed-fleet or
-class-leading-efficiency claim. See
-[`docs/CAPABILITY_STATE.md`](docs/CAPABILITY_STATE.md) for the complete scope.
-
-The latest graph release separately replays one fixed LLVM `code_localize`
-query over that preserved index. Median latency fell from 12.95 seconds to
-3.02 seconds (4.29x), and a fresh-process sample reduced peak RSS from 1.78 GB
-to 627 MB while preserving the ranked-output SHA-256 exactly. This improves the
-measured localization path; it does not retroactively change the historical
-full-indexing or broad warm-query measurements above.
-
-Search v0.3.6 also uses APFS copy-on-write clones for mutable compatibility
-mirrors of immutable generations. In a controlled 282,106,413-byte artifact
-replay, initial allocation fell from 282,017,792 bytes to 446,464 bytes while
-retaining distinct inodes and independent writes. Portable copy remains the
-fallback on unsupported filesystems; this is not a logical-size or mature-index
-compaction claim.
-
-The content-addressed five-arm localization instrument lives under
-`bench/compare/`; see `bench/compare/README.md` for frozen controls, fixture
-falsifiers, public-pin requirements, privacy boundaries, and the current
-fail-closed live-preflight status.
-
-### Portable proof packets
-
-Proof bundles can declare an optional capability-level assurance requirement.
-The deterministic evaluator preserves an evidence lattice across source
-coordinates, lexical/semantic retrieval, structural relationships, compiler
-resolution, runtime observation, and variable-level taint. It does not flatten
-those sources into one confidence score: a claim remains unresolved when its
-support or counterexample does not carry every requested capability.
-
-The first external-analysis adapter projects one selected CodeQL SARIF code
-flow into canonical `analysis:v1`, `ev:v1`, and `obs:v1` references:
-
-```bash
-python3 scripts/codeql_evidence.py ingest results.sarif \
-  --database-manifest codeql-database-manifest.json \
-  --query-pack-manifest query-pack-lock.json \
-  --repository-id <repository-id> \
-  --source-revision <source-revision> \
-  --index-generation <index-generation> \
-  --output codeql-observation.json
-```
-
-The reference binds the exact repository revision and index generation;
-CodeQL CLI, extractor, and database-content identity; a passing extraction
-quality receipt; query-pack manifest and SARIF digests; query/result/path
-selection; and every ordered source/intermediate/sink coordinate. This is an
-ingest boundary, not an embedded CodeQL runner. Graph reachability remains
-discovery context and never becomes taint evidence.
-
-After `proof_evaluator.py` accepts a proof bundle, export a deterministic
-packet containing the canonical bundle, evaluator result, concise Markdown
-report, and content-addressed manifest:
-
-```bash
-python3 scripts/export_proof.py export proof-bundle.json \
-  --output-dir proof-packet
-python3 scripts/export_proof.py verify proof-packet
-```
-
-Verification recomputes every artifact digest and reruns the deterministic
-evaluator. A changed bundle, result, report, manifest, or evaluator outcome is
-rejected. The validation workflow exports and verifies the committed proof
-fixture before publishing the packet as a retained CI artifact.
-
-## Trusted component validation
-
-The ordinary pull-request workflow has a stable, fail-closed `merge-gate`
-whose only dependency is the deterministic `validate` job. It does not read a
-component token. Trusted installation is isolated in
-`.github/workflows/trusted-component-promotion.yml`; its
-`validate-installed-components` job installs both private repositories from
-the exact descriptor path passed with `--component-bom` and validates their
-real `tools/list` responses. The same job downloads the exact public
-`scip-go` release asset, verifies the pinned release commit plus archive and
-binary digests, and runs the generator verifier. It runs only from a trusted
-`main` push or a manual default-branch dispatch, never on `pull_request`.
-`CODE_INTEL_COMPONENT_TOKEN` is a required post-merge validation secret:
-configure a fine-grained token with read access to
-`brandyn-s/code-search` and `brandyn-s/code-graph`.
-The validator exposes it only to authenticated GitHub fetch/tag-resolution
-commands and removes it before package builds or MCP processes start.
-The installed-component smoke also performs a lexical evidence query against
-the three-line `src/config.py` fixture and requires the generation-bound result
-to end at line 3, preventing newline-terminated files from claiming a
-nonexistent fourth line.
-
-For the release-wheel path, repository `Contents: read` is sufficient to
-resolve and peel the tag and download its private assets. The wheel is treated
-as an attested build artifact downloaded from that pinned release; the checks
-do not cryptographically prove its placement there. Its separately
-checksum-pinned offline attestation bundle is passed directly to
-`gh attestation verify`; no online Attestations API lookup is used, so the
-search verification does not need `Attestations: read`. Code-graph uses an
-operator-fetched canonical bundle vendored under `compatibility/attestations/`;
-the graph descriptor pins its repository-relative path and SHA-256, and static
-validation rejects a missing, modified, or release-mismatched bundle. The
-bundle covers all five immutable platform archives, so runtime verification is
-also offline and does not need `Attestations: read`. Both policies bind the
-build to the pinned source commit, release workflow, `refs/heads/main`, and
-GitHub-hosted runners.
-
-There is currently no repository secret fallback. If the secret is absent,
-the trusted job intentionally fails; do not skip or weaken this validation.
-Because the current BOM is `status: ready`, the same job invokes the readiness
-smoke generator against the just-installed MCP executables on every trusted
-`main` push or manual default-branch run. The fresh `ready-validation` file
-stays under the isolated runner directory and must pass the full version,
-readiness, identity-shape, generation, binding, and unchanged-checkout
-validator. The committed `promotion-candidate` record cannot substitute for
-that run-specific attestation. The uploaded trusted artifact includes freshly
-captured schema contracts and readiness evidence, each bound to the canonical
-SHA-256 of the complete install descriptor.
-
-Rollback is descriptor-atomic: revert the reviewed component-promotion commit
-that changed the BOM, snapshots, and readiness record together, then rerun the
-deterministic validation gate and trusted workflow. Never roll back only a tag,
-digest, manifest, or evidence file.
-
-The interactive installers also preserve the previously installed `.venv` and
-`bin` until the replacement components pass their live MCP schema check. Graph
-artifacts and launchers are built in an isolated `.install-staging` directory;
-if any install, provenance, extraction, or validation step fails, the rollback
-handler restores the prior installation instead of leaving a partial upgrade.
-
-## Environment Variables
-
-These control embedding behavior across the two MCPs. `EMBEDDING_PROVIDER`
-applies only to code-search. Set variables in your shell profile (`.bashrc`,
-`.zshrc`) or before launching Claude Code. They're read at runtime, so you can
-switch providers without reinstalling.
-
-**For Jina (local, free):**
-```bash
-export EMBEDDING_PROVIDER="jina"
-```
-
-**For Voyage AI (cloud code-search default):**
-```bash
-export EMBEDDING_PROVIDER="voyage"
-export VOYAGE_API_KEY="pa-..."  # Get a key at https://dash.voyageai.com
-```
-
-**If neither is set**, code-search auto-selects `voyage` for code when
-`VOYAGE_API_KEY` exists and `local` otherwise. Documentation indexing selects
-`voyage-context` when the Voyage key exists.
-
-**All variables:**
-
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `EMBEDDING_PROVIDER` | No | Auto-detect | code-search provider: `voyage` (Voyage 4 Large), `voyage-context`, `voyage-code-3`, `jina`, or `local` |
-| `VOYAGE_API_KEY` | Only for Voyage | - | Enables Voyage in code-search and optional Voyage embeddings in code-graph |
-| `CODE_GRAPH_SKIP_EMBEDDINGS` | No | Unset | Set to `1` or `true` to prevent code-graph from generating Voyage node embeddings even if the key is present |
-| `LOCAL_EMBEDDING_MODEL` | No | Provider-specific | HuggingFace model for `jina` or `local` provider |
-| `JINA_TRUNCATE_DIM` | No | - | Matryoshka dim truncation (0.5b: 64-896, 1.5b: 128-1536) |
-| `QUANTIZATION` | No | `int8` | FAISS index type: `int8` (4x smaller), `float32`, `binary` (32x smaller) |
-
-## Usage
-
-### Step 1: Integrated indexing
-
-```
-/index-repo /path/to/your/monorepo
-```
-
-The command indexes code-search first, verifies semantic completion, indexes
-code-graph with `skip_report=true`, and then requires both engines to report
-ready with matching complete v1 checkout identities.
-
-For a clean Git checkout with a root `go.mod` or `tsconfig.json`,
-compiler-backed CALLS precision can be generated explicitly:
-
-```
-/index-repo /path/to/go-repo --graph-precision auto --scip-policy required
-```
-
-The helper verifies the selected generator and runtime digests against the
-component BOM, runs it in the canonical checkout, rejects checkout mutation,
-and atomically caches the nonempty index outside the repository by index
-generation. TypeScript additionally requires an existing target
-`node_modules`; the plugin never installs dependencies in the target. The
-graph verifies that it ingested the same artifact digest. `preferred` may fall
-back visibly to heuristic indexing; `required` stops before graph indexing
-when compiler preparation fails. Generators invoke language toolchains and are
-not execution sandboxes. Automatic generation covers root Go and TypeScript
-projects on the documented platforms; it is not an organization-wide SCIP
-fleet or a claim that every edge is compiler-resolved.
-
-**Component timing reference** (3,000 chunks, typical single crate/package):
-
-| Provider | Time | Notes |
-|----------|------|-------|
-| `voyage-context` | ~5-10 min | API calls, rate-limited |
-| `voyage` | ~5-10 min | API calls, rate-limited |
-| `jina` | ~50 min (CPU) | Local, no API. First run downloads ~1GB model |
-| `local` | ~2-5 min | Local, small model, lower quality |
-
-Code-graph's AST extraction and SQLite graph construction are local and
-typically complete in ~30-60 seconds. If `VOYAGE_API_KEY` is present and graph
-embeddings are not disabled, code-graph also sends selected node text to
-Voyage; that optional pass adds API-dependent time and cost.
-
-### Step 2: Search (after a verified dual index)
-
-| Question type | Example | What happens |
-|--------------|---------|-------------|
-| **Conceptual** | "How does authentication work?" | Semantic search finds auth code, graph traces the call chain |
-| **Structural** | "What calls processOrder?" | Graph traces inbound call path with risk classification |
-| **Discovery** | "Find the rate limiting implementation" | Semantic search by meaning, not just keywords |
-| **Architecture** | "Show all API endpoints" | Graph queries for Route/Handler nodes |
-| **Impact** | "Blast radius of changing UserService?" | Graph traces all dependents with hop-distance risk |
-| **Quality** | "Find dead code" | Graph finds functions with zero inbound calls |
-| **Security** | "Where are the input entry points / auth boundaries?" | Graph queries security-tagged surfaces (auth/crypto/input/sink) |
-| **Security** | "Does user input reach a sensitive sink?" | Graph traces CALLS/READS/WRITES/USAGE reachability; vulnerability-grade variable taint is handed to CodeQL |
-| **Compliance** | "What code satisfies STIG control X?" | Graph maps the control ID to code evidence |
-| **Localization** | "Where would I fix \<issue\>?" | Semantic chunk evidence is aggregated into a file-level ranking |
-
-### Step 3: Multi-repo
-
-Each verified repo can be activated independently. Bounded cross-project
-discovery can query up to 25 isolated indexes without changing the active
-project; rankings remain per-project and scores are not compared globally.
-
-```
-/index-repo /path/to/repo-a
-/index-repo /path/to/repo-b
-# Discover across both, then select one project for exact evidence
-```
-
-## Historical component-only measurements
-
-The table below predates the provenance-bound routing/evidence harness. It
-compares embedding providers inside code-search on 102 historical queries.
-This is not an integrated E2E comparative grade and must not be presented as a
-current live plugin result.
-
-| Provider | Model | MRR (Nix) | MRR (Rust svc) | MRR (Rust lib) | MRR (TypeScript) | Data leaves machine? | Cost |
-|----------|-------|-----------|----------------|----------------|------------------|---------------------|------|
-| **`voyage-context`** | voyage-context-3 | **0.723** | **0.783** | **0.861** | **0.677** | Yes | ~$0.06/1M tokens |
-| historical `voyage` selector | voyage-code-3 | 0.584 | 0.742 | 0.861 | 0.642 | Yes | ~$0.06/1M tokens |
-| **`jina` (enriched)** | jina-code-embeddings-0.5b | **0.638** | 0.742 | ~0.86 | **0.660** | **No** | **Free** |
-| `jina` (baseline) | jina-code-embeddings-0.5b | 0.582 | 0.742 | ~0.86 | 0.660 | No | Free |
-| `local` | all-MiniLM-L6-v2 | ~0.35 | ~0.45 | ~0.50 | ~0.40 | No | Free |
-
-*Jina "enriched" = default mode. Prepends sibling chunk names to each chunk's header, approximating Voyage's contextualized embeddings. Enabled automatically for Jina and local providers.*
-
-At the time of this measurement, the recorded `voyage` selector resolved to
-`voyage-code-3`. That historical label is not the current `voyage` provider:
-at the pinned code-search release, `voyage` maps to `voyage-4-large`, while
-`voyage-code-3` is a separately selected non-default provider.
-
-### Key findings
-
-- **In this historical run, `voyage-context-3` led the tested models.** Its
-  advantage came from embedding chunks with awareness of their file context
-  (sibling chunks). The advantage was largest for declarative configuration
-  languages (+24% on Nix) and smallest for self-contained libraries (0% on
-  Rust libs). This result does not compare the current `voyage-4-large`
-  mapping.
-
-- **`jina-code-0.5b` with enriched headers closes 40% of the gap to Voyage** on Nix (0.582 → 0.638, reference 0.723). Enriched context is on by default — no configuration needed. It runs entirely on-device with no API calls.
-
-- **In this historical run, `jina` beat `voyage-code-3`** on Nix (0.638
-  vs 0.584, +9.2%) and TypeScript (0.660 vs 0.642, +2.8%), while running
-  locally and free of API cost.
-
-- **In this historical run, `voyage-code-3` did not outperform Jina overall**
-  and required sending code to Voyage. It remains a distinct non-default
-  selector; use current component evidence when evaluating it for a specific
-  corpus.
-
-### Which should I use?
-
-| Situation | Recommended provider |
-|-----------|---------------------|
-| Current cloud default for code | `voyage` (`voyage-4-large`) |
-| Contextualized documentation indexing | `voyage-context` |
-| Older `voyage-code-3`-specific workflow | `voyage-code-3` (explicitly; not `voyage`) |
-| Code must stay on-device (security/compliance) | `jina`, remove the graph Voyage key, and set `CODE_GRAPH_SKIP_EMBEDDINGS=1` as defense in depth |
-| Quick evaluation, don't want to set up API keys | `jina` |
-| Smallest possible index, lowest resource usage | `local` (lower quality) |
-
-### Jina model variants
-
-| Model | Params | Dim | RAM | CPU Index (3K chunks) |
-|-------|--------|-----|-----|----------------------|
-| `jinaai/jina-code-embeddings-0.5b` (default) | 494M | 896 | ~2.3 GB | ~50 min |
-| `jinaai/jina-code-embeddings-1.5b` | 1.54B | 1536 | ~4 GB | ~120 min |
-
-Set via `LOCAL_EMBEDDING_MODEL=jinaai/jina-code-embeddings-1.5b`. Both support Matryoshka dimension truncation via `JINA_TRUNCATE_DIM`.
-
-## Supported Languages
-
-**code-search** (semantic): Any text file. AST-aware chunking for Rust, Python, TypeScript, JavaScript, Go, Java, C, C++, C#, Nix, HCL (Terraform), TOML, YAML, and Markdown.
-
-**code-graph** (structural): Rust, Python, TypeScript, JavaScript, Go, Java, C, C++, C#, Nix, HCL, Ruby, Swift, Kotlin, Scala, and more.
-
-## Lessons Learned: large monorepos
-
-Practical advice from running this plugin on a large private monorepo (~4,800 files, 34K chunks, Rust/Nix/TypeScript/Python/HCL).
-These are historical component observations and workflow guidance, not the
-readiness evidence for the current BOM.
-
-### Index by concern, not the entire repo
-
-Indexing the entire monorepo at once produces 34K chunks. Queries compete against everything — a search for "firewall config" matches Nix modules, Rust network code, TypeScript UI components, and Terraform security groups. The results are diluted.
-
-**Recommended workflow:** Index sub-projects separately based on what you're
-working on:
-
-```
-/index-repo /path/to/monorepo/nix           # NixOS system config
-/index-repo /path/to/monorepo/asset-service # Asset management service (Rust)
-/index-repo /path/to/monorepo/libnet        # Networking library (Rust)
-/index-repo /path/to/monorepo/web-ui        # Web UI (TypeScript)
-```
-
-The active project auto-switches when you ask questions. If you're working on the Rust networking library, the results come from `libnet` — not the entire monorepo.
-
-### Quality varies by language — context matters more for config languages
-
-Our eval (102 queries, 4 languages) showed that embedding quality depends on the language:
-
-| Language type | Example | voyage-context-3 advantage | Why |
-|---|---|---|---|
-| **Declarative config** | Nix, HCL | **+24%** over baseline | `allowedTCPPorts = [ 80 443 ]` is meaningless without file context |
-| **Application services** | Rust services, TypeScript | **+5.5%** | Typed functions carry meaning in signatures, but service context helps |
-| **Self-contained libraries** | Rust libraries | **0%** (tie) | `fn login(path: &Path) -> Result<()>` is fully self-descriptive |
-
-**Practical implication:** If you work primarily in Rust libraries, Jina (free, local) gives you the same quality as Voyage. If you work in NixOS config or large service codebases, Voyage's contextualized embeddings are worth the API cost.
-
-### Nix-specific: use full mode for code-graph
-
-The `/index-repo` skill handles this automatically. When testing code-graph
-directly, Nix repos require `mode: "full"`.
-
-### First-time indexing is slow with Jina — incremental is fast
-
-The Jina 0.5b model takes ~50 minutes to index 3K chunks on CPU (no GPU). This is a one-time cost. After the initial index:
-- **Incremental re-index**: Only changed files are re-embedded. A 10-file change takes seconds.
-- **Project switching**: Instant — just loads the existing index from disk.
-- **Query latency**: ~5 seconds per query on CPU.
-
-If the initial indexing time is a blocker, index during lunch or overnight.
-Or use the current Voyage code provider for the initial index
-(`EMBEDDING_PROVIDER=voyage`), then switch to Jina for daily use once you're
-willing to re-index.
-
-### The graph and semantic tools complement each other — don't use just one
-
-Common mistake: using only semantic search ("find the auth code") and ignoring the graph. The graph answers questions that semantic search fundamentally cannot:
-
-- **"What happens if I change this function?"** → Graph traces all callers (blast radius)
-- **"Is this function dead code?"** → Graph checks for zero inbound calls
-- **"What's the dependency chain from main() to this handler?"** → Graph traces the call path
-
-Conversely, semantic retrieval is the preferred first step for a conceptual
-question such as "where is the code that handles rate limiting?" Graph text
-search can corroborate it, but it is not a substitute for the semantic FIND
-route.
-
-**Best workflow:** Start with semantic search when the structural target is not
-yet known, then use graph queries to *understand* how it connects. If the user
-already names an exact symbol and asks only for callers or dependencies, go
-directly to the narrowest graph relationship tool.
-
-### Versioned indexes for docs and release notes
-
-Version-specific workflows can use isolated Git worktrees:
-
-```bash
-# Create worktrees for each version you want to index
-git worktree add ../myrepo-v1 v1.0.0
-git worktree add ../myrepo-v2 v2.0.0
-
-# Index each version separately — different paths = different project IDs
-/index-repo ../myrepo-v1
-/index-repo ../myrepo-v2
-```
-
-Each version gets its own isolated index. Use bounded cross-project discovery
-to locate candidates, then select one project for exact follow-up evidence.
-Code-graph's immutable index comparison reports file-content and declaration
-deltas without treating retrieval scores as comparable.
-
-**Use cases:**
-- **Release notes**: Index v1 and v2, search each for "what changed in authentication" — compare results
-- **Migration guides**: Index old and new versions, find functions that moved or were renamed
-- **Version-specific docs**: Index the exact code a version ships, generate docs from that snapshot — no hallucinations from newer code
-
-**Tip for doc generation:** If your docs are well-structured (MDX, Markdown with clear sections), the local Jina model works well — structured text is self-descriptive, like typed code. You don't need Voyage's contextualized embeddings for docs that already have good headings and organization.
-
-**Current limitations:**
-- Cross-project results are project-balanced discovery only; scores from
-  separate indexes are not globally comparable
-- Index comparison covers file content and declarations, not a semantic
-  organization-wide diff
-- No organization ACL model or continuously managed indexing fleet
-- Worktrees use disk space for each checked-out version
+`/index-repo` runs both engines and checks that they indexed the same
+unchanged checkout. This runs both semantic and structural indexing; the
+graph side suppresses report writes. `/code-intel` routes each question to the
+right engine and applies the evidence rules. `/code-explore` is the compact
+natural-language variant.
+
+## What you get
+
+- **`/index-repo`**: index both engines and verify readiness and checkout identity.
+- **`/code-intel`**: FIND / UNDERSTAND / PROVE facade with coherence, contradiction, and coverage rules.
+- **`/code-explore`**: natural-language questions, auto-routed.
+- **code-search MCP server**: hybrid semantic + lexical retrieval with persistent per-project indexes.
+- **code-graph MCP server**: callers, callees, implementations, routes, change impact, dead code, security surfaces.
+
+For clean Go or TypeScript repositories, `/index-repo ... --graph-precision auto`
+adds compiler-grade CALLS and IMPORTS relationships through pinned SCIP
+generators. Everything else is tree-sitter plus heuristic resolution and is
+labeled as such.
+
+## Verified install
+
+Checksums are always verified against the BOM. When the GitHub CLI is
+installed and authenticated, the installer also verifies GitHub build
+provenance for both components with `gh attestation verify`; without it, the
+installer says so once and continues. Manual installs, token scopes, the
+trusted post-merge validation workflow, and the readiness record are described
+in [docs/INSTALL.md](docs/INSTALL.md).
+
+## Using the components without Claude Code
+
+Both servers are ordinary stdio MCP servers and work with Cursor, Codex, Gemini
+CLI, Windsurf, and any other MCP client. See each component's client guide:
+[code-search docs/clients.md](https://github.com/brandyn-s/code-search/blob/main/docs/clients.md)
+and
+[code-graph docs/clients.md](https://github.com/brandyn-s/code-graph/blob/main/docs/clients.md).
+
+## Measurements and benchmarks
+
+Bounded measurements (public LocBench localization, LLVM-scale indexing,
+lifecycle timings) are recorded in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md).
+The reproducible comparison harness lives in
+[bench/compare/README.md](bench/compare/README.md) and the recorded-trace
+routing harness in [bench/e2e/README.md](bench/e2e/README.md). Guidance for
+very large repositories is in [docs/LARGE_MONOREPOS.md](docs/LARGE_MONOREPOS.md).
 
 ## Troubleshooting
 
-**"Search returns irrelevant results from wrong files"**
-- Check which verified project is active and rerun `/index-repo` for a stale
-  or unverified checkout.
+- **Servers fail on the very first launch**: the bootstrap is still installing. Watch `.runtime/bootstrap.log` under the plugin directory, then reconnect with `/mcp`. Set `CODE_INTEL_NO_BOOTSTRAP=1` to disable auto-install and run `install.sh` yourself.
+- **Indexing seems stuck**: local Jina indexing is CPU-bound (about one chunk per second). Check `~/.claude_code_search/` for growing files. With Voyage, check the key and rate limits.
+- **Results come from the wrong project**: rerun `/index-repo` on the checkout you mean; the active project follows the verified index.
+- **code-graph returns 0 nodes on a Nix repo**: `/index-repo` already uses `mode: "full"`; when calling the server directly, pass it explicitly.
 
-**"Indexing seems stuck"**
-- Jina CPU indexing is genuinely slow (~1 chunk/second on CPU). Check `~/.claude_code_search/` for growing index files.
-- For Voyage, check your API key is valid and you haven't hit rate limits.
+## Contributing
 
-**"All search results come from one large file"**
-- Some repos have very large files (generated code, lockfiles) that dominate results. Add them to `.gitignore` or index a sub-directory instead.
-
-**"code-graph returns 0 nodes"**
-- For Nix repos: ensure `mode: "full"` is used (the `/index-repo` skill does this automatically).
-- Check that the target directory has files in supported languages.
-
-**"Vector search results seem random"**
-- If you indexed before 2026-04-05: the FAISS int8 quantizer had a bug that returned zero similarities. Re-index to fix.
-
-## Notes
-
-- **Incremental updates**: Re-run `/index-repo`; code-search re-embeds changed
-  files and both engines must re-verify the checkout identity.
-- **Index storage**: Indexes are stored in `~/.claude_code_search/` by default. Set `CODE_SEARCH_STORAGE` to change.
-- **code-graph privacy**: Structural extraction and SQLite storage are local.
-  With `VOYAGE_API_KEY`, code-graph can send selected node and query text to
-  Voyage for embedding-backed features. Remove the key before launching the
-  MCP to prevent all graph Voyage calls. `CODE_GRAPH_SKIP_EMBEDDINGS=1`
-  prevents node-embedding generation but does not by itself prevent query
-  embedding against a pre-existing graph index while the key remains present.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

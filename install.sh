@@ -8,11 +8,19 @@
 set -e
 
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-TARGET_BIN_DIR="$PLUGIN_DIR/bin"
+# Layout: bin/ holds the committed MCP launchers that .mcp.json points at.
+# Installed components are runtime state under .runtime/bin (native binaries,
+# optional SCIP generators) and .venv (code-search). Both are gitignored.
+RUNTIME_DIR="$PLUGIN_DIR/.runtime"
+LAUNCHER_DIR="$PLUGIN_DIR/bin"
+TARGET_BIN_DIR="$RUNTIME_DIR/bin"
 TARGET_VENV_DIR="$PLUGIN_DIR/.venv"
 BIN_DIR="$TARGET_BIN_DIR"
 VENV_DIR="$TARGET_VENV_DIR"
 BOM_FILE="$PLUGIN_DIR/component-bom.json"
+# The installed code-graph binary is always named code-graph regardless of the
+# name inside the release archive (older releases shipped codebase-memory-mcp).
+GRAPH_INSTALLED_NAME="code-graph"
 
 echo "=== Codebase Search Plugin Installer ==="
 echo ""
@@ -27,9 +35,9 @@ case "$ARCH" in
 esac
 
 case "$OS" in
-    linux)  PLATFORM="linux" ; EXT="tar.gz" ; GRAPH_BINARY="codebase-memory-mcp" ;;
-    darwin) PLATFORM="darwin" ; EXT="tar.gz" ; GRAPH_BINARY="codebase-memory-mcp" ;;
-    mingw*|msys*|cygwin*) PLATFORM="windows" ; EXT="zip" ; GRAPH_BINARY="codebase-memory-mcp.exe" ;;
+    linux)  PLATFORM="linux" ; EXT="tar.gz" ; GRAPH_BINARY="$GRAPH_INSTALLED_NAME" ;;
+    darwin) PLATFORM="darwin" ; EXT="tar.gz" ; GRAPH_BINARY="$GRAPH_INSTALLED_NAME" ;;
+    mingw*|msys*|cygwin*) PLATFORM="windows" ; EXT="zip" ; GRAPH_BINARY="$GRAPH_INSTALLED_NAME.exe" ;;
     *) echo "Error: Unsupported OS: $OS"; exit 1 ;;
 esac
 
@@ -287,15 +295,93 @@ run_with_allowed_environment() {
     env -i "${allowed_environment[@]}" "$@"
 }
 
-require_authenticated_gh() {
-    if ! command -v gh &>/dev/null; then
-        echo "Error: GitHub CLI is required for private code-search releases." >&2
+# GitHub CLI is optional. Public releases are fetched with curl; gh is used
+# when present and authenticated (private releases, build provenance).
+GH_AUTHENTICATED=""
+gh_authenticated() {
+    if [ -z "$GH_AUTHENTICATED" ]; then
+        if command -v gh &>/dev/null && gh auth status --hostname github.com >/dev/null 2>&1; then
+            GH_AUTHENTICATED=yes
+        else
+            GH_AUTHENTICATED=no
+        fi
+    fi
+    [ "$GH_AUTHENTICATED" = "yes" ]
+}
+
+# github_api_get <repos/...> : GET a GitHub REST endpoint and print the body.
+github_api_get() {
+    local endpoint="$1"
+    if gh_authenticated; then
+        gh api --method GET "$endpoint"
+        return
+    fi
+    if ! command -v curl &>/dev/null; then
+        echo "Error: curl or an authenticated GitHub CLI is required to resolve release tags." >&2
         return 1
     fi
-    if ! gh auth status --hostname github.com >/dev/null 2>&1; then
-        echo "Error: authenticate GitHub CLI with gh auth login or GH_TOKEN." >&2
-        return 1
+    local -a headers
+    headers=(-H "Accept: application/vnd.github+json")
+    if [ -n "${GH_TOKEN:-}" ]; then
+        headers+=(-H "Authorization: Bearer $GH_TOKEN")
     fi
+    curl --fail --location --silent --show-error "${headers[@]}" \
+        "https://api.github.com/$endpoint"
+}
+
+# download_release_asset <repository> <tag> <asset> <dest-dir>
+# Public releases download directly; gh is the fallback for private ones.
+download_release_asset() {
+    local repository="$1"
+    local tag="$2"
+    local asset="$3"
+    local dest_dir="$4"
+    local url="https://github.com/${repository}/releases/download/${tag}/${asset}"
+    mkdir -p "$dest_dir"
+    if command -v curl &>/dev/null; then
+        if curl --fail --location --silent --show-error --retry 2 \
+            "$url" --output "$dest_dir/$asset" 2>/dev/null; then
+            return 0
+        fi
+        rm -f "$dest_dir/$asset"
+    fi
+    if gh_authenticated; then
+        gh release download "$tag" \
+            --repo "$repository" \
+            --pattern "$asset" \
+            --dir "$dest_dir" \
+            --clobber
+        return
+    fi
+    echo "Error: could not download $asset from $repository ($tag)." >&2
+    echo "  The public release URL was unavailable and the GitHub CLI is not authenticated." >&2
+    echo "  For private releases: install gh, run 'gh auth login' (or set GH_TOKEN), and re-run." >&2
+    return 1
+}
+
+# verify_release_attestation <artifact> <bundle> <repository> <signer-workflow> <source-digest> <source-ref>
+# Checksums against the BOM are always mandatory (see verify_sha256). Build
+# provenance additionally needs the GitHub CLI; without it we say so once.
+verify_release_attestation() {
+    local artifact="$1"
+    local bundle="$2"
+    local repository="$3"
+    local signer_workflow="$4"
+    local source_digest="$5"
+    local source_ref="$6"
+    if gh_authenticated; then
+        run_with_allowed_environment \
+            gh attestation verify "$artifact" \
+            --bundle "$bundle" \
+            --repo "$repository" \
+            --signer-workflow "$signer_workflow" \
+            --source-digest "$source_digest" \
+            --source-ref "$source_ref" \
+            --deny-self-hosted-runners
+        return
+    fi
+    echo "  Provenance attestation not verified for $artifact: GitHub CLI is not available or not authenticated." >&2
+    echo "  Checksums matched the tested BOM. To also verify build provenance, install gh, run 'gh auth login', and re-run install.sh." >&2
 }
 
 resolve_release_tag_commit() {
@@ -307,9 +393,8 @@ resolve_release_tag_commit() {
     local extra
     local depth
 
-    response=$(gh api --method GET \
-        "repos/${repository}/git/ref/tags/${tag}" \
-        --jq '.object | [.type, .sha] | @tsv')
+    response=$(github_api_get "repos/${repository}/git/ref/tags/${tag}" \
+        | "$PYTHON" -c 'import json,sys; o=json.load(sys.stdin)["object"]; print(f"{o[\"type\"]}\t{o[\"sha\"]}")')
     depth=0
     while [ "$depth" -lt 16 ]; do
         depth=$((depth + 1))
@@ -328,9 +413,8 @@ resolve_release_tag_commit() {
                 return 0
                 ;;
             tag)
-                response=$(gh api --method GET \
-                    "repos/${repository}/git/tags/${target_sha}" \
-                    --jq '.object | [.type, .sha] | @tsv')
+                response=$(github_api_get "repos/${repository}/git/tags/${target_sha}" \
+                    | "$PYTHON" -c 'import json,sys; o=json.load(sys.stdin)["object"]; print(f"{o[\"type\"]}\t{o[\"sha\"]}")')
                 ;;
             *)
                 echo "Error: GitHub tag resolves to unsupported object type: $target_type" >&2
@@ -348,7 +432,7 @@ HAD_TARGET_BIN=0
 HAD_TARGET_VENV=0
 NEW_BIN_PROMOTED=0
 NEW_VENV_PROMOTED=0
-ROLLBACK_BIN_DIR="$PLUGIN_DIR/.bin.rollback.$$"
+ROLLBACK_BIN_DIR="$RUNTIME_DIR/bin.rollback.$$"
 ROLLBACK_VENV_DIR="$PLUGIN_DIR/.venv.rollback.$$"
 INSTALL_STAGE=""
 
@@ -379,6 +463,7 @@ rollback_install() {
     return "$exit_code"
 }
 
+mkdir -p "$RUNTIME_DIR"
 INSTALL_STAGE=$(mktemp -d "$PLUGIN_DIR/.install-staging.XXXXXX")
 INSTALL_RUNTIME_HOME="$INSTALL_STAGE/runtime-home"
 mkdir -p "$INSTALL_RUNTIME_HOME"
@@ -426,9 +511,13 @@ case "$CODE_SEARCH_KIND" in
         CODE_SEARCH_REF=$("$PYTHON" -c \
             'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["revision"])' \
             "$BOM_FILE")
-        echo "  Installing redacted-code-search from GitHub..."
+        echo "  Installing code-search from GitHub..."
+        # Distribution name of the pinned source; older pins used redacted-code-search.
+        CODE_SEARCH_DIST=$("$PYTHON" -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"].get("distribution", "redacted-code-search"))' \
+            "$BOM_FILE")
         "$VENV_PIP" install --quiet \
-            "redacted-code-search @ git+${CODE_SEARCH_REPOSITORY}@${CODE_SEARCH_REF}"
+            "${CODE_SEARCH_DIST} @ git+${CODE_SEARCH_REPOSITORY}@${CODE_SEARCH_REF}"
         run_with_allowed_environment \
             "$VENV_PYTHON" "$PLUGIN_DIR/scripts/verify_code_search_revision.py" \
                 "$CODE_SEARCH_REF" \
@@ -468,7 +557,6 @@ case "$CODE_SEARCH_KIND" in
         CODE_SEARCH_DOWNLOAD_DIR="$BIN_DIR/.code-search-download"
         mkdir -p "$CODE_SEARCH_DOWNLOAD_DIR"
 
-        require_authenticated_gh
         RESOLVED_CODE_SEARCH_REVISION=$(resolve_release_tag_commit \
             "$CODE_SEARCH_REPOSITORY" \
             "$CODE_SEARCH_TAG")
@@ -479,13 +567,10 @@ case "$CODE_SEARCH_KIND" in
             exit 1
         fi
         echo "  Downloading tested code-search wheel and attestation bundle..."
-        gh release download "$CODE_SEARCH_TAG" \
-            --repo "$CODE_SEARCH_REPOSITORY" \
-            --pattern "$CODE_SEARCH_WHEEL" \
-            --pattern "$CODE_SEARCH_BUNDLE" \
-            --pattern "$CODE_SEARCH_CHECKSUMS" \
-            --dir "$CODE_SEARCH_DOWNLOAD_DIR" \
-            --clobber
+        for release_file in "$CODE_SEARCH_WHEEL" "$CODE_SEARCH_BUNDLE" "$CODE_SEARCH_CHECKSUMS"; do
+            download_release_asset "$CODE_SEARCH_REPOSITORY" "$CODE_SEARCH_TAG" \
+                "$release_file" "$CODE_SEARCH_DOWNLOAD_DIR"
+        done
 
         verify_sha256 \
             "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_WHEEL" \
@@ -507,17 +592,12 @@ case "$CODE_SEARCH_KIND" in
         echo "  Verifying offline build provenance..."
         (
             cd "$CODE_SEARCH_DOWNLOAD_DIR"
-            run_with_allowed_environment \
-                gh attestation verify "$CODE_SEARCH_WHEEL" \
-                --bundle "$CODE_SEARCH_BUNDLE" \
-                --repo "$CODE_SEARCH_REPOSITORY" \
-                --signer-workflow "$CODE_SEARCH_SIGNER_WORKFLOW" \
-                --source-digest "$CODE_SEARCH_SOURCE_REVISION" \
-                --source-ref "$CODE_SEARCH_SOURCE_REF" \
-                --deny-self-hosted-runners
+            verify_release_attestation "$CODE_SEARCH_WHEEL" "$CODE_SEARCH_BUNDLE" \
+                "$CODE_SEARCH_REPOSITORY" "$CODE_SEARCH_SIGNER_WORKFLOW" \
+                "$CODE_SEARCH_SOURCE_REVISION" "$CODE_SEARCH_SOURCE_REF"
         )
 
-        echo "  Installing the verified local redacted-code-search wheel..."
+        echo "  Installing the verified local code-search wheel..."
         run_with_allowed_environment \
             "$VENV_PIP" install --quiet --force-reinstall \
             "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_WHEEL"
@@ -550,7 +630,6 @@ echo "  Tested release: $RELEASE_TAG"
 
 GRAPH_DOWNLOAD_DIR="$BIN_DIR/.code-graph-download"
 mkdir -p "$GRAPH_DOWNLOAD_DIR"
-require_authenticated_gh
 RESOLVED_GRAPH_REVISION=$(resolve_release_tag_commit \
     "$GRAPH_REPOSITORY" \
     "$RELEASE_TAG")
@@ -561,12 +640,10 @@ if [ "$RESOLVED_GRAPH_REVISION" != "$GRAPH_SOURCE_REVISION" ]; then
     exit 1
 fi
 echo "  Downloading code-graph ${RELEASE_TAG} for ${PLATFORM}-${ARCH}..."
-gh release download "$RELEASE_TAG" \
-    --repo "$GRAPH_REPOSITORY" \
-    --pattern "$ASSET_NAME" \
-    --pattern "$GRAPH_CHECKSUMS" \
-    --dir "$GRAPH_DOWNLOAD_DIR" \
-    --clobber
+for release_file in "$ASSET_NAME" "$GRAPH_CHECKSUMS"; do
+    download_release_asset "$GRAPH_REPOSITORY" "$RELEASE_TAG" \
+        "$release_file" "$GRAPH_DOWNLOAD_DIR"
+done
 
 if [ ! -f "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" ]; then
     echo "Error: failed to download code-graph binary." >&2
@@ -598,27 +675,39 @@ verify_sha256 \
 echo "  Verifying code-graph build provenance..."
 (
     cd "$GRAPH_DOWNLOAD_DIR"
-    run_with_allowed_environment \
-        gh attestation verify "$ASSET_NAME" \
-        --bundle "$GRAPH_ATTESTATION_BUNDLE" \
-        --repo "$GRAPH_REPOSITORY" \
-        --signer-workflow "$GRAPH_SIGNER_WORKFLOW" \
-        --source-digest "$GRAPH_SOURCE_REVISION" \
-        --source-ref "$GRAPH_SOURCE_REF" \
-        --deny-self-hosted-runners
+    verify_release_attestation "$ASSET_NAME" "$GRAPH_ATTESTATION_BUNDLE" \
+        "$GRAPH_REPOSITORY" "$GRAPH_SIGNER_WORKFLOW" \
+        "$GRAPH_SOURCE_REVISION" "$GRAPH_SOURCE_REF"
 )
 
+GRAPH_EXTRACT_DIR="$GRAPH_DOWNLOAD_DIR/extracted"
+mkdir -p "$GRAPH_EXTRACT_DIR"
 if [ "$EXT" = "tar.gz" ]; then
     run_with_allowed_environment tar xzf \
-        "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" -C "$BIN_DIR"
+        "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" -C "$GRAPH_EXTRACT_DIR"
 else
     run_with_allowed_environment unzip -qo \
-        "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" -d "$BIN_DIR"
+        "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" -d "$GRAPH_EXTRACT_DIR"
 fi
-rm -f \
-    "$GRAPH_DOWNLOAD_DIR/$ASSET_NAME" \
-    "$GRAPH_DOWNLOAD_DIR/$GRAPH_CHECKSUMS"
-rmdir "$GRAPH_DOWNLOAD_DIR" 2>/dev/null || true
+# Release archives contain exactly one binary. Current releases name it
+# code-graph; releases before the rename shipped codebase-memory-mcp. Install
+# it under the stable name the launcher expects.
+EXTRACTED_GRAPH_BINARY=""
+for candidate in "code-graph" "codebase-memory-mcp"; do
+    if [ "$EXT" = "zip" ]; then
+        candidate="$candidate.exe"
+    fi
+    if [ -f "$GRAPH_EXTRACT_DIR/$candidate" ]; then
+        EXTRACTED_GRAPH_BINARY="$candidate"
+        break
+    fi
+done
+if [ -z "$EXTRACTED_GRAPH_BINARY" ]; then
+    echo "Error: release archive $ASSET_NAME does not contain a code-graph binary." >&2
+    exit 1
+fi
+mv "$GRAPH_EXTRACT_DIR/$EXTRACTED_GRAPH_BINARY" "$BIN_DIR/$GRAPH_BINARY"
+rm -rf "$GRAPH_DOWNLOAD_DIR"
 chmod +x "$BIN_DIR/$GRAPH_BINARY" 2>/dev/null || true
 
 echo "  code-graph installed."
@@ -630,7 +719,6 @@ echo "Installing optional Go SCIP precision generator..."
 if [ "$GO_SCIP_SUPPORTED" = "yes" ]; then
     GO_SCIP_DOWNLOAD_DIR="$BIN_DIR/.go-scip-download"
     mkdir -p "$GO_SCIP_DOWNLOAD_DIR"
-    require_authenticated_gh
     RESOLVED_GO_SCIP_REVISION=$(resolve_release_tag_commit \
         "$GO_SCIP_REPOSITORY" \
         "$GO_SCIP_TAG")
@@ -638,11 +726,8 @@ if [ "$GO_SCIP_SUPPORTED" = "yes" ]; then
         echo "Error: go-scip tag source revision mismatch." >&2
         exit 1
     fi
-    gh release download "$GO_SCIP_TAG" \
-        --repo "$GO_SCIP_REPOSITORY" \
-        --pattern "$GO_SCIP_ASSET" \
-        --dir "$GO_SCIP_DOWNLOAD_DIR" \
-        --clobber
+    download_release_asset "$GO_SCIP_REPOSITORY" "$GO_SCIP_TAG" \
+        "$GO_SCIP_ASSET" "$GO_SCIP_DOWNLOAD_DIR"
     verify_sha256 \
         "$GO_SCIP_DOWNLOAD_DIR/$GO_SCIP_ASSET" \
         "$GO_SCIP_ARCHIVE_SHA256" \
@@ -763,24 +848,20 @@ echo ""
 # ------------------------------------------------------------------
 # 4. Create launcher script (cross-platform wrapper)
 # ------------------------------------------------------------------
-echo "[4/5] Creating launcher scripts..."
+echo "[4/5] Preparing launcher scripts..."
 
-# code-search launcher — invokes the venv's Python with the MCP server
-cat > "$BIN_DIR/run-code-search" << LAUNCHER
-#!/usr/bin/env bash
-SCRIPT_DIR="\$(cd "\$(dirname "\$0")/.." && pwd)"
-if [ -f "\$SCRIPT_DIR/.venv/bin/code-search-mcp" ]; then
-    exec "\$SCRIPT_DIR/.venv/bin/code-search-mcp" "\$@"
-elif [ -f "\$SCRIPT_DIR/.venv/Scripts/code-search-mcp.exe" ]; then
-    exec "\$SCRIPT_DIR/.venv/Scripts/code-search-mcp.exe" "\$@"
-else
-    echo "Error: code-search-mcp not found. Run install.sh first." >&2
-    exit 1
-fi
-LAUNCHER
-chmod +x "$BIN_DIR/run-code-search"
+# The launchers are committed in bin/ (run-code-search, code-graph) and are
+# what .mcp.json points at. They exec the components installed below and
+# bootstrap this installer on first launch if the components are missing.
+for launcher in run-code-search code-graph; do
+    if [ ! -f "$LAUNCHER_DIR/$launcher" ]; then
+        echo "Error: committed launcher is missing: $LAUNCHER_DIR/$launcher" >&2
+        exit 1
+    fi
+    chmod +x "$LAUNCHER_DIR/$launcher"
+done
 
-echo "  Launchers created."
+echo "  Launchers ready."
 echo ""
 
 # ------------------------------------------------------------------
@@ -822,10 +903,11 @@ case "$READINESS_STATUS" in
         ;;
     ready)
         echo "=== INTEGRATED READINESS: READY ==="
-        echo "1. Install the plugin in Claude Code:"
-        echo "  claude plugin install codebase-search@redacted-code-intelligence --scope user"
-        echo "2. Configure the embedding provider as described in README.md."
-        echo "3. Index a repo:"
+        echo "Components installed under .venv/ and .runtime/bin/; bin/ launchers are ready."
+        echo "If the plugin is not installed yet:"
+        echo "  claude plugin marketplace add brandyn-s/codebase-search-plugin"
+        echo "  claude plugin install codebase-search@code-intelligence --scope user"
+        echo "Then index a repo from Claude Code:"
         echo "  /index-repo <repo-path>"
         ;;
     *)

@@ -336,7 +336,9 @@ class LiveBenchmarkProvenanceTests(unittest.TestCase):
 
     def test_live_recording_workflow_is_documented_without_a_grade_claim(self):
         documentation = (BENCH / "README.md").read_text(encoding="utf-8")
-        root_documentation = (ROOT / "README.md").read_text(encoding="utf-8")
+        root_documentation = (ROOT / "docs" / "MEASUREMENTS.md").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("record_live.py", documentation)
         self.assertIn("--provenance", documentation)
