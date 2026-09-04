@@ -14,6 +14,8 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from component_descriptor import (
@@ -482,18 +484,7 @@ def install_code_search_git(
         raise RealInstallError("code-search BOM entry lacks repository/revision")
 
     source = destination / "code-search-source"
-    run(
-        [
-            "gh",
-            "repo",
-            "clone",
-            repository,
-            str(source),
-            "--",
-            "--no-checkout",
-        ],
-        env=fetch_env,
-    )
+    clone_repository(repository, source, fetch_env)
     run(
         ["git", "-C", str(source), "checkout", "--detach", revision],
         env=runtime_env,
@@ -557,17 +548,90 @@ def release_asset(
     return name, sha256
 
 
-def github_api_json(endpoint: str, fetch_env: dict[str, str]) -> dict:
-    fetch_env = allowlisted_fetch_environment(fetch_env)
-    completed = subprocess.run(
-        ["gh", "api", "--method", "GET", endpoint],
-        env=fetch_env,
-        check=True,
-        capture_output=True,
-        text=True,
+GITHUB_API_BASE = "https://api.github.com"
+GITHUB_RELEASE_DOWNLOAD_BASE = "https://github.com"
+PUBLIC_FETCH_USER_AGENT = "codebase-search-plugin-validator"
+_gh_authenticated_cache: dict[str, bool] = {}
+
+
+def gh_is_authenticated(fetch_env: dict[str, str]) -> bool:
+    """Decide whether fetches may use `gh` (authenticated) or must use public REST.
+
+    Mirrors install.sh: an explicit GH_TOKEN always selects gh; otherwise gh is
+    used only when `gh auth status` reports a logged-in host. The answer is
+    cached per token value because `gh auth status` spawns a process.
+    """
+    token = fetch_env.get("GH_TOKEN", "")
+    if token:
+        return True
+    cache_key = ""
+    cached = _gh_authenticated_cache.get(cache_key)
+    if cached is not None:
+        return cached
+    if shutil.which("gh") is None:
+        authenticated = False
+    else:
+        completed = subprocess.run(
+            ["gh", "auth", "status", "--hostname", "github.com"],
+            env=fetch_env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        # gh exits 0 when a host is logged in; exit 1 (older) or 4 (newer)
+        # when it is not. Only a clean exit counts as authenticated.
+        authenticated = completed.returncode == 0 and "Logged in" in (
+            completed.stdout + completed.stderr
+        )
+    _gh_authenticated_cache[cache_key] = authenticated
+    return authenticated
+
+
+def _public_http_get(url: str, *, accept: str) -> bytes:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": accept,
+            "User-Agent": PUBLIC_FETCH_USER_AGENT,
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
     )
     try:
-        document = json.loads(completed.stdout)
+        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 - https GitHub URLs only
+            return response.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise RealInstallError(f"GitHub resource not found: {url}") from exc
+        if exc.code in (403, 429):
+            raise RealInstallError(
+                f"GitHub refused {url} (HTTP {exc.code}); unauthenticated "
+                "requests are limited to 60 per hour, set GH_TOKEN to raise "
+                "the limit"
+            ) from exc
+        raise RealInstallError(f"GitHub request failed for {url}: HTTP {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise RealInstallError(f"GitHub request failed for {url}: {exc.reason}") from exc
+
+
+def github_api_json(endpoint: str, fetch_env: dict[str, str]) -> dict:
+    """GET a GitHub REST endpoint via gh when authenticated, else public REST."""
+    fetch_env = allowlisted_fetch_environment(fetch_env)
+    if gh_is_authenticated(fetch_env):
+        completed = subprocess.run(
+            ["gh", "api", "--method", "GET", endpoint],
+            env=fetch_env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        raw = completed.stdout
+    else:
+        raw = _public_http_get(
+            f"{GITHUB_API_BASE}/{endpoint.lstrip('/')}",
+            accept="application/vnd.github+json",
+        ).decode("utf-8")
+    try:
+        document = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise RealInstallError(
             f"GitHub API returned malformed JSON for {endpoint}"
@@ -577,6 +641,54 @@ def github_api_json(endpoint: str, fetch_env: dict[str, str]) -> dict:
             f"GitHub API returned a non-object response for {endpoint}"
         )
     return document
+
+
+def download_release_assets(
+    repository: str,
+    tag: str,
+    names: list[str],
+    destination: Path,
+    fetch_env: dict[str, str],
+) -> None:
+    """Download named release assets via gh when authenticated, else public URLs."""
+    fetch_env = allowlisted_fetch_environment(fetch_env)
+    if gh_is_authenticated(fetch_env):
+        command = ["gh", "release", "download", tag, "--repo", repository]
+        for name in names:
+            command.extend(["--pattern", name])
+        command.extend(["--dir", str(destination), "--clobber"])
+        run(command, env=fetch_env)
+        return
+    for name in names:
+        url = f"{GITHUB_RELEASE_DOWNLOAD_BASE}/{repository}/releases/download/{tag}/{name}"
+        print(f"+ GET {url}", flush=True)
+        data = _public_http_get(url, accept="application/octet-stream")
+        (destination / name).write_bytes(data)
+
+
+def clone_repository(
+    repository: str,
+    destination: Path,
+    fetch_env: dict[str, str],
+) -> None:
+    """Clone without checkout via gh when authenticated, else plain git over HTTPS."""
+    fetch_env = allowlisted_fetch_environment(fetch_env)
+    if gh_is_authenticated(fetch_env):
+        run(
+            ["gh", "repo", "clone", repository, str(destination), "--", "--no-checkout"],
+            env=fetch_env,
+        )
+        return
+    run(
+        [
+            "git",
+            "clone",
+            "--no-checkout",
+            f"{GITHUB_RELEASE_DOWNLOAD_BASE}/{repository}.git",
+            str(destination),
+        ],
+        env=fetch_env,
+    )
 
 
 def resolve_release_tag_commit(
@@ -675,26 +787,7 @@ def install_code_search_release(
 
     downloads = destination / "code-search-download"
     downloads.mkdir()
-    run(
-        [
-            "gh",
-            "release",
-            "download",
-            tag,
-            "--repo",
-            repository,
-            "--pattern",
-            wheel_name,
-            "--pattern",
-            bundle_name,
-            "--pattern",
-            checksums_name,
-            "--dir",
-            str(downloads),
-            "--clobber",
-        ],
-        env=fetch_env,
-    )
+    download_release_assets(repository, tag, [wheel_name, bundle_name, checksums_name], downloads, fetch_env)
     wheel = downloads / wheel_name
     bundle = downloads / bundle_name
     checksums = downloads / checksums_name
@@ -876,22 +969,7 @@ def install_go_scip(
 
     downloads = destination / "go-scip-download"
     downloads.mkdir()
-    run(
-        [
-            "gh",
-            "release",
-            "download",
-            tag,
-            "--repo",
-            repository,
-            "--pattern",
-            archive_name,
-            "--dir",
-            str(downloads),
-            "--clobber",
-        ],
-        env=fetch_env,
-    )
+    download_release_assets(repository, tag, [archive_name], downloads, fetch_env)
     archive_path = downloads / archive_name
     verify_sha256(archive_path, archive_sha256)
 
@@ -1149,24 +1227,7 @@ def install_code_graph(
 
     downloads = destination / "code-graph-download"
     downloads.mkdir()
-    run(
-        [
-            "gh",
-            "release",
-            "download",
-            tag,
-            "--repo",
-            repository,
-            "--pattern",
-            asset_name,
-            "--pattern",
-            checksums_name,
-            "--dir",
-            str(downloads),
-            "--clobber",
-        ],
-        env=fetch_env,
-    )
+    download_release_assets(repository, tag, [asset_name, checksums_name], downloads, fetch_env)
     archive = downloads / asset_name
     checksums = downloads / checksums_name
     verify_sha256(archive, expected_sha256)

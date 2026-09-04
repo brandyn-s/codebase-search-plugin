@@ -42,6 +42,8 @@ def load_helper():
     module = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(module)
+        if hasattr(module, "_gh_authenticated_cache"):
+            module._gh_authenticated_cache[""] = True  # emulate an authenticated gh
     finally:
         if added:
             sys.path.remove(scripts)

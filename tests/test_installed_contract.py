@@ -26,6 +26,8 @@ def load_revision_verifier():
         raise AssertionError("could not load code-search revision verifier")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    if hasattr(module, "_gh_authenticated_cache"):
+        module._gh_authenticated_cache[""] = True  # emulate an authenticated gh
     return module
 
 

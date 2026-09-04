@@ -175,10 +175,16 @@ push or a manual default-branch dispatch, never on `pull_request`.
 Post-merge trusted validation runs only when the BOM pins publicly reachable
 brandyn-s releases; until then the workflow's first step
 (`scripts/promotion_gate.py`) reports that it is gated and the job exits
-successfully. No credential is used to reach a component release. An operator
-running the validator by hand may set `GH_TOKEN` to raise API rate limits; the
-validator passes it only to authenticated GitHub fetch/tag-resolution commands
-and removes it before package builds or MCP processes start.
+successfully. No repository secret is used to reach a component release: in
+CI the validator receives only the workflow's ephemeral read-only
+`github.token`, and without any token it resolves tags and downloads assets
+through the public GitHub REST API (limited to 60 requests per hour per
+address). An operator running the validator by hand may set `GH_TOKEN` to
+raise that limit; the validator passes it only to authenticated GitHub
+fetch/tag-resolution commands and removes it before package builds or MCP
+processes start.
+Provenance verification (`gh attestation verify --bundle`) does not need a
+token.
 
 For the release-wheel path, repository `Contents: read` is sufficient to
 resolve and peel the tag and download its assets. The wheel is treated as an

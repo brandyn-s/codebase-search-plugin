@@ -13,6 +13,11 @@ First public release line. Versions 0.4.x were internal.
   toolset; set `CODE_GRAPH_TOOLSET=full` for all 40), and
   `compatibility/readiness-evidence.json` is the promotion-candidate record
   with integrated readiness `ready`.
+- The trusted validator no longer requires an authenticated `gh`: without a
+  token it resolves tags, peels annotated tags, downloads release assets and
+  clones sources through the public GitHub REST/HTTPS endpoints, and the
+  promotion workflow passes the ephemeral `github.token` (not a secret) to
+  stay clear of the unauthenticated rate limit.
 - The installers install the code-search wheel with its `[local]` extra so the
   documented on-device embedding path works without any API key.
 - Fixed the installer's GitHub tag parser, which failed under Python 3.12+

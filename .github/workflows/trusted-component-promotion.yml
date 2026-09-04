@@ -1,9 +1,11 @@
 name: Trusted Component Promotion
 # Post-merge trusted validation installs the exact component releases pinned in
-# component-bom.json and captures readiness evidence. It never uses a
-# credential to reach a release: the first step gates the job on every pin
-# living in a publicly reachable brandyn-s/ repository, and until the pins are
-# promoted the job reports that it is gated and exits successfully.
+# component-bom.json and captures readiness evidence. It uses no repository
+# secret: the first step gates the job on every pin living in a publicly
+# reachable brandyn-s/ repository, and the validator receives only the
+# workflow's ephemeral read-only github.token so tag resolution and asset
+# downloads are not subject to the unauthenticated REST rate limit. Without a
+# token the validator falls back to the public REST API automatically.
 
 on:
   push:
@@ -48,6 +50,8 @@ jobs:
 
       - name: Install exact candidate and capture trusted evidence
         if: steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: >-
           python3 scripts/validate_real_installed.py
           --component-bom component-bom.json
