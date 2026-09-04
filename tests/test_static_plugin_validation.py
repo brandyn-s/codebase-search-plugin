@@ -118,7 +118,7 @@ class StaticPluginValidationTests(unittest.TestCase):
         self.assertNotIn('"pending"', json.dumps(bom["components"]))
         self.assertTrue(
             (
-                ROOT / "compatibility" / "attestations" / "code-graph-v0.9.0-provenance.jsonl"
+                ROOT / "compatibility" / "attestations" / "code-graph-v0.9.2-provenance.jsonl"
             ).is_file()
         )
         self.assertTrue((ROOT / "compatibility" / "readiness-evidence.json").is_file())
@@ -384,7 +384,7 @@ class StaticPluginValidationTests(unittest.TestCase):
                 checkout
                 / "compatibility"
                 / "attestations"
-                / "code-graph-v0.9.0-provenance.jsonl"
+                / "code-graph-v0.9.2-provenance.jsonl"
             )
             bundle.unlink()
 
@@ -406,7 +406,7 @@ class StaticPluginValidationTests(unittest.TestCase):
                 checkout
                 / "compatibility"
                 / "attestations"
-                / "code-graph-v0.9.0-provenance.jsonl"
+                / "code-graph-v0.9.2-provenance.jsonl"
             )
             bundle.write_text('{"tampered":true}\n', encoding="utf-8")
 

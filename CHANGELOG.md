@@ -4,6 +4,15 @@
 
 First public release line. Versions 0.4.x were internal.
 
+- Promoted code-graph to v0.9.2 (release commit 456894a): extractor memory-safety
+  fixes, isolating extraction supervisor, Go/Python extraction fixes, seven new
+  grammars, Kubernetes manifest surfaces, team-shared graph artifacts, and
+  report generation that is opt-in (`write_report`/`report_path`) so indexing
+  no longer writes into the checkout; `skip_report` remains accepted and the
+  index-repo skill keeps passing `skip_report=true`. The
+  BOM, vendored attestation bundle, tool snapshot (26 core tools, unchanged
+  schemas), readiness evidence, and compare fixtures were regenerated from the
+  installed release. code-search stays at v0.4.0.
 - Promoted the component pins to the first public releases: code-graph
   v0.9.0 (release commit b655cec) and code-search v0.4.0 (release commit
   7fee121), both immutable GitHub releases with build attestations. The BOM

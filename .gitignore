@@ -14,3 +14,6 @@ bench/compare/runs/
 
 # OS cruft
 .DS_Store
+
+# gh auth probes write device-id state under the cwd when no config dir exists
+.local/

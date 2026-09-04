@@ -5,29 +5,29 @@
         "assets": {
           "darwin-amd64": {
             "name": "code-graph-darwin-amd64.tar.gz",
-            "sha256": "83a969f9e3ecbec24f7f88f63df07614c848b314abc621d646c1b00a0d3cc473"
+            "sha256": "f26bac4cbff2714c65f025284de62497c5bc8326ba8f23eb29eb9821964eb718"
           },
           "darwin-arm64": {
             "name": "code-graph-darwin-arm64.tar.gz",
-            "sha256": "795da2813a04e6461cdf175f6f78eb88fa69d0a2c9df1ff20d88a4288716771f"
+            "sha256": "05cef61d3420b263656cde7cac0c696d38d1471cb3e051b98a78dc918707c596"
           },
           "linux-amd64": {
             "name": "code-graph-linux-amd64.tar.gz",
-            "sha256": "e62b27db2eab0763c3502821af3873c9830f164f18a12cab8784e83ef6972920"
+            "sha256": "96447990977a4213f45eed5c3e9219896da45c46e93aec663d32d1f45cf50b3e"
           },
           "linux-arm64": {
             "name": "code-graph-linux-arm64.tar.gz",
-            "sha256": "491630b02dd798cb3984a9030a6ab23b3db73e1bb2bc05887007c8911d3a3838"
+            "sha256": "d6504dc10537800ceb50ba494eea2716a8882287739003d273a28aa90daf58ba"
           },
           "windows-amd64": {
             "name": "code-graph-windows-amd64.zip",
-            "sha256": "2e0828d727a932492a834936b13e0fe812b71f3271c577793075bf53d6ff0021"
+            "sha256": "cbf93f216f4ac32b33b565d61d95d9f4a2bc37cce6a14dc4ac42773b19a12748"
           }
         },
         "attestation": {
           "bundle": {
-            "path": "compatibility/attestations/code-graph-v0.9.0-provenance.jsonl",
-            "sha256": "744973bc0e62a5775c743e15256bb8722c9c20b54c5069a87915a4ea7c1b90dc"
+            "path": "compatibility/attestations/code-graph-v0.9.2-provenance.jsonl",
+            "sha256": "cb3c35fdd2aa98686587946545ea57c73489140ff1cfaa3548a2ff613c45a7b3"
           },
           "deny_self_hosted_runners": true,
           "signer_workflow": "brandyn-s/code-graph/.github/workflows/release.yml",
@@ -35,12 +35,12 @@
         },
         "checksums": {
           "name": "checksums.txt",
-          "sha256": "8e87b8f6e11062c8852cb00315eb27e566448f4f21263dea13de76ac3115b1b4"
+          "sha256": "447ddb98f16bf08d0a9bcddc0e9e30bf772f22a1665b9af75d34cc683ab5d684"
         },
         "kind": "github-release",
         "repository": "brandyn-s/code-graph",
-        "source_revision": "b655cec2c34d762d657c991ddfa35cb951114368",
-        "tag": "v0.9.0"
+        "source_revision": "456894ae9e5aa63040d40537ad051d96784330bf",
+        "tag": "v0.9.2"
       },
       "schema_snapshot": "compatibility/code-graph-tools.json",
       "tested_capabilities": {
@@ -110,7 +110,7 @@
   },
   "integrated_readiness": {
     "evidence": "compatibility/readiness-evidence.json",
-    "reason": "Recorded by the promotion run against the published code-graph v0.9.0 and code-search v0.4.0 releases: both servers indexed the fixture, reported complete version-1 index identity, and code-search verified the evidence coordinate. Trusted post-merge CI re-validates this promotion-candidate record on every main push.",
+    "reason": "Recorded by the promotion run against the published code-graph v0.9.2 and code-search v0.4.0 releases: both servers indexed the fixture, reported complete version-1 index identity, and code-search verified the evidence coordinate. Trusted post-merge CI re-validates this promotion-candidate record on every main push.",
     "requires": {
       "code-graph": {
         "index_repository.skip_report": true,

@@ -103,7 +103,7 @@ sessions do not retain the prior MCP processes, then confirm both servers with
 ## Readiness record
 
 `component-bom.json` carries an `integrated_readiness` status. It is `ready`
-for the pinned code-graph v0.9.0 and code-search v0.4.0 releases. `pending`
+for the pinned code-graph v0.9.2 and code-search v0.4.0 releases. `pending`
 would mean a `promotion_state: pending-first-release` BOM whose component
 releases are not published yet, where installers and launchers refuse to run.
 `ready` means the
@@ -140,7 +140,7 @@ Follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use the release named by the BOM (currently
-[`v0.9.0`](https://github.com/brandyn-s/code-graph/releases/tag/v0.9.0)).
+[`v0.9.2`](https://github.com/brandyn-s/code-graph/releases/tag/v0.9.2)).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at

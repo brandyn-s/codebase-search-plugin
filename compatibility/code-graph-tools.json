@@ -7,9 +7,9 @@
   },
   "schema_version": 1,
   "source": {
-    "install_descriptor_sha256": "d091b58d6fe4e40af214419d36ba46ab1f2c0434351fcf84a6b830cd5a980937",
+    "install_descriptor_sha256": "40093a37fbd3d83c8b2429b56254f20492a60d0fd6eb2995771f73d51a4b05ec",
     "kind": "github-release",
-    "version": "v0.9.0"
+    "version": "v0.9.2"
   },
   "tested_capabilities": {
     "inputs": {
@@ -216,6 +216,10 @@
     "generate_report": {
       "input_schema": {
         "properties": {
+          "output_path": {
+            "description": "Where to write the report. Default: <cache>/reports/<project>/ARCHITECTURE_REPORT.md. A relative path resolves under the project root; an absolute path must be inside the project root or the cache report directory. Writing into the checkout makes it differ from the indexed state until the file is committed or ignored.",
+            "type": "string"
+          },
           "project": {
             "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
@@ -223,7 +227,7 @@
         },
         "type": "object"
       },
-      "input_schema_sha256": "4589bc04bfbbcd48ce8dea9b2fcfd662312984d1079bc920eca42f841e20bc80"
+      "input_schema_sha256": "07dddac2ed1573a07c61c20c1fa6f5c4c6064e8117a8230542e5cbf944713d5f"
     },
     "get_architecture": {
       "input_schema": {
@@ -421,18 +425,26 @@
             "description": "Absolute path to the repository to index. If omitted, uses the auto-detected session project root.",
             "type": "string"
           },
+          "report_path": {
+            "description": "Where to write the report when one is requested. Default: <cache>/reports/<project>/ARCHITECTURE_REPORT.md. A relative path resolves under repo_path and an absolute path must be inside repo_path or the cache report directory; writing into the checkout is an explicit choice and makes the checkout differ from the indexed state until the file is committed or ignored.",
+            "type": "string"
+          },
           "scip_index_path": {
             "description": "SCIP index path for precision_tier='scip'. Relative paths resolve under repo_path. Defaults to <repo>/index.scip.",
             "type": "string"
           },
           "skip_report": {
-            "description": "Skip writing ARCHITECTURE_REPORT.md to the repo root after indexing. Required when indexing read-only repos (bench fixtures, vendored code, protected paths) where any write violates policy. Default: false (report is written).",
+            "description": "Legacy inverse of write_report, kept for compatibility: skip_report=false requests a report. Default: true (no report). Prefer write_report.",
+            "type": "boolean"
+          },
+          "write_report": {
+            "description": "Write an ARCHITECTURE_REPORT.md orientation doc after indexing. Default: false. The report is written under the code-graph cache directory (<cache>/reports/<project>/) so the indexed checkout is never modified; set report_path to place it elsewhere. The choice is remembered per project.",
             "type": "boolean"
           }
         },
         "type": "object"
       },
-      "input_schema_sha256": "4bf5ebf183ab92bac450ef9b98406c49610c0888e6243422cf25434428b63631"
+      "input_schema_sha256": "e734c092ebc86e4c53dab4a682ebbbfaa73a5bfc526b81c49e5612984031b5e0"
     },
     "index_status": {
       "input_schema": {

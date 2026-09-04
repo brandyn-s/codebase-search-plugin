@@ -178,7 +178,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
 
         self.assertEqual(install["kind"], "github-release")
         self.assertEqual(install["repository"], "brandyn-s/code-graph")
-        self.assertEqual(install["tag"], "v0.9.0")
+        self.assertEqual(install["tag"], "v0.9.2")
         self.assertRegex(install["source_revision"], FULL_SHA)
         self.assertEqual(
             {key: asset["name"] for key, asset in install["assets"].items()},

@@ -332,7 +332,7 @@ class ReadinessContractTests(unittest.TestCase):
         self.assertEqual(readiness["requires"], READINESS_REQUIREMENTS)
         self.assertEqual(readiness["evidence"], "compatibility/readiness-evidence.json")
         self.assertIn("promotion run", readiness["reason"].lower())
-        self.assertIn("v0.9.0", readiness["reason"])
+        self.assertIn("v0.9.2", readiness["reason"])
         self.assertIn("v0.4.0", readiness["reason"])
 
     def test_valid_ready_fixture_passes_every_gate(self):

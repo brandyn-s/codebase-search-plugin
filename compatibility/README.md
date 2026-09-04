@@ -8,7 +8,7 @@ published component and has been captured from `tools/list`.
 ## Current readiness evidence
 
 The current BOM pins the published, immutable, attested releases code-graph
-`v0.9.0` and code-search `v0.4.0`; its integrated readiness status is `ready`.
+`v0.9.2` and code-search `v0.4.0`; its integrated readiness status is `ready`.
 The promotion run recorded every artifact digest, vendored the code-graph
 attestation bundle under `attestations/`, regenerated both tool snapshots from
 the installed components (code-graph exposes its 26-tool default `core`
