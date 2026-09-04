@@ -295,7 +295,6 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
                 "ANTHROPIC_API_KEY": "must-not-reach-smoke",
                 "PYTHONUNBUFFERED": "1",
                 "GH_TOKEN": "must-not-reach-smoke",
-                "CODE_INTEL_COMPONENT_TOKEN": "must-not-reach-smoke",
             },
             text=True,
             capture_output=True,

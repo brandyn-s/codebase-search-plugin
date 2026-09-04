@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tarfile
@@ -82,26 +83,19 @@ class RealInstalledCIContractTests(unittest.TestCase):
             validate_job.index(upload_action),
         )
 
-    def test_distinct_ci_job_installs_and_validates_real_private_components(self):
+    def test_distinct_ci_job_installs_and_validates_real_components(self):
         workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
         pull_request_workflow = WORKFLOW.read_text(encoding="utf-8")
 
         self.assertIn("validate-installed-components:", workflow)
-        self.assertIn(
-            "CODE_INTEL_COMPONENT_TOKEN: "
-            "${{ secrets.CODE_INTEL_COMPONENT_TOKEN }}",
-            workflow,
-        )
+        self.assertNotIn("secrets.", workflow)
         self.assertIn("python3 scripts/validate_real_installed.py", workflow)
         self.assertNotIn(
             "fake_mcp_server",
             workflow.split("validate-installed-components:", 1)[1],
         )
         self.assertNotIn("validate-installed-components:", pull_request_workflow)
-        self.assertNotIn(
-            "secrets.CODE_INTEL_COMPONENT_TOKEN",
-            pull_request_workflow,
-        )
+        self.assertNotIn("secrets.", pull_request_workflow)
         self.assertNotIn("pull_request:", workflow)
 
         self.assertTrue(HELPER.is_file(), HELPER)
@@ -123,10 +117,10 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertTrue(MODEL_BUILDER.is_file(), MODEL_BUILDER)
 
         readme = (ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
-        self.assertIn("CODE_INTEL_COMPONENT_TOKEN", readme)
         normalized_readme = " ".join(readme.lower().split())
         self.assertIn("trusted `main` push", normalized_readme)
-        self.assertIn("post-merge validation secret", normalized_readme)
+        self.assertIn("publicly reachable brandyn-s releases", normalized_readme)
+        self.assertNotIn("component token", normalized_readme)
 
     def test_trusted_job_uploads_successful_live_readiness_evidence(self):
         workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
@@ -181,7 +175,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("$parseErrors.Count", validation_job)
         self.assertIn("throw", validation_job)
 
-    def test_private_token_is_limited_to_trusted_fetch_operations(self):
+    def test_trusted_job_is_gated_on_public_pins_and_uses_no_secrets(self):
         workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
         real_job = workflow.split("validate-installed-components:", 1)[1]
 
@@ -190,14 +184,33 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/main'", real_job)
         self.assertIn("github.event_name == 'push'", real_job)
         self.assertIn("github.event_name == 'workflow_dispatch'", real_job)
-        self.assertNotIn(
-            "GH_TOKEN: ${{ secrets.CODE_INTEL_COMPONENT_TOKEN }}",
-            real_job,
+        self.assertNotIn("secrets.", workflow)
+        self.assertNotIn("redacted-org", workflow)
+
+        # The gate runs before anything that touches a component release, and
+        # every later step is conditioned on it.
+        gate = "python3 scripts/promotion_gate.py --component-bom component-bom.json"
+        self.assertIn("name: Gate on publicly reachable component pins", real_job)
+        self.assertIn("id: gate", real_job)
+        self.assertIn(gate, real_job)
+        self.assertLess(real_job.index(gate), real_job.index("actions/setup-python@"))
+        self.assertLess(
+            real_job.index(gate),
+            real_job.index("scripts/validate_real_installed.py"),
         )
-        self.assertIn(
-            "CODE_INTEL_COMPONENT_TOKEN: "
-            "${{ secrets.CODE_INTEL_COMPONENT_TOKEN }}",
-            real_job,
+        conditioned = real_job.split("id: gate", 1)[1]
+        step_names = re.findall(r"^\s+- name: (.+)$", conditioned, flags=re.MULTILINE)
+        self.assertEqual(
+            step_names,
+            [
+                "Set up Python 3.12",
+                "Install exact candidate and capture trusted evidence",
+                "Upload trusted readiness evidence",
+            ],
+        )
+        self.assertEqual(
+            conditioned.count("if: steps.gate.outputs.run == 'true'"),
+            len(step_names),
         )
 
         helper = load_helper()
@@ -208,7 +221,6 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 "LANG": "C.UTF-8",
                 "GH_TOKEN": "ambient-token",
                 "GITHUB_TOKEN": "ambient-actions-token",
-                "CODE_INTEL_COMPONENT_TOKEN": "private-token",
                 "AWS_SECRET_ACCESS_KEY": "must-not-leak",
                 "OPENAI_API_KEY": "must-not-leak",
                 "UNRELATED_CREDENTIAL": "must-not-leak",
@@ -218,11 +230,16 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertEqual(fetch_env["GH_TOKEN"], "private-token")
         self.assertEqual(fetch_env["PATH"], os.environ.get("PATH", ""))
         self.assertEqual(fetch_env["LANG"], "C.UTF-8")
-        self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", fetch_env)
         self.assertNotIn("GITHUB_TOKEN", fetch_env)
         self.assertNotIn("GH_TOKEN", runtime_env)
         self.assertNotIn("GITHUB_TOKEN", runtime_env)
-        self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", runtime_env)
+
+        # Without an operator token the fetch environment carries no credential.
+        unauthenticated_fetch, _ = helper.build_subprocess_environments(
+            "",
+            {"PATH": os.environ.get("PATH", ""), "GH_TOKEN": "ambient-token"},
+        )
+        self.assertNotIn("GH_TOKEN", unauthenticated_fetch)
         for environment in (fetch_env, runtime_env):
             self.assertNotIn("AWS_SECRET_ACCESS_KEY", environment)
             self.assertNotIn("OPENAI_API_KEY", environment)
@@ -353,7 +370,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
             'test "$LIVE_CONTROL_PLANE_RESULT" = "success"',
             merge_gate,
         )
-        self.assertNotIn("secrets.CODE_INTEL_COMPONENT_TOKEN", workflow)
+        self.assertNotIn("secrets.", workflow)
 
     def test_zero_cost_live_control_plane_job_is_secret_free_and_offline(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -401,7 +418,6 @@ class RealInstalledCIContractTests(unittest.TestCase):
             "ANTHROPIC_VERTEX_PROJECT_ID",
             "GH_TOKEN",
             "GITHUB_TOKEN",
-            "CODE_INTEL_COMPONENT_TOKEN",
         ):
             self.assertIn(f'{name}: ""', live_job)
         for test_target in (

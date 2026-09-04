@@ -19,3 +19,7 @@ First public release line. Versions 0.4.x were internal.
   `docs/INSTALL.md`, `docs/EVIDENCE.md`, `docs/MEASUREMENTS.md`,
   `docs/EMBEDDINGS.md`, and `docs/LARGE_MONOREPOS.md`.
 - Added CONTRIBUTING.md, issue and pull request templates.
+- Trusted Component Promotion no longer needs a repository secret. A gate step
+  (`scripts/promotion_gate.py`) checks that every BOM pin is a publicly
+  reachable `brandyn-s/` release and exits successfully with a notice until
+  the pins are promoted.

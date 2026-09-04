@@ -70,7 +70,7 @@ PROBE_END = int(os.environ.get("FAKE_READINESS_PROBE_END", "3"))
 def isolated_runtime_is_valid() -> bool:
     for name in (
         "GH_TOKEN",
-        "CODE_INTEL_COMPONENT_TOKEN",
+        "GITHUB_TOKEN",
         "VOYAGE_API_KEY",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",

@@ -99,15 +99,10 @@ def resolve_runner_temp_output(
 
 
 def require_environment() -> tuple[str, Path]:
-    token = (
-        os.environ.get("CODE_INTEL_COMPONENT_TOKEN", "").strip()
-        or os.environ.get("GH_TOKEN", "").strip()
-    )
-    if not token:
-        raise RealInstallError(
-            "CODE_INTEL_COMPONENT_TOKEN is required for trusted main/manual "
-            "component validation"
-        )
+    # Component releases are fetched from public repositories. An operator may
+    # still supply GH_TOKEN (for example to raise API rate limits); it is only
+    # ever passed to fetch and tag-resolution commands, never required.
+    token = os.environ.get("GH_TOKEN", "").strip()
 
     runner_temp_raw = os.environ.get("RUNNER_TEMP", "").strip()
     if not runner_temp_raw:
@@ -129,7 +124,9 @@ def build_subprocess_environments(
     """Separate authenticated fetches from secret-free build/runtime work."""
     candidate = os.environ if source is None else source
     runtime_env = allowlisted_runtime_environment(candidate)
-    fetch_env = {**runtime_env, "GH_TOKEN": token}
+    fetch_env = dict(runtime_env)
+    if token:
+        fetch_env["GH_TOKEN"] = token
     return fetch_env, runtime_env
 
 
@@ -1216,7 +1213,6 @@ def main(argv: list[str] | None = None) -> int:
         fetch_env, runtime_env = build_subprocess_environments(token)
         os.environ.pop("GH_TOKEN", None)
         os.environ.pop("GITHUB_TOKEN", None)
-        os.environ.pop("CODE_INTEL_COMPONENT_TOKEN", None)
         bom_path = Path(args.component_bom).resolve()
         bom = load_bom(bom_path)
         runtime_env = build_isolated_runtime_environment(

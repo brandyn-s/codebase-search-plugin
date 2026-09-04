@@ -247,8 +247,8 @@ These are blockers only for this future five-arm model experiment. They do not
 invalidate the direct public retrieval measurement, the deterministic CI suite,
 or the completed bounded Stage-4 release holdout.
 
-`CODE_INTEL_COMPONENT_TOKEN` is only a fetch credential for installing exact
-private release artifacts. It must never enter a child MCP or model process.
+`GH_TOKEN`, when an operator supplies one, is only a fetch credential for
+installing exact release artifacts. It must never enter a child MCP or model process.
 Model and embedding credentials likewise stay outside MCP child environments,
 public logs, and public artifacts. The diagnostic records content hashes only;
 credentials and authority claims are never printed or forwarded.

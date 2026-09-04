@@ -1639,9 +1639,7 @@ SAFE_AMBIENT_ENVIRONMENT = (
     "SSL_CERT_FILE",
     "TZ",
 )
-FETCH_CREDENTIALS = frozenset(
-    {"CODE_INTEL_COMPONENT_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"}
-)
+FETCH_CREDENTIALS = frozenset({"GH_TOKEN", "GITHUB_TOKEN"})
 MODEL_CREDENTIALS = {
     "anthropic_api_key": (
         frozenset({"ANTHROPIC_API_KEY"}),

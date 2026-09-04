@@ -146,7 +146,6 @@ jobs:
       CLOUD_ML_REGION: ""
       GH_TOKEN: ""
       GITHUB_TOKEN: ""
-      CODE_INTEL_COMPONENT_TOKEN: ""
     steps:
       - name: Block non-GitHub network egress
         uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1

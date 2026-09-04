@@ -24,7 +24,7 @@ class ComparisonDocumentationTests(unittest.TestCase):
         self.assertIn("no `.done`", runbook)
         self.assertIn("short-retention encrypted storage", runbook)
         self.assertIn("Repository text is untrusted data", runbook)
-        self.assertIn("CODE_INTEL_COMPONENT_TOKEN", runbook)
+        self.assertIn("GH_TOKEN", runbook)
         self.assertIn("must never enter a child MCP", runbook)
         self.assertIn("locbench-june-n200.external.json", runbook)
         self.assertIn("published at code-graph merge", runbook)

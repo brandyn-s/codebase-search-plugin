@@ -11,7 +11,7 @@ shellcheck install.sh bin/run-code-search bin/code-graph bin/_bootstrap.sh
 `validate.yml` runs the same commands plus the recorded-trace routing harness
 (`bench/e2e`) and the comparison harness fixtures (`bench/compare`). Pull
 requests must keep all of them green; the merge gate has no other dependencies
-and never reads a component token.
+and reads no secrets.
 
 ## How component versions change
 

@@ -126,8 +126,8 @@ python3 scripts/validate_installed.py \
 ## Trusted component validation
 
 The ordinary pull-request workflow has a stable, fail-closed `merge-gate`
-whose only dependency is the deterministic `validate` job. It does not read a
-component token. Trusted installation is isolated in
+whose only dependency is the deterministic `validate` job. It reads no
+secrets. Trusted installation is isolated in
 `.github/workflows/trusted-component-promotion.yml`; its
 `validate-installed-components` job installs both component releases from the
 exact descriptor path passed with `--component-bom` and validates their real
@@ -136,15 +136,13 @@ release asset, verifies the pinned release commit plus archive and binary
 digests, and runs the generator verifier. It runs only from a trusted `main`
 push or a manual default-branch dispatch, never on `pull_request`.
 
-`CODE_INTEL_COMPONENT_TOKEN` is the post-merge validation secret used while
-the component releases are private: configure a fine-grained token with `Contents: read`
-on the repositories the BOM currently pins (`redacted-org/code-search`
-and `redacted-org/code-graph`; they move to `brandyn-s/...` when the
-first brandyn-s releases are promoted) and store it as the
-`CODE_INTEL_COMPONENT_TOKEN` repository secret. The validator
-exposes it only to authenticated GitHub fetch/tag-resolution commands and
-removes it before package builds or MCP processes start. Once the component
-releases are public the token is no longer needed for downloads.
+Post-merge trusted validation runs only when the BOM pins publicly reachable
+brandyn-s releases; until then the workflow's first step
+(`scripts/promotion_gate.py`) reports that it is gated and the job exits
+successfully. No credential is used to reach a component release. An operator
+running the validator by hand may set `GH_TOKEN` to raise API rate limits; the
+validator passes it only to authenticated GitHub fetch/tag-resolution commands
+and removes it before package builds or MCP processes start.
 
 For the release-wheel path, repository `Contents: read` is sufficient to
 resolve and peel the tag and download its assets. The wheel is treated as an

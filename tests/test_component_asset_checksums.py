@@ -581,7 +581,6 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         for secret_name in (
             "GH_TOKEN",
             "GITHUB_TOKEN",
-            "CODE_INTEL_COMPONENT_TOKEN",
             "AWS_SECRET_ACCESS_KEY",
             "OPENAI_API_KEY",
             "UNRELATED_CREDENTIAL",
@@ -639,7 +638,6 @@ New-Item -ItemType Directory -Path $script:InstallRuntimeHome | Out-Null
 $Names = @(
     "GH_TOKEN",
     "GITHUB_TOKEN",
-    "CODE_INTEL_COMPONENT_TOKEN",
     "AWS_SECRET_ACCESS_KEY",
     "OPENAI_API_KEY",
     "UNRELATED_CREDENTIAL",

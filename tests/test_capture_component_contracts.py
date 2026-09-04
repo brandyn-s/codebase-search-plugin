@@ -615,7 +615,6 @@ class CaptureComponentContractsTests(unittest.TestCase):
                 extra_env={
                     "GH_TOKEN": secret,
                     "GITHUB_TOKEN": secret,
-                    "CODE_INTEL_COMPONENT_TOKEN": secret,
                     "OPENAI_API_KEY": secret,
                     "MODEL_API_TOKEN": secret,
                 },

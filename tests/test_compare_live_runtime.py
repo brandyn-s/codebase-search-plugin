@@ -1362,7 +1362,6 @@ class ChildEnvironmentTests(unittest.TestCase):
                     "HOME": "/ambient/home",
                     "ANTHROPIC_API_KEY": "ambient-model-secret",
                     "VOYAGE_API_KEY": "ambient-embedding-secret",
-                    "CODE_INTEL_COMPONENT_TOKEN": "ambient-fetch-secret",
                     "GH_TOKEN": "ambient-github-secret",
                     "AWS_SECRET_ACCESS_KEY": "ambient-cloud-secret",
                     "SSH_AUTH_SOCK": "/ambient/agent.sock",
@@ -1370,9 +1369,7 @@ class ChildEnvironmentTests(unittest.TestCase):
                 trusted_root=directory,
                 isolated_root=isolated_root,
                 auth_authority=authority,
-                fetch_credentials={
-                    "CODE_INTEL_COMPONENT_TOKEN": "explicit-fetch-secret"
-                },
+                fetch_credentials={"GH_TOKEN": "explicit-fetch-secret"},
                 model_credentials={
                     "ANTHROPIC_API_KEY": "explicit-model-secret"
                 },
@@ -1387,13 +1384,9 @@ class ChildEnvironmentTests(unittest.TestCase):
             tuple(mcp),
             ("code-search", "code-graph"),
         )
-        self.assertEqual(
-            fetch["CODE_INTEL_COMPONENT_TOKEN"],
-            "explicit-fetch-secret",
-        )
+        self.assertEqual(fetch["GH_TOKEN"], "explicit-fetch-secret")
         self.assertNotIn("ANTHROPIC_API_KEY", fetch)
         self.assertEqual(model["ANTHROPIC_API_KEY"], "explicit-model-secret")
-        self.assertNotIn("CODE_INTEL_COMPONENT_TOKEN", model)
         self.assertNotIn("GH_TOKEN", model)
         self.assertNotIn("VOYAGE_API_KEY", model)
         self.assertEqual(fetch["PATH"], "/usr/bin:/bin")
@@ -1405,7 +1398,6 @@ class ChildEnvironmentTests(unittest.TestCase):
         denied_names = {
             "ANTHROPIC_API_KEY",
             "VOYAGE_API_KEY",
-            "CODE_INTEL_COMPONENT_TOKEN",
             "GH_TOKEN",
             "AWS_SECRET_ACCESS_KEY",
             "SSH_AUTH_SOCK",
@@ -3253,9 +3245,7 @@ class ExecutionContractTests(unittest.TestCase):
                 trusted_root=trusted_root,
                 isolated_root=trusted_root / "children",
                 auth_authority=auth,
-                fetch_credentials={
-                    "CODE_INTEL_COMPONENT_TOKEN": "explicit-fetch-secret"
-                },
+                fetch_credentials={"GH_TOKEN": "explicit-fetch-secret"},
                 model_credentials={},
             )
             invocation = compile_claude_invocation(
@@ -3979,7 +3969,7 @@ class ExecutionContractTests(unittest.TestCase):
                 fixture.environments,
                 model=(
                     *fixture.environments.model,
-                    ("CODE_INTEL_COMPONENT_TOKEN", "injected-fetch-secret"),
+                    ("GH_TOKEN", "injected-fetch-secret"),
                 ),
                 descriptor_sha256="0" * 64,
             )
