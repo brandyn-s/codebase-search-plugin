@@ -25,8 +25,9 @@ pinned in `component-bom.json`, verify SHA-256 checksums, and start the
 servers. The first launch downloads a Python environment and a Go binary, so it
 can take a few minutes; if Claude Code reports the servers as failed on that
 first start, wait for `.runtime/bootstrap.log` in the plugin directory to
-finish and reconnect with `/mcp`. Windows users run `install.ps1` from the
-installed plugin directory once instead.
+finish and reconnect with `/mcp`. On Windows, register the committed `.cmd`
+launchers once (see [docs/INSTALL.md](docs/INSTALL.md#windows)); they install
+the components on first start the same way.
 
 No API keys are required. Without keys, code-search embeds locally and skips
 LLM reranking, and code-graph stays fully on-device.
@@ -103,7 +104,8 @@ very large repositories is in [docs/LARGE_MONOREPOS.md](docs/LARGE_MONOREPOS.md)
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md). To
+report a vulnerability, follow [SECURITY.md](SECURITY.md).
 
 ## License
 

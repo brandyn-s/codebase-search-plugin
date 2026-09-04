@@ -1,10 +1,9 @@
 # Runtime state created by install.sh / install.ps1 inside the plugin directory.
-# bin/ holds the committed launchers; installed components live in .runtime/.
+# bin/ holds the committed launchers (bash and .cmd); installed components live in .runtime/.
 .venv/
 .venv.rollback.*/
 .runtime/
 .install-staging.*/
-bin/*.cmd
 
 # Python
 __pycache__/

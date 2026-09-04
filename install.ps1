@@ -6,9 +6,9 @@
 
 $ErrorActionPreference = "Stop"
 $PluginDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-# Layout: bin\ holds the committed launchers referenced by .mcp.json (bash on
-# macOS/Linux; this installer adds .cmd shims for Windows). Installed
-# components are runtime state under .runtime\bin and .venv.
+# Layout: bin\ holds the committed launchers referenced by .mcp.json (bash
+# launchers plus .cmd shims for Windows). Installed components are runtime
+# state under .runtimein and .venv.
 $RuntimeDir = Join-Path $PluginDir ".runtime"
 $LauncherDir = Join-Path $PluginDir "bin"
 $TargetBinDir = Join-Path $RuntimeDir "bin"
@@ -872,40 +872,21 @@ if ($TypeScriptScipSupported) {
 Write-Host ""
 
 # ------------------------------------------------------------------
-# 4. Create launcher scripts
+# 4. Prepare launcher scripts
 # ------------------------------------------------------------------
-Write-Host "[4/5] Creating launcher scripts..." -ForegroundColor Yellow
+Write-Host "[4/5] Preparing launcher scripts..." -ForegroundColor Yellow
 
-# The bash launchers bin\run-code-search and bin\code-graph are committed and
-# referenced by .mcp.json. Windows spawners resolve those base names to the
-# .cmd shims below via PATHEXT; the shims exec the installed components.
-$SearchLauncher = @"
-@echo off
-setlocal
-set "PLUGIN_DIR=%~dp0.."
-if exist "%PLUGIN_DIR%\.venv\Scripts\code-search-mcp.exe" (
-    "%PLUGIN_DIR%\.venv\Scripts\code-search-mcp.exe" %*
-) else (
-    echo Error: code-search-mcp not found. Run install.ps1 from the plugin directory. >&2
-    exit /b 1
-)
-"@
-Set-Content -Path (Join-Path $LauncherDir "run-code-search.cmd") -Value $SearchLauncher -Encoding ASCII
-
-$GraphLauncher = @"
-@echo off
-setlocal
-set "PLUGIN_DIR=%~dp0.."
-if exist "%PLUGIN_DIR%\.runtime\bin\code-graph.exe" (
-    "%PLUGIN_DIR%\.runtime\bin\code-graph.exe" %*
-) else (
-    echo Error: code-graph not found. Run install.ps1 from the plugin directory. >&2
-    exit /b 1
-)
-"@
-Set-Content -Path (Join-Path $LauncherDir "code-graph.cmd") -Value $GraphLauncher -Encoding ASCII
-
-Write-Host "  Launchers created."
+# The launchers are committed: bash scripts for macOS/Linux and .cmd shims for
+# Windows, all referenced from .mcp.json or a user-level MCP registration.
+# Nothing is generated here; we only confirm the shims are present.
+foreach ($Shim in @("run-code-search.cmd", "code-graph.cmd", "_bootstrap.cmd")) {
+    $ShimPath = Join-Path $LauncherDir $Shim
+    if (-not (Test-Path -LiteralPath $ShimPath)) {
+        Write-Host "Error: committed launcher missing: $ShimPath" -ForegroundColor Red
+        exit 1
+    }
+}
+Write-Host "  Launchers present."
 Write-Host ""
 
 # ------------------------------------------------------------------

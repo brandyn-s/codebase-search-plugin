@@ -8,7 +8,7 @@ the pins are promoted. The short version is in the README.
 ## Prerequisites
 
 - **Python 3.12+** (for code-search)
-- **`curl` and `tar`** on Linux and macOS; PowerShell 5.1+ on Windows (use `install.ps1`)
+- **`curl` and `tar`** on Linux and macOS; PowerShell 5.1+ on Windows (see [Windows](#windows))
 - **GitHub CLI (`gh`)**, optional: needed only to download private releases and
   to verify GitHub build provenance. Unauthenticated REST calls honour
   `GH_TOKEN` when set. Without it the installer verifies SHA-256
@@ -44,6 +44,31 @@ serialized with a lock so two servers starting at once share one install. Set
 waits for an in-progress install. If the bootstrap fails, the launcher prints
 the last lines of `.runtime/bootstrap.log` to stderr and the next launch
 retries.
+
+## Windows
+
+The plugin manifest format has no platform-specific command field, and Claude
+Code spawns `.mcp.json` commands directly, so the bash launchers it references
+(`bin/code-graph`, `bin/run-code-search`) do not start on Windows. The
+repository ships equivalent shims, `bin\code-graph.cmd` and
+`bin\run-code-search.cmd`, which bootstrap through `install.ps1` on first
+launch (log: `.runtime\bootstrap.log`) and then run the installed component.
+Register them once at user scope, pointing at the installed plugin directory
+(`claude plugin list --json` shows `installPath`):
+
+```powershell
+$p = (claude plugin list --json | ConvertFrom-Json | Where-Object id -eq "codebase-search@code-intelligence").installPath
+claude mcp add --scope user code-graph -- cmd /c "$p\bin\code-graph.cmd"
+claude mcp add --scope user code-search -- cmd /c "$p\bin\run-code-search.cmd"
+```
+
+Alternatively run `install.ps1` from that directory once; the shims then find
+the installed components immediately. `CODE_INTEL_NO_BOOTSTRAP=1` and
+`CODE_INTEL_BOOTSTRAP_WAIT_SECONDS` apply to the shims as well. Unlike the bash
+launchers, the shim runs the installer in the foreground of the first launch,
+so an MCP client that kills a slow first start also stops the install; the next
+launch resumes it. If Claude Code adds platform-specific manifest commands, the
+registration step goes away.
 
 ## Upgrade
 

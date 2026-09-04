@@ -331,7 +331,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         powershell_graph = powershell.split(
             "[3/5] Installing code-graph (structural analysis)...",
             1,
-        )[1].split("[4/5] Creating launcher scripts", 1)[0]
+        )[1].split("[4/5] Preparing launcher scripts...", 1)[0]
         for graph, resolver, download, checksum_verifier, attestation, extraction in (
             (
                 shell_graph,
