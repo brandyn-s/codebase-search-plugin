@@ -1,4 +1,8 @@
 name: Trusted Component Promotion
+# TODO(brandyn-s primary): this job fails on every main push until either the
+# CODE_INTEL_COMPONENT_TOKEN secret is configured (component releases are still
+# private in the originating org) or the BOM is promoted to public brandyn-s
+# releases. Failing loudly is intentional; see docs/INSTALL.md.
 
 on:
   push:

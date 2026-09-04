@@ -190,7 +190,7 @@ def write_passing_holdout(
     evidence_precision: float = 1.0,
     evidence_recall: float = 1.0,
 ) -> Path:
-    run_root = evidence_root / "pilot-wave45-independent-pass"
+    run_root = evidence_root / "pilot-independent-pass"
     run_root.mkdir()
     cases = [
         {
@@ -324,7 +324,7 @@ def write_passing_holdout(
         json.dumps(
             {
                 "schema_version": 1,
-                "run_id": "wave45-independent-pass",
+                "run_id": "independent-pass",
                 "run_type": "bounded_operator_authorized_fresh_holdout_confirmation",
                 "outcome_gate_status": "pass",
                 "arms": {
@@ -417,7 +417,7 @@ def write_passing_holdout(
         json.dumps(
             {
                 "schema_version": 2,
-                "run_id": "wave45-independent-pass",
+                "run_id": "independent-pass",
                 "artifacts": artifacts,
                 "artifact_roles": {
                     "cases": "cases.jsonl",
