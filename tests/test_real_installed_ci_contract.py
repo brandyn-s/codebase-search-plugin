@@ -354,7 +354,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("name: merge-gate", merge_gate)
         self.assertIn("if: ${{ always() }}", merge_gate)
         self.assertIn(
-            "needs: [validate, live-control-plane]",
+            "needs: [validate, live-control-plane, windows-launchers]",
             merge_gate,
         )
         self.assertIn(
@@ -370,6 +370,17 @@ class RealInstalledCIContractTests(unittest.TestCase):
             'test "$LIVE_CONTROL_PLANE_RESULT" = "success"',
             merge_gate,
         )
+        self.assertIn(
+            "WINDOWS_LAUNCHERS_RESULT: ${{ needs.windows-launchers.result }}",
+            merge_gate,
+        )
+        self.assertIn(
+            'test "$WINDOWS_LAUNCHERS_RESULT" = "success"',
+            merge_gate,
+        )
+        self.assertIn("  windows-launchers:", workflow)
+        self.assertIn("runs-on: windows-latest", workflow)
+        self.assertIn("tests.test_launcher_bootstrap_windows", workflow)
         self.assertNotIn("secrets.", workflow)
 
     def test_zero_cost_live_control_plane_job_is_secret_free_and_offline(self):

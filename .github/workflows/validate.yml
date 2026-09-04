@@ -188,10 +188,32 @@ jobs:
             tests.test_compare_run.ComparisonRunTests.test_live_preflight_refuses_a_symlink_artifact_directory \
             tests.test_compare_documentation
 
+  windows-launchers:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+
+      - name: Parse install.ps1 with Windows PowerShell 5.1 and pwsh
+        shell: pwsh
+        run: |
+          foreach ($shell in @("powershell", "pwsh")) {
+            & $shell -NoProfile -Command "`$t = `$null; `$e = `$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path install.ps1), [ref]`$t, [ref]`$e) | Out-Null; if (`$e.Count -gt 0) { `$e | ForEach-Object { Write-Error `$_.Message }; exit 1 }"
+            if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed to parse under $shell" }
+          }
+
+      - name: Drive the committed .cmd launchers against a stubbed installer
+        shell: pwsh
+        run: python -m unittest tests.test_launcher_bootstrap_windows -v
+
   merge-gate:
     name: merge-gate
     if: ${{ always() }}
-    needs: [validate, live-control-plane]
+    needs: [validate, live-control-plane, windows-launchers]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -204,6 +226,8 @@ jobs:
         env:
           VALIDATE_RESULT: ${{ needs.validate.result }}
           LIVE_CONTROL_PLANE_RESULT: ${{ needs.live-control-plane.result }}
+          WINDOWS_LAUNCHERS_RESULT: ${{ needs.windows-launchers.result }}
         run: |
           test "$VALIDATE_RESULT" = "success"
           test "$LIVE_CONTROL_PLANE_RESULT" = "success"
+          test "$WINDOWS_LAUNCHERS_RESULT" = "success"
