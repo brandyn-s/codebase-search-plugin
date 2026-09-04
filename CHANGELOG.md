@@ -19,6 +19,14 @@ First public release line. Versions 0.4.x were internal.
   `docs/INSTALL.md`, `docs/EVIDENCE.md`, `docs/MEASUREMENTS.md`,
   `docs/EMBEDDINGS.md`, and `docs/LARGE_MONOREPOS.md`.
 - Added CONTRIBUTING.md, issue and pull request templates.
+- `SECURITY.md` with private reporting and the plugin's threat model.
+- Windows launchers `bin/code-graph.cmd`, `bin/run-code-search.cmd`, and
+  `bin/_bootstrap.cmd` are committed and self-bootstrap through `install.ps1`;
+  `install.ps1` no longer generates them. A `windows-launchers` CI job drives
+  them on `windows-latest`. Registration on Windows is documented in
+  `docs/INSTALL.md`.
+- Documented that code-graph runs with its default `core` toolset under the
+  plugin and how to select `CODE_GRAPH_TOOLSET=full`.
 - Trusted Component Promotion no longer needs a repository secret. A gate step
   (`scripts/promotion_gate.py`) checks that every BOM pin is a publicly
   reachable `brandyn-s/` release and exits successfully with a notice until

@@ -45,6 +45,17 @@ waits for an in-progress install. If the bootstrap fails, the launcher prints
 the last lines of `.runtime/bootstrap.log` to stderr and the next launch
 retries.
 
+## code-graph toolset
+
+code-graph advertises its `core` toolset by default (`CODE_GRAPH_TOOLSET=core`):
+the tools the plugin skills, the benchmark arm contracts, and the indexing,
+status, and evidence essentials use. Every tool stays registered and callable
+by name; the toolset only controls what `tools/list` returns, which keeps the
+schema small for the agent. To expose all tools, set `CODE_GRAPH_TOOLSET=full`
+in the environment Claude Code launches the plugin with (for example in your
+shell profile, or in a user-scope MCP registration's `env`), then restart the
+server. The plugin does not override this variable.
+
 ## Windows
 
 The plugin manifest format has no platform-specific command field, and Claude
