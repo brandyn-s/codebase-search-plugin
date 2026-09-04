@@ -41,7 +41,7 @@ Route code exploration queries to the narrowest tool that can answer them.
 | `mcp__code-graph__localize_across_projects` | Bounded structural discovery across isolated project indexes |
 | `mcp__code-graph__compare_project_indexes` | File-content and declaration delta between two immutable indexes |
 
-### code-graph (security & localization — redacted extensions)
+### code-graph (security & localization extensions)
 
 | Tool | Use for |
 |------|---------|

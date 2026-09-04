@@ -137,8 +137,11 @@ digests, and runs the generator verifier. It runs only from a trusted `main`
 push or a manual default-branch dispatch, never on `pull_request`.
 
 `CODE_INTEL_COMPONENT_TOKEN` is the post-merge validation secret used while
-the component releases are private: configure a fine-grained token with read
-access to `brandyn-s/code-search` and `brandyn-s/code-graph`. The validator
+the component releases are private: configure a fine-grained token with `Contents: read`
+on the repositories the BOM currently pins (`redacted-org/code-search`
+and `redacted-org/code-graph`; they move to `brandyn-s/...` when the
+first brandyn-s releases are promoted) and store it as the
+`CODE_INTEL_COMPONENT_TOKEN` repository secret. The validator
 exposes it only to authenticated GitHub fetch/tag-resolution commands and
 removes it before package builds or MCP processes start. Once the component
 releases are public the token is no longer needed for downloads.
