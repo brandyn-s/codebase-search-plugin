@@ -10,7 +10,8 @@ the pins are promoted. The short version is in the README.
 - **Python 3.12+** (for code-search)
 - **`curl` and `tar`** on Linux and macOS; PowerShell 5.1+ on Windows (use `install.ps1`)
 - **GitHub CLI (`gh`)**, optional: needed only to download private releases and
-  to verify GitHub build provenance. Without it the installer verifies SHA-256
+  to verify GitHub build provenance. Unauthenticated REST calls honour
+  `GH_TOKEN` when set. Without it the installer verifies SHA-256
   checksums against the BOM and prints one line saying provenance was not checked.
 
 ## What install.sh does
@@ -38,7 +39,11 @@ rollback handler restores the prior installation.
 The launchers in `bin/` are committed and are what `.mcp.json` points at. On
 first launch they run `install.sh` themselves (log: `.runtime/bootstrap.log`),
 serialized with a lock so two servers starting at once share one install. Set
-`CODE_INTEL_NO_BOOTSTRAP=1` to disable that and run the installer yourself.
+`CODE_INTEL_NO_BOOTSTRAP=1` to disable that and run the installer yourself;
+`CODE_INTEL_BOOTSTRAP_WAIT_SECONDS` (default 1800) bounds how long a launcher
+waits for an in-progress install. If the bootstrap fails, the launcher prints
+the last lines of `.runtime/bootstrap.log` to stderr and the next launch
+retries.
 
 ## Upgrade
 
@@ -71,8 +76,12 @@ completion; a `blocked` BOM must not be used for `/index-repo`. See
 
 ## Manual install (alternative)
 
+The BOM currently pins releases published by the originating organization;
+the links below follow the BOM and will move to `brandyn-s` when the first
+releases are promoted there.
+
 The production BOM pins code-search release
-[`v0.3.6`](https://github.com/brandyn-s/code-search/releases/tag/v0.3.6)
+[`v0.3.6`](https://github.com/redacted-org/code-search/releases/tag/v0.3.6)
 with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
@@ -95,7 +104,7 @@ Follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use the release named by the BOM (currently
-[`v0.8.0-redacted.11`](https://github.com/brandyn-s/code-graph/releases/tag/v0.8.0-redacted.11)).
+[`v0.8.0-redacted.11`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.11)).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at

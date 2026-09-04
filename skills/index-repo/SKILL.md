@@ -145,7 +145,7 @@ or auto tier, and `--scip-policy` has no effect outside auto mode.
       <resolved-root> \
       --generator "${CLAUDE_PLUGIN_ROOT}/.runtime/bin/scip-go" \
       --component-bom "${CLAUDE_PLUGIN_ROOT}/component-bom.json" \
-      --cache-root "$HOME/.cache/redacted-code-intel/scip"
+      --cache-root "$HOME/.cache/code-intelligence/scip"
     ```
 
     TypeScript:
@@ -157,7 +157,7 @@ or auto tier, and `--scip-policy` has no effect outside auto mode.
       --runtime "${CLAUDE_PLUGIN_ROOT}/.runtime/bin/scip-typescript-runtime/node/bin/node" \
       --generator "${CLAUDE_PLUGIN_ROOT}/.runtime/bin/scip-typescript-runtime/package/node_modules/@sourcegraph/scip-typescript/dist/src/main.js" \
       --component-bom "${CLAUDE_PLUGIN_ROOT}/component-bom.json" \
-      --cache-root "$HOME/.cache/redacted-code-intel/scip"
+      --cache-root "$HOME/.cache/code-intelligence/scip"
     ```
 
     On Windows, use the corresponding `node/node.exe` runtime path. The helper

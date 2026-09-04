@@ -6,5 +6,12 @@
     "name": "redacted Security"
   },
   "repository": "https://github.com/brandyn-s/codebase-search-plugin",
-  "keywords": ["code-search", "code-graph", "semantic-search", "codebase-analysis"]
+  "keywords": [
+    "code-search",
+    "code-graph",
+    "semantic-search",
+    "codebase-analysis"
+  ],
+  "homepage": "https://github.com/brandyn-s/codebase-search-plugin",
+  "license": "MIT"
 }
