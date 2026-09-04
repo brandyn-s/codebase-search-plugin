@@ -4,14 +4,21 @@
 
 First public release line. Versions 0.4.x were internal.
 
-- Removed all references to the originating organization; component pins now
-  target the upcoming brandyn-s releases (code-graph v0.9.0, code-search
-  v0.4.0) in an explicit `promotion_state: pending-first-release`. Digests are
-  the placeholder `pending`, installers and launchers refuse to run, validators
-  report `pending`, and the promotion gate stays closed until a promotion run
-  records the published artifacts. Org-signed attestation bundles and the old
-  readiness evidence were removed. License and manifests now name the
-  codebase-search-plugin contributors.
+- Promoted the component pins to the first public releases: code-graph
+  v0.9.0 (release commit b655cec) and code-search v0.4.0 (release commit
+  7fee121), both immutable GitHub releases with build attestations. The BOM
+  records every asset digest, the code-graph attestation bundle is vendored
+  under `compatibility/attestations/`, both tool snapshots were captured from
+  the installed components (code-graph now exposes its 26-tool default `core`
+  toolset; set `CODE_GRAPH_TOOLSET=full` for all 40), and
+  `compatibility/readiness-evidence.json` is the promotion-candidate record
+  with integrated readiness `ready`.
+- The installers install the code-search wheel with its `[local]` extra so the
+  documented on-device embedding path works without any API key.
+- Fixed the installer's GitHub tag parser, which failed under Python 3.12+
+  because of escaped quotes inside an f-string.
+- Removed all references to the originating organization. License and
+  manifests now name the codebase-search-plugin contributors.
 
 - Marketplace renamed to `code-intelligence`; install id is now
   `codebase-search@code-intelligence`.

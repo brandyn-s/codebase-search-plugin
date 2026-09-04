@@ -408,7 +408,7 @@ resolve_release_tag_commit() {
     local depth
 
     response=$(github_api_get "repos/${repository}/git/ref/tags/${tag}" \
-        | "$PYTHON" -c 'import json,sys; o=json.load(sys.stdin)["object"]; print(f"{o[\"type\"]}\t{o[\"sha\"]}")')
+        | "$PYTHON" -c 'import json,sys; o=json.load(sys.stdin)["object"]; print(o["type"] + "\t" + o["sha"])')
     depth=0
     while [ "$depth" -lt 16 ]; do
         depth=$((depth + 1))
@@ -428,7 +428,7 @@ resolve_release_tag_commit() {
                 ;;
             tag)
                 response=$(github_api_get "repos/${repository}/git/tags/${target_sha}" \
-                    | "$PYTHON" -c 'import json,sys; o=json.load(sys.stdin)["object"]; print(f"{o[\"type\"]}\t{o[\"sha\"]}")')
+                    | "$PYTHON" -c 'import json,sys; o=json.load(sys.stdin)["object"]; print(o["type"] + "\t" + o["sha"])')
                 ;;
             *)
                 echo "Error: GitHub tag resolves to unsupported object type: $target_type" >&2
@@ -538,6 +538,9 @@ case "$CODE_SEARCH_KIND" in
                 --repository "$CODE_SEARCH_REPOSITORY"
         ;;
     github-release)
+        CODE_SEARCH_DIST=$("$PYTHON" -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"].get("distribution", "code-search-mcp"))' \
+            "$BOM_FILE")
         CODE_SEARCH_TAG=$("$PYTHON" -c \
             'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["tag"])' \
             "$BOM_FILE")
@@ -611,10 +614,14 @@ case "$CODE_SEARCH_KIND" in
                 "$CODE_SEARCH_SOURCE_REVISION" "$CODE_SEARCH_SOURCE_REF"
         )
 
-        echo "  Installing the verified local code-search wheel..."
+        echo "  Installing the verified local code-search wheel (with the local-embeddings extra)..."
+        # The wheel keeps torch/sentence-transformers behind the [local] extra
+        # (code-search 0.4.0). The plugin documents an on-device default, so
+        # install the extra from the verified wheel via a PEP 508 direct
+        # reference; pip still records the file URL and hash in direct_url.json.
         run_with_allowed_environment \
             "$VENV_PIP" install --quiet --force-reinstall \
-            "$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_WHEEL"
+            "${CODE_SEARCH_DIST}[local] @ file://$CODE_SEARCH_DOWNLOAD_DIR/$CODE_SEARCH_WHEEL"
         run_with_allowed_environment \
             "$VENV_PYTHON" "$PLUGIN_DIR/scripts/verify_code_search_wheel.py" \
             "$CODE_SEARCH_TAG" \

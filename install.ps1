@@ -583,7 +583,11 @@ switch ($CodeSearchKind) {
 
             Write-Host "  Installing the verified local code-search wheel..."
             Invoke-WithAllowedEnvironment {
-                & $VenvPip install --quiet --force-reinstall $CodeSearchWheelPath
+                # Install the [local] extra from the verified wheel so the on-device
+                # embedding path works without an API key (code-search 0.4.0 keeps
+                # torch/sentence-transformers behind that extra).
+                $WheelUri = ([System.Uri]$CodeSearchWheelPath).AbsoluteUri
+                & $VenvPip install --quiet --force-reinstall "code-search-mcp[local] @ $WheelUri"
                 if ($LASTEXITCODE -ne 0) {
                     throw "code-search wheel install exited with status $LASTEXITCODE"
                 }

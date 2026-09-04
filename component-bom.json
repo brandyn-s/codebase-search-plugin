@@ -5,29 +5,29 @@
         "assets": {
           "darwin-amd64": {
             "name": "code-graph-darwin-amd64.tar.gz",
-            "sha256": "pending"
+            "sha256": "83a969f9e3ecbec24f7f88f63df07614c848b314abc621d646c1b00a0d3cc473"
           },
           "darwin-arm64": {
             "name": "code-graph-darwin-arm64.tar.gz",
-            "sha256": "pending"
+            "sha256": "795da2813a04e6461cdf175f6f78eb88fa69d0a2c9df1ff20d88a4288716771f"
           },
           "linux-amd64": {
             "name": "code-graph-linux-amd64.tar.gz",
-            "sha256": "pending"
+            "sha256": "e62b27db2eab0763c3502821af3873c9830f164f18a12cab8784e83ef6972920"
           },
           "linux-arm64": {
             "name": "code-graph-linux-arm64.tar.gz",
-            "sha256": "pending"
+            "sha256": "491630b02dd798cb3984a9030a6ab23b3db73e1bb2bc05887007c8911d3a3838"
           },
           "windows-amd64": {
             "name": "code-graph-windows-amd64.zip",
-            "sha256": "pending"
+            "sha256": "2e0828d727a932492a834936b13e0fe812b71f3271c577793075bf53d6ff0021"
           }
         },
         "attestation": {
           "bundle": {
             "path": "compatibility/attestations/code-graph-v0.9.0-provenance.jsonl",
-            "sha256": "pending"
+            "sha256": "744973bc0e62a5775c743e15256bb8722c9c20b54c5069a87915a4ea7c1b90dc"
           },
           "deny_self_hosted_runners": true,
           "signer_workflow": "brandyn-s/code-graph/.github/workflows/release.yml",
@@ -35,11 +35,11 @@
         },
         "checksums": {
           "name": "checksums.txt",
-          "sha256": "pending"
+          "sha256": "8e87b8f6e11062c8852cb00315eb27e566448f4f21263dea13de76ac3115b1b4"
         },
         "kind": "github-release",
         "repository": "brandyn-s/code-graph",
-        "source_revision": "88790484b91d2b855767869d232b2e28578a8de3",
+        "source_revision": "b655cec2c34d762d657c991ddfa35cb951114368",
         "tag": "v0.9.0"
       },
       "schema_snapshot": "compatibility/code-graph-tools.json",
@@ -68,12 +68,12 @@
       "install": {
         "asset": {
           "name": "code_search_mcp-0.4.0-py3-none-any.whl",
-          "sha256": "pending"
+          "sha256": "7633ae76eb57fd0040575c5d6d96d7bb8ffc23b683f198f7e3d342f790d50e10"
         },
         "attestation": {
           "bundle": {
             "name": "code_search_mcp-0.4.0-provenance.jsonl",
-            "sha256": "pending"
+            "sha256": "7aebf3c19962321dc0e3c3dfe298d3f6b6405b899c6c65c46bea5cc20a75c5bb"
           },
           "deny_self_hosted_runners": true,
           "signer_workflow": "brandyn-s/code-search/.github/workflows/release.yml",
@@ -81,11 +81,11 @@
         },
         "checksums": {
           "name": "SHA256SUMS",
-          "sha256": "pending"
+          "sha256": "67c65559d8e74a2119fc5952ccd459dd85aba30b66ffe5d5f3e6b5795812de5d"
         },
         "kind": "github-release",
         "repository": "brandyn-s/code-search",
-        "source_revision": "92f035b36344c96eacaf36f9fbd68a7007d33e4b",
+        "source_revision": "7fee1218eb792bf05c5135131c49d2af158e43aa",
         "tag": "v0.4.0"
       },
       "schema_snapshot": "compatibility/code-search-tools.json",
@@ -109,7 +109,8 @@
     }
   },
   "integrated_readiness": {
-    "reason": "The pinned code-graph v0.9.0 and code-search v0.4.0 releases have not been published yet. Every artifact digest is the placeholder \"pending\"; installers refuse to run and no readiness evidence exists. A promotion run against the published releases fills the digests, vendors the code-graph attestation bundle, regenerates the tool snapshots and readiness evidence, and removes promotion_state.",
+    "evidence": "compatibility/readiness-evidence.json",
+    "reason": "Recorded by the promotion run against the published code-graph v0.9.0 and code-search v0.4.0 releases: both servers indexed the fixture, reported complete version-1 index identity, and code-search verified the evidence coordinate. Trusted post-merge CI re-validates this promotion-candidate record on every main push.",
     "requires": {
       "code-graph": {
         "index_repository.skip_report": true,
@@ -145,7 +146,7 @@
         "schema_version": 1
       }
     },
-    "status": "pending"
+    "status": "ready"
   },
   "precision_generators": {
     "go-scip": {
@@ -220,8 +221,6 @@
       "version_output": "0.4.0"
     }
   },
-  "promotion_reason": "First public releases of code-graph (v0.9.0) and code-search (v0.4.0) are not published yet; component pins carry placeholder digests until a promotion run records the real artifacts.",
-  "promotion_state": "pending-first-release",
   "schema_version": 1,
   "tested_at": "2026-08-13"
 }

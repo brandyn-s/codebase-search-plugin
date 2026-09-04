@@ -1,11 +1,9 @@
-"""Turn the checked-in pending-first-release BOM into released-state fixtures.
+"""BOM fixtures for the contract tests.
 
-The committed ``component-bom.json`` pins component releases that do not exist
-yet: every artifact digest is the placeholder ``pending`` and
-``promotion_state`` is ``pending-first-release``. Most contract tests exercise
-the strict released-state rules (real digests, vendored attestation bundle,
-readiness evidence), so they start from the fixture produced here instead of
-the committed BOM.
+``released_bom``/``write_released_checkout`` produce a released-state BOM with
+deterministic fake digests so strict artifact tests do not depend on the live
+pins; ``pending_bom`` produces the pre-promotion ``pending-first-release`` shape
+that the installers, capture, and validators must refuse.
 """
 from __future__ import annotations
 
@@ -19,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from component_descriptor import (  # noqa: E402
     PENDING_DIGEST,
+    PENDING_FIRST_RELEASE,
     install_descriptor_sha256,
 )
 
@@ -104,3 +103,39 @@ def write_released_checkout(checkout: Path, *, readiness_status: str = "blocked"
     bom_path.write_text(json.dumps(bom, indent=2) + "\n", encoding="utf-8")
     rebind_snapshots(checkout, bom)
     return bom
+
+
+PENDING_REASON = (
+    "Fixture: the pinned component releases are not published yet; digests are "
+    "placeholders until a promotion run records the real artifacts."
+)
+
+
+def pending_bom(bom: dict) -> dict:
+    """Return a copy of ``bom`` as it looked before the first promotion run.
+
+    ``promotion_state``/``promotion_reason`` are set, every digest becomes the
+    ``pending`` placeholder, readiness is ``pending`` and carries no evidence.
+    """
+    def _blank(value):
+        if isinstance(value, dict):
+            return {
+                key: (PENDING_DIGEST if key == "sha256" else _blank(item))
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [_blank(item) for item in value]
+        return value
+
+    pending = deepcopy(bom)
+    pending["promotion_state"] = PENDING_FIRST_RELEASE
+    pending["promotion_reason"] = PENDING_REASON
+    pending["components"] = _blank(pending["components"])
+    readiness = pending["integrated_readiness"]
+    pending["integrated_readiness"] = {
+        "reason": PENDING_REASON,
+        "requires": readiness["requires"],
+        "status": "pending",
+    }
+    return pending
+

@@ -736,7 +736,8 @@ def install_code_search_release(
             "--disable-pip-version-check",
             "--quiet",
             "--force-reinstall",
-            str(wheel),
+            # Same extra as install.sh: the on-device embedding path needs it.
+            f"code-search-mcp[local] @ {wheel.resolve().as_uri()}",
         ],
         env=runtime_env,
     )

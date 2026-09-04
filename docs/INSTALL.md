@@ -102,10 +102,11 @@ sessions do not retain the prior MCP processes, then confirm both servers with
 
 ## Readiness record
 
-`component-bom.json` carries an `integrated_readiness` status. `pending` means
-the BOM is in `promotion_state: pending-first-release`: the pinned component
-releases are not published yet, installers and launchers refuse to run, and no
-readiness evidence exists. `ready` means the
+`component-bom.json` carries an `integrated_readiness` status. It is `ready`
+for the pinned code-graph v0.9.0 and code-search v0.4.0 releases. `pending`
+would mean a `promotion_state: pending-first-release` BOM whose component
+releases are not published yet, where installers and launchers refuse to run.
+`ready` means the
 committed `promotion-candidate` record satisfied static evidence-shape,
 version, backend-issued evidence, and checkout-identity checks, and that
 trusted post-merge CI installed the exact pins and generated a fresh
@@ -117,10 +118,7 @@ completion; a `blocked` BOM must not be used for `/index-repo`. See
 
 The production BOM pins code-search release
 [`v0.4.0`](https://github.com/brandyn-s/code-search/releases/tag/v0.4.0)
-with `install.kind: github-release`. While the BOM is in `promotion_state:
-pending-first-release` that release has not been published and every digest
-below reads `pending`; the manual procedure applies once the first promotion
-run has recorded the real artifacts. Its descriptor fixes the source commit,
+with `install.kind: github-release`. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
 use those values directly rather than selecting a moving release.

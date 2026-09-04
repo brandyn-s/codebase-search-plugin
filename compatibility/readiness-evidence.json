@@ -1,0 +1,53 @@
+{
+  "bom_readiness_status": "blocked",
+  "checkout_unchanged": true,
+  "components": {
+    "code-graph": {
+      "index_identity": {
+        "captured_at": "2026-09-04T07:31:41Z",
+        "checkout_id": "f993986659263e8425ca66ac0a021b67ad6a9993a56f7ec26c1a3032c1333907",
+        "dirty_fingerprint": "clean",
+        "index_generation": "ebdc2c2cb9c571a027d06861114fb1fb55eb7a106383bb15aff825a819036531",
+        "repository_id": "f993986659263e8425ca66ac0a021b67ad6a9993a56f7ec26c1a3032c1333907",
+        "schema_version": 1,
+        "source_revision": "6cdd8a27ca80fd36c7f27f20dd8c5ce4aaab485e"
+      },
+      "install_descriptor_sha256": "d091b58d6fe4e40af214419d36ba46ab1f2c0434351fcf84a6b830cd5a980937",
+      "status": "ready",
+      "version": "v0.9.0"
+    },
+    "code-search": {
+      "completion": {
+        "chunks_added": 11,
+        "error": null,
+        "files_added": 11,
+        "index_identity_status": "ready",
+        "index_ready": true,
+        "pipeline_version": "0df0c27634ca2361",
+        "success": true
+      },
+      "evidence_coordinate": {
+        "end_line": 3,
+        "index_generation": "ebdc2c2cb9c571a027d06861114fb1fb55eb7a106383bb15aff825a819036531",
+        "relative_path": "src/config.py",
+        "start_line": 3,
+        "status": "verified"
+      },
+      "index_identity": {
+        "captured_at": "2026-09-04T07:31:41.009398Z",
+        "checkout_id": "f993986659263e8425ca66ac0a021b67ad6a9993a56f7ec26c1a3032c1333907",
+        "dirty_fingerprint": "clean",
+        "index_generation": "ebdc2c2cb9c571a027d06861114fb1fb55eb7a106383bb15aff825a819036531",
+        "repository_id": "f993986659263e8425ca66ac0a021b67ad6a9993a56f7ec26c1a3032c1333907",
+        "schema_version": 1,
+        "source_revision": "6cdd8a27ca80fd36c7f27f20dd8c5ce4aaab485e"
+      },
+      "index_ready": true,
+      "install_descriptor_sha256": "934900b5704af9bf8e885a452d89714a79194fabb693dbfa2759e5e4f4702f4b",
+      "version": "v0.4.0"
+    }
+  },
+  "evidence_mode": "promotion-candidate",
+  "producer": "scripts/generate_live_readiness_evidence.py:v3",
+  "schema_version": 1
+}

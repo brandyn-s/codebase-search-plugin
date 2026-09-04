@@ -325,14 +325,15 @@ class ReadinessContractTests(unittest.TestCase):
             )
 
         readiness = bom["integrated_readiness"]
-        # The first public releases are not published yet: the BOM is in an
-        # explicit pending state with no evidence and every gate preserved.
-        self.assertEqual(bom["promotion_state"], "pending-first-release")
-        self.assertEqual(readiness["status"], "pending")
+        # Promoted to the first public releases: no pending state, committed
+        # promotion-candidate evidence, and every gate preserved.
+        self.assertNotIn("promotion_state", bom)
+        self.assertEqual(readiness["status"], "ready")
         self.assertEqual(readiness["requires"], READINESS_REQUIREMENTS)
-        self.assertNotIn("evidence", readiness)
+        self.assertEqual(readiness["evidence"], "compatibility/readiness-evidence.json")
         self.assertIn("promotion run", readiness["reason"].lower())
-        self.assertIn("not been published", readiness["reason"].lower())
+        self.assertIn("v0.9.0", readiness["reason"])
+        self.assertIn("v0.4.0", readiness["reason"])
 
     def test_valid_ready_fixture_passes_every_gate(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -12,7 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
-from released_bom import write_released_checkout  # noqa: E402
+from released_bom import pending_bom, write_released_checkout  # noqa: E402
 
 RELEASE_INSTALL_FIXTURE = (
     ROOT / "tests" / "fixtures" / "code-search-release-install.json"
@@ -35,8 +35,8 @@ class StaticPluginValidationTests(unittest.TestCase):
             "install.ps1",
         ):
             shutil.copy2(ROOT / filename, checkout / filename)
-        # The committed BOM is pending-first-release; the strict artifact
-        # policy under test applies to released BOMs, so start from one.
+        # Start from a released fixture with deterministic fake digests so the
+        # strict artifact policy under test does not depend on the live pins.
         write_released_checkout(checkout)
 
     def _copy_pending_checkout(self, checkout: Path) -> None:
@@ -54,6 +54,13 @@ class StaticPluginValidationTests(unittest.TestCase):
             "install.ps1",
         ):
             shutil.copy2(ROOT / filename, checkout / filename)
+        bom_path = checkout / "component-bom.json"
+        bom = json.loads(bom_path.read_text(encoding="utf-8"))
+        bom_path.write_text(json.dumps(pending_bom(bom)), encoding="utf-8")
+        shutil.rmtree(checkout / "compatibility" / "attestations", ignore_errors=True)
+        (checkout / "compatibility" / "readiness-evidence.json").unlink(missing_ok=True)
+        for component in ("code-search", "code-graph"):
+            self._rebind_component_descriptor(checkout, component)
 
     def _run_validator(self, checkout: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -91,23 +98,30 @@ class StaticPluginValidationTests(unittest.TestCase):
         )
         self.assertIn("candidate-bom.json", completed.stdout)
 
-    def test_committed_pending_bom_validates_and_reports_pending(self):
+    def test_committed_promoted_bom_validates_and_reports_ready(self):
         completed = self._run_validator(ROOT)
 
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-        self.assertIn("promotion_state=pending-first-release", completed.stdout)
+        self.assertNotIn("promotion_state=", completed.stdout)
         bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
-        self.assertEqual(bom["promotion_state"], "pending-first-release")
-        self.assertEqual(bom["integrated_readiness"]["status"], "pending")
-        self.assertNotIn("evidence", bom["integrated_readiness"])
+        self.assertNotIn("promotion_state", bom)
+        self.assertNotIn("promotion_reason", bom)
+        self.assertEqual(bom["integrated_readiness"]["status"], "ready")
+        self.assertEqual(
+            bom["integrated_readiness"]["evidence"],
+            "compatibility/readiness-evidence.json",
+        )
         for component in ("code-search", "code-graph"):
             install = bom["components"][component]["install"]
             self.assertTrue(install["repository"].startswith("brandyn-s/"))
             self.assertRegex(install["source_revision"], r"^[0-9a-f]{40}$")
-        self.assertFalse((ROOT / "compatibility" / "attestations").exists())
-        self.assertFalse(
-            (ROOT / "compatibility" / "readiness-evidence.json").exists()
+        self.assertNotIn('"pending"', json.dumps(bom["components"]))
+        self.assertTrue(
+            (
+                ROOT / "compatibility" / "attestations" / "code-graph-v0.9.0-provenance.jsonl"
+            ).is_file()
         )
+        self.assertTrue((ROOT / "compatibility" / "readiness-evidence.json").is_file())
 
     def test_pending_bom_requires_pending_readiness_and_a_reason(self):
         mutations = {

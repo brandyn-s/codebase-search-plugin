@@ -17,7 +17,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
-from released_bom import released_bom  # noqa: E402
+from released_bom import pending_bom, released_bom  # noqa: E402
 CAPTURE = ROOT / "scripts" / "capture_component_contracts.py"
 FAKE_SERVER = ROOT / "tests" / "fixtures" / "fake_mcp_server.py"
 RELEASE_INSTALL_FIXTURE = (
@@ -543,7 +543,10 @@ class CaptureComponentContractsTests(unittest.TestCase):
         capture = load_capture_module()
         with tempfile.TemporaryDirectory() as tmp:
             candidate_path = Path(tmp) / "candidate-bom.json"
-            shutil.copy2(ROOT / "component-bom.json", candidate_path)
+            pending = pending_bom(
+                json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+            )
+            candidate_path.write_text(json.dumps(pending), encoding="utf-8")
             with self.assertRaisesRegex(
                 capture.CaptureError, "pending-first-release"
             ):

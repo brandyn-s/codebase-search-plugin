@@ -16,7 +16,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
-from released_bom import released_bom  # noqa: E402
+from released_bom import pending_bom, released_bom  # noqa: E402
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 TRUSTED_WORKFLOW = (
     ROOT / ".github" / "workflows" / "trusted-component-promotion.yml"
@@ -557,10 +557,16 @@ class RealInstalledCIContractTests(unittest.TestCase):
 
     def test_load_bom_refuses_a_pending_first_release_bom(self):
         helper = load_helper()
-        with self.assertRaisesRegex(
-            helper.RealInstallError, "pending-first-release"
-        ):
-            helper.load_bom(ROOT / "component-bom.json")
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate_path = Path(tmp) / "component-bom.json"
+            pending = pending_bom(
+                json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+            )
+            candidate_path.write_text(json.dumps(pending), encoding="utf-8")
+            with self.assertRaisesRegex(
+                helper.RealInstallError, "pending-first-release"
+            ):
+                helper.load_bom(candidate_path)
 
     def test_load_bom_rejects_unknown_install_descriptor_fields(self):
         helper = load_helper()
@@ -728,7 +734,8 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("--force-reinstall", commands[pip_install])
         self.assertEqual(
             commands[pip_install][-1],
-            str(destination / "code-search-download" / wheel_name),
+            "code-search-mcp[local] @ "
+            + (destination / "code-search-download" / wheel_name).resolve().as_uri(),
         )
         self.assertIn("--asset-name", commands[installed_provenance])
         self.assertIn("--sha256", commands[installed_provenance])

@@ -7,14 +7,13 @@ published component and has been captured from `tools/list`.
 
 ## Current readiness evidence
 
-The current BOM is in `promotion_state: pending-first-release`, so its
-integrated readiness status is `pending`: the pinned code-graph `v0.9.0` and
-code-search `v0.4.0` releases are not published yet, every artifact digest is
-the placeholder `pending`, and no readiness evidence or attestation bundle is
-committed. A promotion run against the published releases fills the digests,
-vendors the code-graph bundle under `attestations/`, regenerates both tool
-snapshots and `readiness-evidence.json`, removes `promotion_state`, and sets
-the status to `blocked` or `ready`. When the status is `ready`, its
+The current BOM pins the published, immutable, attested releases code-graph
+`v0.9.0` and code-search `v0.4.0`; its integrated readiness status is `ready`.
+The promotion run recorded every artifact digest, vendored the code-graph
+attestation bundle under `attestations/`, regenerated both tool snapshots from
+the installed components (code-graph exposes its 26-tool default `core`
+toolset), and committed `readiness-evidence.json` as the promotion-candidate
+record. When the status is `ready`, its
 `tested_capabilities` section declares complete version-1 `index_identity`
 outputs, semantic `index_ready`, graph `status: ready`, and the optional
 boolean `skip_report` input exposed by code-graph. The
@@ -89,8 +88,7 @@ server for a blocked BOM unless a reviewer explicitly supplies
 
 The production BOM pins code-search release
 [`v0.4.0`](https://github.com/brandyn-s/code-search/releases/tag/v0.4.0),
-its exact source commit, wheel, and offline attestation bundle (digests are
-`pending` until the first promotion run). Contract
+its exact source commit, wheel, and offline attestation bundle. Contract
 capture and validation support future GitHub Release wheel candidates without
 weakening readiness: capture preserves the complete release descriptor,
 records the tag as the component version, and resets behavioral claims to a
