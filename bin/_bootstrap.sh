@@ -136,7 +136,9 @@ ensure_components_installed() {
     done
 
     if [ "$(cat "$status" 2>/dev/null)" != "0" ] || ! components_installed "$plugin_dir"; then
-        _bootstrap_log "component installation failed; see $log"
+        _bootstrap_log "component installation failed (exit $(cat "$status" 2>/dev/null || echo "?")); last lines of $log:"
+        tail -n 8 "$log" 2>/dev/null | sed 's/^/[code-intelligence]   /' >&2 || true
+        _bootstrap_log "fix the cause and restart the MCP server, or run: bash \"$plugin_dir/install.sh\""
         return 1
     fi
     _bootstrap_log "components installed"
