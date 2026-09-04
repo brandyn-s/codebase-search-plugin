@@ -29,6 +29,8 @@ from bench.e2e.pilot.run import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tests"))
+from released_bom import released_bom  # noqa: E402
 RUNNER = ROOT / "bench" / "e2e" / "pilot" / "run.py"
 STATE_GUARD = ROOT / "scripts" / "code_intel_state_guard.py"
 
@@ -268,8 +270,12 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
     def test_v6_preregistration_binds_unified_state_guard(self):
         cases = ROOT / "bench" / "e2e" / "pilot" / "cases-v2.jsonl"
         target_manifest = ROOT / "bench" / "e2e" / "target-repo-manifest.json"
-        component_bom = ROOT / "component-bom.json"
-        bom = json.loads(component_bom.read_text(encoding="utf-8"))
+        # The committed BOM is pending-first-release; the pilot requires an
+        # integrated-ready BOM, so the test writes a released fixture.
+        bom = released_bom(
+            json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8")),
+            readiness_status="ready",
+        )
 
         def install_descriptor_sha256(component: str) -> str:
             encoded = json.dumps(
@@ -283,6 +289,8 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            component_bom = root / "component-bom.json"
+            component_bom.write_text(json.dumps(bom, indent=2) + "\n", encoding="utf-8")
             target = root / "target-repo"
             readiness_evidence = root / "readiness-evidence.json"
             shutil.copytree(ROOT / "bench" / "e2e" / "target-repo", target)
@@ -627,7 +635,7 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(
             preregistration["components"]["code-graph"]["version"],
-            "v0.8.0-redacted.2",
+            "v0.8.0-internal.2",
         )
         self.assertTrue(
             any(case.get("expected_disposition") == "not_supported" for case in cases)
@@ -852,6 +860,11 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     str(model),
                     "--preregistration",
                     str(preregistration_path),
+                    # The committed readiness evidence was removed with the
+                    # pending-first-release BOM; unbound preregistrations only
+                    # need an existing record to copy into the run manifest.
+                    "--readiness-evidence",
+                    str(ROOT / "bench" / "e2e" / "pilot" / "readiness-wave44.json"),
                 ],
                 cwd=ROOT,
                 capture_output=True,
@@ -980,6 +993,11 @@ class OperatorPilotAcceptanceTests(unittest.TestCase):
                     str(model),
                     "--preregistration",
                     str(preregistration_path),
+                    # The committed readiness evidence was removed with the
+                    # pending-first-release BOM; unbound preregistrations only
+                    # need an existing record to copy into the run manifest.
+                    "--readiness-evidence",
+                    str(ROOT / "bench" / "e2e" / "pilot" / "readiness-wave44.json"),
                 ],
                 cwd=ROOT,
                 capture_output=True,

@@ -7,9 +7,9 @@
   },
   "schema_version": 1,
   "source": {
-    "install_descriptor_sha256": "511a36fbb995f7580bcb25bfd686c0ade4e8cc49d1b39aa8dcf20355a2e1ce47",
+    "install_descriptor_sha256": "0a0bedeaf2825c0add3dfe542010abcd69ed92f66fae76f9404196a894e05c76",
     "kind": "github-release",
-    "version": "v0.8.0-redacted.11"
+    "version": "v0.9.0"
   },
   "tested_capabilities": {
     "inputs": {
@@ -44,11 +44,11 @@
             "type": "string"
           },
           "project": {
-            "description": "Project name (optional — uses session project if omitted)",
+            "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
           },
           "seed_strategy": {
-            "description": "How to match issue → seed nodes. 'substring' (legacy): tokens substring-match Name/QualifiedName. 'embedding': Voyage-embed the issue, cosine-search node embeddings (requires VOYAGE_API_KEY + index with embeddings populated). 'hybrid' (default): both, deduplicated; falls back to substring if embeddings unavailable.",
+            "description": "How to match issue \u2192 seed nodes. 'substring' (legacy): tokens substring-match Name/QualifiedName. 'embedding': Voyage-embed the issue, cosine-search node embeddings (requires VOYAGE_API_KEY + index with embeddings populated). 'hybrid' (default): both, deduplicated; falls back to substring if embeddings unavailable.",
             "enum": [
               "substring",
               "embedding",
@@ -80,7 +80,7 @@
             "type": "string"
           },
           "project": {
-            "description": "Project name (optional — uses session project if omitted)",
+            "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
           },
           "top_k": {
@@ -135,7 +135,7 @@
             "type": "string"
           },
           "exclude_entry_points": {
-            "description": "When true, exclude nodes whose is_entry_point property is true (route handlers, framework-registered functions, main()). Essential for dead-code detection — without this, the count is dominated by entry points the framework calls but no internal code references.",
+            "description": "When true, exclude nodes whose is_entry_point property is true (route handlers, framework-registered functions, main()). Essential for dead-code detection \u2014 without this, the count is dominated by entry points the framework calls but no internal code references.",
             "type": "boolean"
           },
           "label": {
@@ -158,7 +158,7 @@
             "type": "string"
           },
           "project": {
-            "description": "Project name (optional — uses session project if omitted)",
+            "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
           },
           "value": {
@@ -254,7 +254,7 @@
             "type": "string"
           },
           "project": {
-            "description": "Project name (optional — uses session project if omitted)",
+            "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
           },
           "to_sha": {
@@ -344,7 +344,7 @@
             "type": "integer"
           },
           "project": {
-            "description": "Project name (optional — uses session project if omitted)",
+            "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
           }
         },
@@ -364,11 +364,11 @@
             "type": "string"
           },
           "project": {
-            "description": "Project name (optional — uses session project if omitted)",
+            "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
           },
           "threshold": {
-            "description": "Minimum cosine similarity score (0.0-1.0) — common values: 0.85 for \"worth investigating\", 0.92 for \"probable copy-paste\". Default 0.0 (return top-K regardless of score).",
+            "description": "Minimum cosine similarity score (0.0-1.0) \u2014 common values: 0.85 for \"worth investigating\", 0.92 for \"probable copy-paste\". Default 0.0 (return top-K regardless of score).",
             "type": "number"
           }
         },
@@ -383,7 +383,7 @@
       "input_schema": {
         "properties": {
           "project": {
-            "description": "Project name (optional — uses session project if omitted)",
+            "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
           }
         },
@@ -648,7 +648,7 @@
             "type": "boolean"
           },
           "mode": {
-            "description": "Indexing mode. 'full' (default): parse all supported files. 'fast': aggressive filtering — skips generated code, test fixtures, docs, large files (>512KB), and non-source assets for faster indexing of large repos.",
+            "description": "Indexing mode. 'full' (default): parse all supported files. 'fast': aggressive filtering \u2014 skips generated code, test fixtures, docs, large files (>512KB), and non-source assets for faster indexing of large repos.",
             "enum": [
               "full",
               "fast"
@@ -910,7 +910,7 @@
       "input_schema": {
         "properties": {
           "project": {
-            "description": "Project name (optional — uses session project if omitted)",
+            "description": "Project name (optional \u2014 uses session project if omitted)",
             "type": "string"
           },
           "query": {
@@ -918,7 +918,7 @@
             "type": "string"
           },
           "seed_strategy": {
-            "description": "How to match query → seed nodes. 'hybrid' (default, recommended): substring + embedding seeds with embedding-dominance threshold (≥3 embedding seeds drops substring entirely). 'embedding': Voyage-embed only (requires VOYAGE_API_KEY + index with embeddings populated). 'substring': tokens word-boundary-match Name/QualifiedName. NOTE: when 'substring' is requested AND the project has embeddings, the call is auto-routed to 'hybrid' — substring on its own surfaces PageRank-propagation noise (generic types / error wrappers accumulating rank from seeded callers) that hybrid eliminates. Bare substring runs only when no embeddings exist.",
+            "description": "How to match query \u2192 seed nodes. 'hybrid' (default, recommended): substring + embedding seeds with embedding-dominance threshold (\u22653 embedding seeds drops substring entirely). 'embedding': Voyage-embed only (requires VOYAGE_API_KEY + index with embeddings populated). 'substring': tokens word-boundary-match Name/QualifiedName. NOTE: when 'substring' is requested AND the project has embeddings, the call is auto-routed to 'hybrid' \u2014 substring on its own surfaces PageRank-propagation noise (generic types / error wrappers accumulating rank from seeded callers) that hybrid eliminates. Bare substring runs only when no embeddings exist.",
             "enum": [
               "substring",
               "embedding",
@@ -962,7 +962,7 @@
             "type": "integer"
           },
           "pattern": {
-            "description": "Text to search for. Case-insensitive by default. Literal string match unless regex=true. With regex=true: Go regex syntax (no backslash before pipe). Best practice: use alternatives for word form variance — 'deprecat|obsolete|legacy' catches 'deprecated', 'deprecating', 'obsolete', etc. A partial stem with alternatives is more effective than an exact word.",
+            "description": "Text to search for. Case-insensitive by default. Literal string match unless regex=true. With regex=true: Go regex syntax (no backslash before pipe). Best practice: use alternatives for word form variance \u2014 'deprecat|obsolete|legacy' catches 'deprecated', 'deprecating', 'obsolete', etc. A partial stem with alternatives is more effective than an exact word.",
             "type": "string"
           },
           "project": {
@@ -1033,18 +1033,18 @@
             "type": "boolean"
           },
           "exclude_labels": {
-            "description": "Labels to exclude from results. Community nodes are excluded by default — pass [] to include them.",
+            "description": "Labels to exclude from results. Community nodes are excluded by default \u2014 pass [] to include them.",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "file_pattern": {
-            "description": "Glob pattern for file path within the project. Use to filter by directory ('**/services/**'), file extension ('*.py', '*.yaml'), or filename ('**/Makefile'). Essential for shared-repo projects where multiple languages coexist — e.g., use '*.html' to find only HTML files in a JavaScript project.",
+            "description": "Glob pattern for file path within the project. Use to filter by directory ('**/services/**'), file extension ('*.py', '*.yaml'), or filename ('**/Makefile'). Essential for shared-repo projects where multiple languages coexist \u2014 e.g., use '*.html' to find only HTML files in a JavaScript project.",
             "type": "string"
           },
           "include_connected": {
-            "description": "Include connected node names in results (default: false). Expensive — only enable when you need to see neighbor names.",
+            "description": "Include connected node names in results (default: false). Expensive \u2014 only enable when you need to see neighbor names.",
             "type": "boolean"
           },
           "include_source": {
@@ -1056,7 +1056,7 @@
             "type": "string"
           },
           "limit": {
-            "description": "Max results per page (default: 10). Use small limits and paginate with offset — response includes has_more flag.",
+            "description": "Max results per page (default: 10). Use small limits and paginate with offset \u2014 response includes has_more flag.",
             "type": "integer"
           },
           "max_complexity": {
@@ -1076,7 +1076,7 @@
             "type": "integer"
           },
           "name_pattern": {
-            "description": "Regex pattern matched against the short node name. Case-insensitive by default. Supports full Go regex: '.*Handler$' (suffix), 'get|set|delete' (alternatives — no backslash before pipe), '^on[A-Z]' (prefix+char class). Best practice: include word variations in alternatives — 'auth|authenticate|authorization' (word forms), 'handler|hdlr|ctrl' (abbreviations), 'create|new|init' (synonyms). One regex with | replaces multiple separate searches.",
+            "description": "Regex pattern matched against the short node name. Case-insensitive by default. Supports full Go regex: '.*Handler$' (suffix), 'get|set|delete' (alternatives \u2014 no backslash before pipe), '^on[A-Z]' (prefix+char class). Best practice: include word variations in alternatives \u2014 'auth|authenticate|authorization' (word forms), 'handler|hdlr|ctrl' (abbreviations), 'create|new|init' (synonyms). One regex with | replaces multiple separate searches.",
             "type": "string"
           },
           "offset": {
@@ -1113,7 +1113,7 @@
       "input_schema": {
         "properties": {
           "include_libraries": {
-            "description": "Include shared libraries (lib*) in the map (default false — only services with main functions).",
+            "description": "Include shared libraries (lib*) in the map (default false \u2014 only services with main functions).",
             "type": "boolean"
           },
           "project": {
@@ -1172,7 +1172,7 @@
             "type": "boolean"
           },
           "min_confidence": {
-            "description": "Minimum confidence threshold (0.0-1.0) for all selected edge types. Filters out low-confidence fuzzy matches. Edges with missing or null confidence remain traversable; an explicit numeric zero is filtered when the threshold is positive. Bands: high (>=0.7), medium (>=0.45), speculative (<0.45). Default 0.45 — filters speculative cross-crate name-only matches that frequently resolve to wrong-crate same-named methods. Pass 0 explicitly to disable filtering and see the full unfiltered trace. confidence_band is unknown whenever min_confidence is positive because the resolved-edge numerator is filtered while unresolved_call_count is not.",
+            "description": "Minimum confidence threshold (0.0-1.0) for all selected edge types. Filters out low-confidence fuzzy matches. Edges with missing or null confidence remain traversable; an explicit numeric zero is filtered when the threshold is positive. Bands: high (>=0.7), medium (>=0.45), speculative (<0.45). Default 0.45 \u2014 filters speculative cross-crate name-only matches that frequently resolve to wrong-crate same-named methods. Pass 0 explicitly to disable filtering and see the full unfiltered trace. confidence_band is unknown whenever min_confidence is positive because the resolved-edge numerator is filtered while unresolved_call_count is not.",
             "maximum": 1,
             "minimum": 0,
             "type": "number"

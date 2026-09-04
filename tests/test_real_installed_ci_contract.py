@@ -15,6 +15,8 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tests"))
+from released_bom import released_bom  # noqa: E402
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 TRUSTED_WORKFLOW = (
     ROOT / ".github" / "workflows" / "trusted-component-promotion.yml"
@@ -44,7 +46,9 @@ def load_helper():
 class RealInstalledCIContractTests(unittest.TestCase):
     def test_load_bom_requires_the_optional_generator_contract(self):
         helper = load_helper()
-        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        bom = released_bom(
+            json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        )
         del bom["precision_generators"]
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "component-bom.json"
@@ -185,7 +189,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn("github.event_name == 'push'", real_job)
         self.assertIn("github.event_name == 'workflow_dispatch'", real_job)
         self.assertNotIn("secrets.", workflow)
-        self.assertNotIn("redacted-org", workflow)
+        self.assertNotIn("example-org/", workflow)
 
         # The gate runs before anything that touches a component release, and
         # every later step is conditioned on it.
@@ -534,8 +538,10 @@ class RealInstalledCIContractTests(unittest.TestCase):
         helper = load_helper()
         with tempfile.TemporaryDirectory() as tmp:
             candidate_path = Path(tmp) / "candidate-bom.json"
-            candidate = json.loads(
-                (ROOT / "component-bom.json").read_text(encoding="utf-8")
+            candidate = released_bom(
+                json.loads(
+                    (ROOT / "component-bom.json").read_text(encoding="utf-8")
+                )
             )
             candidate["components"]["code-graph"]["install"]["tag"] = (
                 "v9.9.9-candidate"
@@ -549,12 +555,21 @@ class RealInstalledCIContractTests(unittest.TestCase):
             "v9.9.9-candidate",
         )
 
+    def test_load_bom_refuses_a_pending_first_release_bom(self):
+        helper = load_helper()
+        with self.assertRaisesRegex(
+            helper.RealInstallError, "pending-first-release"
+        ):
+            helper.load_bom(ROOT / "component-bom.json")
+
     def test_load_bom_rejects_unknown_install_descriptor_fields(self):
         helper = load_helper()
         with tempfile.TemporaryDirectory() as tmp:
             candidate_path = Path(tmp) / "candidate-bom.json"
-            candidate = json.loads(
-                (ROOT / "component-bom.json").read_text(encoding="utf-8")
+            candidate = released_bom(
+                json.loads(
+                    (ROOT / "component-bom.json").read_text(encoding="utf-8")
+                )
             )
             candidate["components"]["code-graph"]["install"]["assets"][
                 "linux-amd64"
@@ -571,15 +586,15 @@ class RealInstalledCIContractTests(unittest.TestCase):
         helper = load_helper()
         wheel_bytes = b"pinned wheel"
         bundle_bytes = b"offline attestation bundle"
-        wheel_name = "redacted_code_search-0.2.1-py3-none-any.whl"
-        bundle_name = "redacted_code_search-0.2.1-provenance.jsonl"
+        wheel_name = "code_search_mcp-0.2.1-py3-none-any.whl"
+        bundle_name = "code_search_mcp-0.2.1-provenance.jsonl"
         checksums_name = "SHA256SUMS"
         checksums_bytes = (
             f"{hashlib.sha256(wheel_bytes).hexdigest()}  {wheel_name}\n"
         ).encode()
         install = {
             "kind": "github-release",
-            "repository": "redacted-org/code-search",
+            "repository": "brandyn-s/code-search",
             "tag": "v0.2.1",
             "source_revision": "a" * 40,
             "asset": {
@@ -597,7 +612,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 },
                 "deny_self_hosted_runners": True,
                 "signer_workflow": (
-                    "redacted-org/code-search/"
+                    "brandyn-s/code-search/"
                     ".github/workflows/release.yml"
                 ),
                 "source_ref": "refs/heads/main",
@@ -652,7 +667,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 )
 
         resolve.assert_called_once_with(
-            "redacted-org/code-search",
+            "brandyn-s/code-search",
             "v0.2.1",
             fetch_env,
         )
@@ -766,7 +781,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
             side_effect=responses,
         ) as run:
             resolved = helper.resolve_release_tag_commit(
-                "redacted-org/code-search",
+                "brandyn-s/code-search",
                 "v0.2.0",
                 fetch_env,
             )
@@ -775,16 +790,16 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertEqual(run.call_count, 3)
         commands = [call.args[0] for call in run.call_args_list]
         self.assertIn(
-            "repos/redacted-org/code-search/git/ref/tags/v0.2.0",
+            "repos/brandyn-s/code-search/git/ref/tags/v0.2.0",
             commands[0],
         )
         self.assertIn(
-            f"repos/redacted-org/code-search/git/tags/{tag_object}",
+            f"repos/brandyn-s/code-search/git/tags/{tag_object}",
             commands[1],
         )
         self.assertIn(
             (
-                "repos/redacted-org/code-search/git/tags/"
+                "repos/brandyn-s/code-search/git/tags/"
                 f"{nested_tag_object}"
             ),
             commands[2],
@@ -827,24 +842,24 @@ class RealInstalledCIContractTests(unittest.TestCase):
         archive_buffer = io.BytesIO()
         binary_bytes = b"verified graph binary"
         with tarfile.open(fileobj=archive_buffer, mode="w:gz") as archive:
-            entry = tarfile.TarInfo("codebase-memory-mcp")
+            entry = tarfile.TarInfo("code-graph")
             entry.mode = 0o755
             entry.size = len(binary_bytes)
             archive.addfile(entry, io.BytesIO(binary_bytes))
         archive_bytes = archive_buffer.getvalue()
-        archive_name = "codebase-memory-mcp-linux-amd64.tar.gz"
+        archive_name = "code-graph-linux-amd64.tar.gz"
         archive_sha256 = hashlib.sha256(archive_bytes).hexdigest()
         checksums_name = "checksums.txt"
         checksums_bytes = f"{archive_sha256}  {archive_name}\n".encode()
         attestation_bundle_bytes = b'{"bundle":"operator-fetched"}\n'
         attestation_bundle_path = (
             "compatibility/attestations/"
-            "code-graph-v0.7.0-redacted.3-provenance.jsonl"
+            "code-graph-v0.7.0-internal.3-provenance.jsonl"
         )
         install = {
             "kind": "github-release",
-            "repository": "redacted-org/code-graph",
-            "tag": "v0.7.0-redacted.3",
+            "repository": "brandyn-s/code-graph",
+            "tag": "v0.7.0-internal.3",
             "source_revision": "a" * 40,
             "assets": {
                 "linux-amd64": {
@@ -865,7 +880,7 @@ class RealInstalledCIContractTests(unittest.TestCase):
                 },
                 "deny_self_hosted_runners": True,
                 "signer_workflow": (
-                    "redacted-org/code-graph/"
+                    "brandyn-s/code-graph/"
                     ".github/workflows/release.yml"
                 ),
                 "source_ref": "refs/heads/main",
@@ -939,8 +954,8 @@ class RealInstalledCIContractTests(unittest.TestCase):
             self.assertEqual(executable.read_bytes(), binary_bytes)
 
         resolve.assert_called_once_with(
-            "redacted-org/code-graph",
-            "v0.7.0-redacted.3",
+            "brandyn-s/code-graph",
+            "v0.7.0-internal.3",
             fetch_env,
         )
         verify_manifest.assert_called_once_with(
@@ -981,9 +996,9 @@ class RealInstalledCIContractTests(unittest.TestCase):
         self.assertIn(str(bundle), commands[attestation])
         for required in (
             "--repo",
-            "redacted-org/code-graph",
+            "brandyn-s/code-graph",
             "--signer-workflow",
-            "redacted-org/code-graph/.github/workflows/release.yml",
+            "brandyn-s/code-graph/.github/workflows/release.yml",
             "--source-digest",
             "a" * 40,
             "--source-ref",
@@ -994,11 +1009,18 @@ class RealInstalledCIContractTests(unittest.TestCase):
 
     def test_graph_release_rejects_tag_commit_mismatch_before_download(self):
         helper = load_helper()
-        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        bom = released_bom(
+            json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        )
         install = bom["components"]["code-graph"]["install"]
+        bundle_bytes = b'{"bundle":"fixture"}\n'
+        install["attestation"]["bundle"]["sha256"] = hashlib.sha256(
+            bundle_bytes
+        ).hexdigest()
 
         with (
             tempfile.TemporaryDirectory() as tmp,
+            tempfile.TemporaryDirectory() as plugin_tmp,
             mock.patch.object(
                 helper,
                 "resolve_release_tag_commit",
@@ -1007,11 +1029,15 @@ class RealInstalledCIContractTests(unittest.TestCase):
             mock.patch.object(helper.platform, "system", return_value="Linux"),
             mock.patch.object(helper.platform, "machine", return_value="x86_64"),
             mock.patch.object(helper, "run") as run,
+            mock.patch.object(helper, "ROOT", Path(plugin_tmp)),
             self.assertRaisesRegex(
                 helper.RealInstallError,
                 "tag source revision mismatch",
             ),
         ):
+            bundle = Path(plugin_tmp) / install["attestation"]["bundle"]["path"]
+            bundle.parent.mkdir(parents=True)
+            bundle.write_bytes(bundle_bytes)
             helper.install_code_graph(
                 install,
                 Path(tmp),

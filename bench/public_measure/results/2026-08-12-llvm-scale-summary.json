@@ -31,7 +31,7 @@
       }
     },
     "code-graph": {
-      "release": "v0.8.0-redacted.6",
+      "release": "v0.8.0-internal.6",
       "server_sha256": "d9a6281c2b81c2cdffcd6c8a2a1e348026297ee95083d666f85ea9b9a7b6735d",
       "status": "completed",
       "nodes": 729625,

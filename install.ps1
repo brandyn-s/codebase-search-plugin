@@ -79,6 +79,16 @@ if ($PluginValidationExitCode -ne 0) {
 Write-Host ""
 
 $Bom = Get-Content -Raw -Path $BomPath | ConvertFrom-Json
+# A BOM in promotion_state pending-first-release names component releases that
+# have not been published; its digests are placeholders.
+$PromotionState = if ($Bom.PSObject.Properties["promotion_state"]) { $Bom.promotion_state } else { "" }
+if ($PromotionState -eq "pending-first-release") {
+    Write-Host "Error: components not yet released; see docs/INSTALL.md" -ForegroundColor Red
+    Write-Host "  component-bom.json is in promotion_state pending-first-release: the pinned" -ForegroundColor Red
+    Write-Host "  code-graph and code-search releases have not been published, so the plugin" -ForegroundColor Red
+    Write-Host "  cannot install them yet. Nothing was changed." -ForegroundColor Red
+    exit 1
+}
 $CodeSearchInstall = $Bom.components.'code-search'.install
 $CodeSearchKind = $CodeSearchInstall.kind
 $CodeSearchRepository = $CodeSearchInstall.repository
@@ -472,11 +482,11 @@ if (-not (Test-Path $VenvPip)) {
 switch ($CodeSearchKind) {
     "git" {
         $CodeSearchRef = $CodeSearchInstall.revision
-        # Distribution name of the pinned source; older pins used redacted-code-search.
+        # Distribution name of the pinned source (PyPI name of code-search).
         $CodeSearchDist = if ($CodeSearchInstall.PSObject.Properties["distribution"]) {
             $CodeSearchInstall.distribution
         } else {
-            "redacted-code-search"
+            "code-search-mcp"
         }
         Write-Host "  Installing code-search from GitHub..."
         $CodeSearchRequirement = "$CodeSearchDist @ git+{0}@{1}" -f $CodeSearchRepository, $CodeSearchRef

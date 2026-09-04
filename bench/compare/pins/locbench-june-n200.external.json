@@ -12,7 +12,7 @@
   "kind": "external_content_address",
   "path": "bench/accuracy/baselines/data/2026-06-12-matched-depth-n200/locbench-n200-pin.json",
   "recorded_order_sha256": "de161cf07a6310209d78e9f2e2f05ca28a21cfcdeef1b871279d39ea24d54577",
-  "repository": "redacted-org/code-graph",
+  "repository": "brandyn-s/code-graph",
   "runnable": false,
   "schema_version": 1,
   "score_depth": 10,

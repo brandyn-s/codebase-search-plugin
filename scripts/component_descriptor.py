@@ -4,10 +4,43 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 
 
 class DescriptorError(ValueError):
     """A component installation descriptor cannot be canonicalized."""
+
+
+# A BOM in this promotion state points at component releases that have not
+# been published yet. Every artifact digest is the literal PENDING_DIGEST,
+# installers refuse to run, and validators report "pending" instead of "ready".
+# A promotion run replaces the digests with real SHA-256 values, adds the
+# attestation bundle, regenerates the tool snapshots and readiness evidence,
+# and removes promotion_state.
+PENDING_FIRST_RELEASE = "pending-first-release"
+PENDING_DIGEST = "pending"
+LOWER_HEX_SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
+def promotion_state(bom: object) -> str | None:
+    """Return the BOM's promotion_state, or None for a released BOM."""
+    if not isinstance(bom, dict):
+        return None
+    state = bom.get("promotion_state")
+    return state if isinstance(state, str) and state else None
+
+
+def is_pending_first_release(bom: object) -> bool:
+    return promotion_state(bom) == PENDING_FIRST_RELEASE
+
+
+def digest_is_pinned(value: object, *, allow_pending: bool) -> bool:
+    """True for a lowercase SHA-256, or the pending placeholder when allowed."""
+    if not isinstance(value, str):
+        return False
+    if allow_pending and value == PENDING_DIGEST:
+        return True
+    return LOWER_HEX_SHA256.fullmatch(value) is not None
 
 
 GRAPH_ASSET_KEYS = frozenset(

@@ -111,7 +111,7 @@ def main() -> int:
     parser.add_argument("--sha256", required=True)
     parser.add_argument(
         "--distribution",
-        default="redacted-code-search",
+        default="code-search-mcp",
         help="installed Python distribution name",
     )
     args = parser.parse_args()

@@ -9,7 +9,10 @@ reach a pre-promotion release. Until the pins move, the gate reports
 
 Usage:
     python3 scripts/promotion_gate.py --component-bom component-bom.json
-Prints one JSON object: {"run": bool, "pinned": {component: repository}}.
+Prints one JSON object: {"run": bool, "pinned": {component: repository},
+"promotion_state": str|null}. A BOM whose promotion_state is
+"pending-first-release" is always gated: its pins name releases that do not
+exist yet.
 When ``GITHUB_OUTPUT`` is set, also appends ``run=<true|false>`` to it.
 """
 from __future__ import annotations
@@ -21,6 +24,7 @@ import sys
 from pathlib import Path
 
 PUBLIC_OWNER_PREFIX = "brandyn-s/"
+PENDING_FIRST_RELEASE = "pending-first-release"
 
 
 def evaluate(bom: dict) -> dict:
@@ -34,8 +38,12 @@ def evaluate(bom: dict) -> dict:
         if not isinstance(repository, str) or not repository:
             raise ValueError(f"component {name!r} has no install.repository")
         pinned[name] = repository
-    run = all(repo.startswith(PUBLIC_OWNER_PREFIX) for repo in pinned.values())
-    return {"run": run, "pinned": pinned}
+    state = bom.get("promotion_state")
+    state = state if isinstance(state, str) and state else None
+    run = state is None and all(
+        repo.startswith(PUBLIC_OWNER_PREFIX) for repo in pinned.values()
+    )
+    return {"run": run, "pinned": pinned, "promotion_state": state}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -48,7 +56,15 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"::error::promotion gate cannot read the BOM: {exc}", file=sys.stderr)
         return 1
-    if not result["run"]:
+    if not result["run"] and result["promotion_state"] is not None:
+        print(
+            f"::notice::component-bom.json is in promotion_state "
+            f"{result['promotion_state']}: the pinned component releases are "
+            f"not published yet, so trusted post-merge validation is skipped "
+            f"until a promotion run records the real release artifacts.",
+            file=sys.stderr,
+        )
+    elif not result["run"]:
         for name, repository in result["pinned"].items():
             if not repository.startswith(PUBLIC_OWNER_PREFIX):
                 print(

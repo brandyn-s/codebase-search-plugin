@@ -3,7 +3,9 @@
 Every number here is a bounded measurement of a specific pinned release on a
 specific instrument. None of them is a general accuracy claim or a market-wide
 superiority claim. Plugin 0.4.32 (the last internal release) pinned code-search
-v0.3.6 and code-graph v0.8.0-redacted.11; the numbers below are from that pin.
+v0.3.6 and the internal code-graph v0.8.0 series (build 11); the numbers below
+are from that pin. Both are pre-public builds; the first public releases are
+code-search v0.4.0 and code-graph v0.9.0.
 
 ## Public file localization (LocBench, n=80)
 
@@ -28,7 +30,7 @@ remains below code-search, so conceptual discovery stays search-primary.
 ## Compiler-tier relationship oracles
 
 Independent Go SSA/RTA and TypeScript compiler-API oracles measure released
-CALLS and IMPORTS relationships. Code-graph v0.8.0-redacted.11 preserves 13/13
+CALLS and IMPORTS relationships. Code-graph v0.8.0-internal.11 preserves 13/13
 TypeScript declared type, 456/456 TypeScript IMPORTS, and direct-method
 relationship results.
 

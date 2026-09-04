@@ -19,8 +19,10 @@ claude plugin marketplace add brandyn-s/codebase-search-plugin
 claude plugin install codebase-search@code-intelligence --scope user
 ```
 
-That is all. The two MCP servers install themselves the first time Claude Code
-launches them: the launchers in `bin/` fetch the exact component releases
+The first public component releases (code-graph v0.9.0, code-search v0.4.0)
+are pending; installs work once they are published and promoted into
+`component-bom.json`. After that, the two MCP servers install themselves the
+first time Claude Code launches them: the launchers in `bin/` fetch the exact component releases
 pinned in `component-bom.json`, verify SHA-256 checksums, and start the
 servers. The first launch downloads a Python environment and a Go binary, so it
 can take a few minutes; if Claude Code reports the servers as failed on that

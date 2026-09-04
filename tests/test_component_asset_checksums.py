@@ -15,91 +15,21 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts" / "validate_real_installed.py"
 
-EXPECTED_ASSETS = {
-    "darwin-amd64": {
-        "name": "codebase-memory-mcp-darwin-amd64.tar.gz",
-        "sha256": "5e31d0a575168695cab497af3b72e22d10c65ca37711ee657b345a513fc1c208",
-    },
-    "darwin-arm64": {
-        "name": "codebase-memory-mcp-darwin-arm64.tar.gz",
-        "sha256": "d569f40ccda72d1adeb4f9ada97d0e97d24df837c9ce940757b7c63859c2ccbb",
-    },
-    "linux-amd64": {
-        "name": "codebase-memory-mcp-linux-amd64.tar.gz",
-        "sha256": "1123cd44c248bc7d7f562ed7456015cc77567192a2abf7c995b722464e6db3fc",
-    },
-    "linux-arm64": {
-        "name": "codebase-memory-mcp-linux-arm64.tar.gz",
-        "sha256": "13fe6aa9f454625dcb587bb9334f15a3b7ac84a58657e0e975abac2ea9dd976c",
-    },
-    "windows-amd64": {
-        "name": "codebase-memory-mcp-windows-amd64.zip",
-        "sha256": "fe3e0cdd73a1235fd7699d1000eab66582f40b035d6a33fbf40229a16afaa7ff",
-    },
+GRAPH_ASSET_NAMES = {
+    "darwin-amd64": "code-graph-darwin-amd64.tar.gz",
+    "darwin-arm64": "code-graph-darwin-arm64.tar.gz",
+    "linux-amd64": "code-graph-linux-amd64.tar.gz",
+    "linux-arm64": "code-graph-linux-arm64.tar.gz",
+    "windows-amd64": "code-graph-windows-amd64.zip",
 }
+PENDING = "pending"
+FULL_SHA = r"^[0-9a-f]{40}$"
 
-EXPECTED_GRAPH_INSTALL = {
-    "assets": EXPECTED_ASSETS,
-    "attestation": {
-        "bundle": {
-            "path": (
-                "compatibility/attestations/"
-                "code-graph-v0.8.0-redacted.11-provenance.jsonl"
-            ),
-            "sha256": (
-                "1ada10957335481e7e9e66a1fb8657ed5a1daa8cc2fdb7c4cca8d5469f703388"
-            ),
-        },
-        "deny_self_hosted_runners": True,
-        "signer_workflow": (
-            "redacted-org/code-graph/.github/workflows/release.yml"
-        ),
-        "source_ref": "refs/heads/main",
-    },
-    "checksums": {
-        "name": "checksums.txt",
-        "sha256": (
-            "cbb0f136b63063a6f6921a1b55193d6383f3f33210c5c9d369494c9a2fce1b73"
-        ),
-    },
-    "kind": "github-release",
-    "repository": "redacted-org/code-graph",
-    "source_revision": "45250f8638308f12447dfe023585e6d7e9ab41a6",
-    "tag": "v0.8.0-redacted.11",
-}
 
-EXPECTED_SEARCH_INSTALL = {
-    "asset": {
-        "name": "redacted_code_search-0.3.6-py3-none-any.whl",
-        "sha256": (
-            "2bc9837404b56864fd3349686842edcb02edec5f0a355f584be5b12e70c50554"
-        ),
-    },
-    "attestation": {
-        "bundle": {
-            "name": "redacted_code_search-0.3.6-provenance.jsonl",
-            "sha256": (
-                "eb82d10c8de043177068a7f646bd5f2b0f721fe72f707010ed456d57462526c1"
-            ),
-        },
-        "deny_self_hosted_runners": True,
-        "signer_workflow": (
-            "redacted-org/code-search/.github/workflows/release.yml"
-        ),
-        "source_ref": "refs/heads/main",
-    },
-    "checksums": {
-        "name": "SHA256SUMS",
-        "sha256": (
-            "44b0fab5207397ba6c1ffa4a29b00ca49052ee39ef809cb4f91833260a475eec"
-        ),
-    },
-    "kind": "github-release",
-    "repository": "redacted-org/code-search",
-    "source_revision": "cbdb9bdedd2f296ec7235cf810b7e5c471b415ea",
-    "tag": "v0.3.6",
-}
-
+def digest_matches_promotion_state(bom: dict, value: str) -> bool:
+    if bom.get("promotion_state") == "pending-first-release":
+        return value == PENDING
+    return bool(re.fullmatch(r"[0-9a-f]{64}", value))
 
 def load_helper():
     scripts = str(HELPER.parent)
@@ -211,17 +141,63 @@ class ComponentAssetChecksumTests(unittest.TestCase):
 
     def test_bom_pins_exact_code_search_release_descriptor(self):
         bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        install = bom["components"]["code-search"]["install"]
+        version = install["tag"].removeprefix("v")
 
+        self.assertEqual(install["kind"], "github-release")
+        self.assertEqual(install["repository"], "brandyn-s/code-search")
+        self.assertEqual(install["tag"], "v0.4.0")
+        self.assertRegex(install["source_revision"], FULL_SHA)
         self.assertEqual(
-            bom["components"]["code-search"]["install"],
-            EXPECTED_SEARCH_INSTALL,
+            install["asset"]["name"], f"code_search_mcp-{version}-py3-none-any.whl"
         )
+        self.assertEqual(install["checksums"]["name"], "SHA256SUMS")
+        attestation = install["attestation"]
+        self.assertEqual(
+            attestation["bundle"]["name"],
+            f"code_search_mcp-{version}-provenance.jsonl",
+        )
+        self.assertEqual(
+            attestation["signer_workflow"],
+            "brandyn-s/code-search/.github/workflows/release.yml",
+        )
+        self.assertEqual(attestation["source_ref"], "refs/heads/main")
+        self.assertIs(attestation["deny_self_hosted_runners"], True)
+        for digest in (
+            install["asset"]["sha256"],
+            install["checksums"]["sha256"],
+            attestation["bundle"]["sha256"],
+        ):
+            self.assertTrue(digest_matches_promotion_state(bom, digest), digest)
 
     def test_bom_pins_exact_code_graph_release_descriptor(self):
         bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
-        graph_install = bom["components"]["code-graph"]["install"]
+        install = bom["components"]["code-graph"]["install"]
 
-        self.assertEqual(graph_install, EXPECTED_GRAPH_INSTALL)
+        self.assertEqual(install["kind"], "github-release")
+        self.assertEqual(install["repository"], "brandyn-s/code-graph")
+        self.assertEqual(install["tag"], "v0.9.0")
+        self.assertRegex(install["source_revision"], FULL_SHA)
+        self.assertEqual(
+            {key: asset["name"] for key, asset in install["assets"].items()},
+            GRAPH_ASSET_NAMES,
+        )
+        self.assertEqual(install["checksums"]["name"], "checksums.txt")
+        attestation = install["attestation"]
+        self.assertEqual(
+            attestation["bundle"]["path"],
+            f"compatibility/attestations/code-graph-{install['tag']}-provenance.jsonl",
+        )
+        self.assertEqual(
+            attestation["signer_workflow"],
+            "brandyn-s/code-graph/.github/workflows/release.yml",
+        )
+        self.assertEqual(attestation["source_ref"], "refs/heads/main")
+        self.assertIs(attestation["deny_self_hosted_runners"], True)
+        digests = [asset["sha256"] for asset in install["assets"].values()]
+        digests += [install["checksums"]["sha256"], attestation["bundle"]["sha256"]]
+        for digest in digests:
+            self.assertTrue(digest_matches_promotion_state(bom, digest), digest)
 
     def test_ci_helper_fails_closed_for_missing_invalid_and_mismatched_digest(self):
         helper = load_helper()
@@ -475,7 +451,7 @@ class ComponentAssetChecksumTests(unittest.TestCase):
         self.assertIn("vendored", combined)
         self.assertIn("production BOM pins code-search release", readme)
         self.assertIn(
-            "code-search/releases/tag/v0.3.6",
+            "code-search/releases/tag/v0.4.0",
             readme,
         )
         self.assertIn("`install.kind: github-release`", readme)
@@ -787,7 +763,7 @@ function gh {{
     }}
 }}
 $Resolved = Resolve-ReleaseTagCommit `
-    -Repository "redacted-org/code-search" `
+    -Repository "brandyn-s/code-search" `
     -Tag "v0.2.0"
 if ($Resolved -ne "{commit}") {{
     throw "wrong resolved commit: $Resolved"

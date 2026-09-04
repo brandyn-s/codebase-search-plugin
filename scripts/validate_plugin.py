@@ -16,8 +16,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from component_descriptor import (
+    PENDING_DIGEST,
+    PENDING_FIRST_RELEASE,
     DescriptorError,
+    digest_is_pinned,
     install_descriptor_sha256,
+    is_pending_first_release,
+    promotion_state,
     validate_install_descriptor_shape,
 )
 
@@ -40,12 +45,13 @@ errors: list[str] = []
 TOOL_REFERENCE = re.compile(r"mcp__code-(search|graph)__([A-Za-z0-9_]+)")
 COMPONENT_FOR_PREFIX = {"search": "code-search", "graph": "code-graph"}
 GRAPH_ASSET_NAMES = {
-    "darwin-amd64": "codebase-memory-mcp-darwin-amd64.tar.gz",
-    "darwin-arm64": "codebase-memory-mcp-darwin-arm64.tar.gz",
-    "linux-amd64": "codebase-memory-mcp-linux-amd64.tar.gz",
-    "linux-arm64": "codebase-memory-mcp-linux-arm64.tar.gz",
-    "windows-amd64": "codebase-memory-mcp-windows-amd64.zip",
+    "darwin-amd64": "code-graph-darwin-amd64.tar.gz",
+    "darwin-arm64": "code-graph-darwin-arm64.tar.gz",
+    "linux-amd64": "code-graph-linux-amd64.tar.gz",
+    "linux-arm64": "code-graph-linux-arm64.tar.gz",
+    "windows-amd64": "code-graph-windows-amd64.zip",
 }
+CODE_SEARCH_WHEEL_PREFIX = "code_search_mcp-"
 GO_SCIP_RELEASE_REPOSITORY = "scip-code/scip-go"
 GO_SCIP_ASSET_NAMES = {
     "darwin-arm64": "scip-go-darwin-arm64.tar.gz",
@@ -61,19 +67,15 @@ NODE_RUNTIME_ASSET_NAMES = {
     "linux-arm64": "node-v22.23.2-linux-arm64.tar.xz",
     "windows-amd64": "node-v22.23.2-win-x64.zip",
 }
-CODE_SEARCH_GIT_REPOSITORY = (
-    "https://github.com/redacted-org/code-search.git"
-)
-# TODO(brandyn-s primary): component pins still reference the redacted-org
-# releases they were built from; re-point when the first brandyn-s releases are promoted.
-CODE_SEARCH_RELEASE_REPOSITORY = "redacted-org/code-search"
+CODE_SEARCH_GIT_REPOSITORY = "https://github.com/brandyn-s/code-search.git"
+CODE_SEARCH_RELEASE_REPOSITORY = "brandyn-s/code-search"
 CODE_SEARCH_RELEASE_SIGNER_WORKFLOW = (
-    "redacted-org/code-search/.github/workflows/release.yml"
+    "brandyn-s/code-search/.github/workflows/release.yml"
 )
 CODE_SEARCH_RELEASE_SOURCE_REF = "refs/heads/main"
-CODE_GRAPH_RELEASE_REPOSITORY = "redacted-org/code-graph"
+CODE_GRAPH_RELEASE_REPOSITORY = "brandyn-s/code-graph"
 CODE_GRAPH_RELEASE_SIGNER_WORKFLOW = (
-    "redacted-org/code-graph/.github/workflows/release.yml"
+    "brandyn-s/code-graph/.github/workflows/release.yml"
 )
 CODE_GRAPH_RELEASE_SOURCE_REF = "refs/heads/main"
 REQUIRED_IDENTITY_FIELDS = [
@@ -113,6 +115,15 @@ READINESS_REQUIREMENTS = {
         "checkout_unchanged": True,
     },
 }
+
+
+# Set once the BOM is loaded; True while the pinned releases are unpublished.
+PENDING = False
+
+
+def pinned_digest_ok(value) -> bool:
+    """Digest fields must be SHA-256, or the pending placeholder pre-release."""
+    return digest_is_pinned(value, allow_pending=PENDING)
 
 
 def component_install_version(component: str, install: dict):
@@ -188,7 +199,7 @@ def validate_code_search_install(install: dict) -> None:
     asset = install.get("asset")
     release_version = tag[1:] if isinstance(tag, str) and tag.startswith("v") else ""
     expected_wheel_name = (
-        f"redacted_code_search-{release_version}-py3-none-any.whl"
+        f"{CODE_SEARCH_WHEEL_PREFIX}{release_version}-py3-none-any.whl"
     )
     if not isinstance(asset, dict):
         errors.append(
@@ -197,21 +208,18 @@ def validate_code_search_install(install: dict) -> None:
     else:
         name = asset.get("name")
         if not safe_release_asset_name(name, ".whl") or not name.startswith(
-            "redacted_code_search-"
+            CODE_SEARCH_WHEEL_PREFIX
         ):
             errors.append(
                 "component-bom.json: code-search release asset must be a "
-                "safe redacted_code_search wheel filename"
+                f"safe {CODE_SEARCH_WHEEL_PREFIX} wheel filename"
             )
         elif name != expected_wheel_name:
             errors.append(
                 "component-bom.json: code-search wheel filename must encode "
                 f"the release tag exactly ({expected_wheel_name})"
             )
-        sha256 = asset.get("sha256")
-        if not isinstance(sha256, str) or re.fullmatch(
-            r"[0-9a-f]{64}", sha256
-        ) is None:
+        if not pinned_digest_ok(asset.get("sha256")):
             errors.append(
                 "component-bom.json: code-search release asset sha256 must "
                 "be 64 lowercase hex characters"
@@ -228,10 +236,7 @@ def validate_code_search_install(install: dict) -> None:
                 "component-bom.json: code-search checksums name must be "
                 "SHA256SUMS"
             )
-        checksums_sha256 = checksums.get("sha256")
-        if not isinstance(checksums_sha256, str) or re.fullmatch(
-            r"[0-9a-f]{64}", checksums_sha256
-        ) is None:
+        if not pinned_digest_ok(checksums.get("sha256")):
             errors.append(
                 "component-bom.json: code-search checksums sha256 must be "
                 "64 lowercase hex characters"
@@ -258,16 +263,13 @@ def validate_code_search_install(install: dict) -> None:
                 "must be a safe JSONL filename"
             )
         elif bundle_name != (
-            f"redacted_code_search-{release_version}-provenance.jsonl"
+            f"{CODE_SEARCH_WHEEL_PREFIX}{release_version}-provenance.jsonl"
         ):
             errors.append(
                 "component-bom.json: code-search attestation bundle must "
                 "encode the release tag exactly"
             )
-        bundle_sha256 = bundle.get("sha256")
-        if not isinstance(bundle_sha256, str) or re.fullmatch(
-            r"[0-9a-f]{64}", bundle_sha256
-        ) is None:
+        if not pinned_digest_ok(bundle.get("sha256")):
             errors.append(
                 "component-bom.json: code-search attestation bundle sha256 "
                 "must be 64 lowercase hex characters"
@@ -335,10 +337,7 @@ def validate_code_graph_install(install: dict) -> None:
                 "component-bom.json: code-graph checksums name must be "
                 "checksums.txt"
             )
-        checksums_sha256 = checksums.get("sha256")
-        if not isinstance(checksums_sha256, str) or re.fullmatch(
-            r"[0-9a-f]{64}", checksums_sha256
-        ) is None:
+        if not pinned_digest_ok(checksums.get("sha256")):
             errors.append(
                 "component-bom.json: code-graph checksums sha256 must be "
                 "64 lowercase hex characters"
@@ -361,14 +360,19 @@ def validate_code_graph_install(install: dict) -> None:
             "component-bom.json: code-graph attestation bundle path must be "
             f"{expected_bundle_path}"
         )
-    elif (
-        not isinstance(bundle_sha256, str)
-        or re.fullmatch(r"[0-9a-f]{64}", bundle_sha256) is None
-    ):
+    elif not pinned_digest_ok(bundle_sha256):
         errors.append(
             "component-bom.json: code-graph attestation bundle sha256 must "
             "be 64 lowercase hex characters"
         )
+    elif bundle_sha256 == PENDING_DIGEST:
+        # Pre-release: the release workflow has not produced a bundle yet, so
+        # there is nothing to vendor. The promotion run adds it.
+        if (ROOT / bundle_path).exists():
+            errors.append(
+                "component-bom.json: a vendored attestation bundle exists but "
+                "the BOM still carries the pending digest"
+            )
     else:
         vendored_bundle = ROOT / bundle_path
         if not vendored_bundle.is_file() or vendored_bundle.is_symlink():
@@ -668,6 +672,25 @@ if bom:
         or bom.get("schema_version") != 1
     ):
         errors.append("component-bom.json: schema_version must be 1")
+    state = promotion_state(bom)
+    if "promotion_state" in bom and state is None:
+        errors.append("component-bom.json: promotion_state must be a nonempty string")
+    elif state is not None and state != PENDING_FIRST_RELEASE:
+        errors.append(
+            f"component-bom.json: unknown promotion_state {state!r}; "
+            f"only {PENDING_FIRST_RELEASE} is defined"
+        )
+    PENDING = is_pending_first_release(bom)
+    if PENDING:
+        reason = bom.get("promotion_reason")
+        if not isinstance(reason, str) or not reason.strip():
+            errors.append(
+                "component-bom.json: promotion_state requires a promotion_reason"
+            )
+    elif "promotion_reason" in bom:
+        errors.append(
+            "component-bom.json: promotion_reason is only valid with promotion_state"
+        )
     components = bom.get("components")
     validate_precision_generators(bom.get("precision_generators"))
     if not isinstance(components, dict):
@@ -791,10 +814,7 @@ if bom:
                                 "component-bom.json: code-graph asset "
                                 f"{platform_key}.name must be {expected_name}"
                             )
-                        sha256 = asset.get("sha256")
-                        if not isinstance(sha256, str) or re.fullmatch(
-                            r"[0-9a-f]{64}", sha256
-                        ) is None:
+                        if not pinned_digest_ok(asset.get("sha256")):
                             errors.append(
                                 "component-bom.json: code-graph asset "
                                 f"{platform_key}.sha256 must be 64 lowercase "
@@ -949,7 +969,17 @@ if snapshots:
         errors.append("component-bom.json: integrated_readiness must be an object")
         readiness = {}
     readiness_status = readiness.get("status")
-    if readiness_status not in {"blocked", "ready"}:
+    if PENDING:
+        if readiness_status != "pending":
+            errors.append(
+                "component-bom.json: integrated_readiness.status must be pending "
+                f"while promotion_state is {PENDING_FIRST_RELEASE}"
+            )
+        if "evidence" in readiness:
+            errors.append(
+                "component-bom.json: a pending BOM cannot reference readiness evidence"
+            )
+    elif readiness_status not in {"blocked", "ready"}:
         errors.append(
             "component-bom.json: integrated_readiness.status must be blocked or ready"
         )
@@ -1416,7 +1446,13 @@ if errors:
         print(f"  - {err}")
     sys.exit(1)
 
-print(
+summary = (
     "Plugin validation passed "
-    f"({len(skill_files)} skill(s), {len(snapshots)} component contract(s) checked)."
+    f"({len(skill_files)} skill(s), {len(snapshots)} component contract(s) checked"
 )
+if PENDING:
+    summary += (
+        f"; promotion_state={PENDING_FIRST_RELEASE}: component pins are not yet "
+        "released, installs are disabled until the first releases are promoted"
+    )
+print(summary + ").")

@@ -172,8 +172,8 @@ class CompareSchemaTests(unittest.TestCase):
         )
 
         identity = component_identity(ROOT)
-        self.assertEqual(identity["code-search"]["version"], "v0.3.6")
-        self.assertEqual(identity["code-graph"]["version"], "v0.8.0-redacted.11")
+        self.assertEqual(identity["code-search"]["version"], "v0.4.0")
+        self.assertEqual(identity["code-graph"]["version"], "v0.9.0")
         self.assertEqual(len(identity["bom_sha256"]), 64)
         self.assertEqual(len(identity["routing_policy_sha256"]), 64)
         self.assertEqual(len(identity["code-search"]["tool_snapshot_sha256"]), 64)
@@ -181,7 +181,7 @@ class CompareSchemaTests(unittest.TestCase):
         validate_component_identity(identity, component_identity(ROOT))
 
         mutated = deepcopy(identity)
-        mutated["code-graph"]["version"] = "v0.7.0-redacted.2"
+        mutated["code-graph"]["version"] = "v0.7.0-internal.2"
         with self.assertRaisesRegex(ContractError, "identity mismatch"):
             validate_component_identity(identity, mutated)
 

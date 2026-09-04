@@ -27,12 +27,12 @@ def _bom(repositories: dict[str, str]) -> dict:
 
 
 class PromotionGateTests(unittest.TestCase):
-    def test_org_pinned_bom_is_gated(self):
+    def test_third_party_pinned_bom_is_gated(self):
         result = promotion_gate.evaluate(
             _bom(
                 {
-                    "code-graph": "redacted-org/code-graph",
-                    "code-search": "redacted-org/code-search",
+                    "code-graph": "example-org/code-graph",
+                    "code-search": "example-org/code-search",
                 }
             )
         )
@@ -40,8 +40,8 @@ class PromotionGateTests(unittest.TestCase):
         self.assertEqual(
             result["pinned"],
             {
-                "code-graph": "redacted-org/code-graph",
-                "code-search": "redacted-org/code-search",
+                "code-graph": "example-org/code-graph",
+                "code-search": "example-org/code-search",
             },
         )
 
@@ -50,11 +50,41 @@ class PromotionGateTests(unittest.TestCase):
             _bom(
                 {
                     "code-graph": "brandyn-s/code-graph",
-                    "code-search": "redacted-org/code-search",
+                    "code-search": "example-org/code-search",
                 }
             )
         )
         self.assertFalse(result["run"])
+
+    def test_pending_first_release_is_gated_even_with_public_pins(self):
+        bom = _bom(
+            {
+                "code-graph": "brandyn-s/code-graph",
+                "code-search": "brandyn-s/code-search",
+            }
+        )
+        bom["promotion_state"] = "pending-first-release"
+        result = promotion_gate.evaluate(bom)
+        self.assertFalse(result["run"])
+        self.assertEqual(result["promotion_state"], "pending-first-release")
+
+    def test_cli_names_the_promotion_state_in_its_notice(self):
+        bom = _bom({"code-graph": "brandyn-s/code-graph"})
+        bom["promotion_state"] = "pending-first-release"
+        with tempfile.TemporaryDirectory() as tmp:
+            bom_path = Path(tmp) / "bom.json"
+            bom_path.write_text(json.dumps(bom), encoding="utf-8")
+            completed = subprocess.run(
+                [sys.executable, str(GATE), "--component-bom", str(bom_path)],
+                text=True,
+                capture_output=True,
+                env={**os.environ, "GITHUB_OUTPUT": ""},
+                check=False,
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(json.loads(completed.stdout)["run"], False)
+        self.assertIn("::notice::", completed.stderr)
+        self.assertIn("pending-first-release", completed.stderr)
 
     def test_public_pins_run(self):
         result = promotion_gate.evaluate(
@@ -77,7 +107,7 @@ class PromotionGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             bom_path = Path(tmp) / "bom.json"
             bom_path.write_text(
-                json.dumps(_bom({"code-graph": "redacted-org/code-graph"})),
+                json.dumps(_bom({"code-graph": "example-org/code-graph"})),
                 encoding="utf-8",
             )
             output_path = Path(tmp) / "github-output"
@@ -96,7 +126,7 @@ class PromotionGateTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(json.loads(stdout.getvalue())["run"], False)
         self.assertIn("::notice::", stderr.getvalue())
-        self.assertIn("redacted-org/code-graph", stderr.getvalue())
+        self.assertIn("example-org/code-graph", stderr.getvalue())
         self.assertEqual(github_output, "run=false\n")
 
     def test_cli_reports_public_pins_without_notice(self):

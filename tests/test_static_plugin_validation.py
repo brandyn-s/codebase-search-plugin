@@ -11,6 +11,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tests"))
+from released_bom import write_released_checkout  # noqa: E402
+
 RELEASE_INSTALL_FIXTURE = (
     ROOT / "tests" / "fixtures" / "code-search-release-install.json"
 )
@@ -18,6 +21,25 @@ RELEASE_INSTALL_FIXTURE = (
 
 class StaticPluginValidationTests(unittest.TestCase):
     def _copy_checkout(self, checkout: Path) -> None:
+        for directory in (
+            ".claude-plugin",
+            "compatibility",
+            "scripts",
+            "skills",
+        ):
+            shutil.copytree(ROOT / directory, checkout / directory)
+        for filename in (
+            ".mcp.json",
+            "component-bom.json",
+            "install.sh",
+            "install.ps1",
+        ):
+            shutil.copy2(ROOT / filename, checkout / filename)
+        # The committed BOM is pending-first-release; the strict artifact
+        # policy under test applies to released BOMs, so start from one.
+        write_released_checkout(checkout)
+
+    def _copy_pending_checkout(self, checkout: Path) -> None:
         for directory in (
             ".claude-plugin",
             "compatibility",
@@ -68,6 +90,76 @@ class StaticPluginValidationTests(unittest.TestCase):
             completed.stdout + completed.stderr,
         )
         self.assertIn("candidate-bom.json", completed.stdout)
+
+    def test_committed_pending_bom_validates_and_reports_pending(self):
+        completed = self._run_validator(ROOT)
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("promotion_state=pending-first-release", completed.stdout)
+        bom = json.loads((ROOT / "component-bom.json").read_text(encoding="utf-8"))
+        self.assertEqual(bom["promotion_state"], "pending-first-release")
+        self.assertEqual(bom["integrated_readiness"]["status"], "pending")
+        self.assertNotIn("evidence", bom["integrated_readiness"])
+        for component in ("code-search", "code-graph"):
+            install = bom["components"][component]["install"]
+            self.assertTrue(install["repository"].startswith("brandyn-s/"))
+            self.assertRegex(install["source_revision"], r"^[0-9a-f]{40}$")
+        self.assertFalse((ROOT / "compatibility" / "attestations").exists())
+        self.assertFalse(
+            (ROOT / "compatibility" / "readiness-evidence.json").exists()
+        )
+
+    def test_pending_bom_requires_pending_readiness_and_a_reason(self):
+        mutations = {
+            "ready status": (
+                lambda bom: bom["integrated_readiness"].__setitem__("status", "ready"),
+                "must be pending",
+            ),
+            "missing reason": (
+                lambda bom: bom.pop("promotion_reason"),
+                "promotion_reason",
+            ),
+            "unknown state": (
+                lambda bom: bom.__setitem__("promotion_state", "pending-later"),
+                "unknown promotion_state",
+            ),
+            "evidence path": (
+                lambda bom: bom["integrated_readiness"].__setitem__(
+                    "evidence", "compatibility/readiness-evidence.json"
+                ),
+                "cannot reference readiness evidence",
+            ),
+        }
+        for label, (mutate, expected) in mutations.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                checkout = Path(tmp)
+                self._copy_pending_checkout(checkout)
+                bom_path = checkout / "component-bom.json"
+                bom = json.loads(bom_path.read_text(encoding="utf-8"))
+                mutate(bom)
+                bom_path.write_text(json.dumps(bom), encoding="utf-8")
+                for component in ("code-search", "code-graph"):
+                    self._rebind_component_descriptor(checkout, component)
+
+                completed = self._run_validator(checkout)
+
+            self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+            self.assertIn(expected, completed.stdout)
+
+    def test_released_bom_rejects_the_pending_placeholder_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp)
+            self._copy_checkout(checkout)
+            bom_path = checkout / "component-bom.json"
+            bom = json.loads(bom_path.read_text(encoding="utf-8"))
+            bom["components"]["code-search"]["install"]["asset"]["sha256"] = "pending"
+            bom_path.write_text(json.dumps(bom), encoding="utf-8")
+            self._rebind_component_descriptor(checkout, "code-search")
+
+            completed = self._run_validator(checkout)
+
+        self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+        self.assertIn("sha256", completed.stdout.lower())
 
     def test_validator_accepts_the_pinned_scip_generator_contracts(self):
         completed = self._run_validator(ROOT)
@@ -158,11 +250,12 @@ class StaticPluginValidationTests(unittest.TestCase):
         evidence_path = (
             checkout / "compatibility" / "readiness-evidence.json"
         )
-        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-        evidence["components"][component][
-            "install_descriptor_sha256"
-        ] = digest
-        evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+        if evidence_path.is_file():
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            evidence["components"][component][
+                "install_descriptor_sha256"
+            ] = digest
+            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
 
     def _rewrite_tool_schema(
         self,
@@ -277,7 +370,7 @@ class StaticPluginValidationTests(unittest.TestCase):
                 checkout
                 / "compatibility"
                 / "attestations"
-                / "code-graph-v0.8.0-redacted.11-provenance.jsonl"
+                / "code-graph-v0.9.0-provenance.jsonl"
             )
             bundle.unlink()
 
@@ -299,7 +392,7 @@ class StaticPluginValidationTests(unittest.TestCase):
                 checkout
                 / "compatibility"
                 / "attestations"
-                / "code-graph-v0.8.0-redacted.11-provenance.jsonl"
+                / "code-graph-v0.9.0-provenance.jsonl"
             )
             bundle.write_text('{"tampered":true}\n', encoding="utf-8")
 
@@ -342,16 +435,6 @@ class StaticPluginValidationTests(unittest.TestCase):
                 "version": "v0.0.0",
             }
             snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
-
-            evidence_path = (
-                checkout / "compatibility" / "readiness-evidence.json"
-            )
-            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-            evidence["components"]["code-search"]["version"] = "v0.0.0"
-            evidence["components"]["code-search"][
-                "install_descriptor_sha256"
-            ] = snapshot["source"]["install_descriptor_sha256"]
-            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
 
             completed = self._run_validator(checkout)
 
@@ -401,7 +484,7 @@ class StaticPluginValidationTests(unittest.TestCase):
     def test_validator_rejects_weakened_search_artifact_policy(self):
         def wrong_wheel(install: dict) -> None:
             install["asset"]["name"] = (
-                "redacted_code_search-9.9.9-py3-none-any.whl"
+                "code_search_mcp-9.9.9-py3-none-any.whl"
             )
 
         def missing_checksums(install: dict) -> None:
@@ -450,7 +533,7 @@ class StaticPluginValidationTests(unittest.TestCase):
 
         def wrong_signer(install: dict) -> None:
             install["attestation"]["signer_workflow"] = (
-                "redacted-org/code-graph/.github/workflows/other.yml"
+                "brandyn-s/code-graph/.github/workflows/other.yml"
             )
 
         def wrong_source_ref(install: dict) -> None:
@@ -494,7 +577,7 @@ class StaticPluginValidationTests(unittest.TestCase):
             "different signer": (
                 "signer_workflow",
                 (
-                    "redacted-org/code-search/"
+                    "brandyn-s/code-search/"
                     ".github/workflows/other.yml"
                 ),
             ),
@@ -528,19 +611,6 @@ class StaticPluginValidationTests(unittest.TestCase):
                 }
                 snapshot_path.write_text(
                     json.dumps(snapshot),
-                    encoding="utf-8",
-                )
-                evidence_path = (
-                    checkout / "compatibility" / "readiness-evidence.json"
-                )
-                evidence = json.loads(
-                    evidence_path.read_text(encoding="utf-8")
-                )
-                evidence["components"]["code-search"]["version"] = (
-                    release_install["tag"]
-                )
-                evidence_path.write_text(
-                    json.dumps(evidence),
                     encoding="utf-8",
                 )
 

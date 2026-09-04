@@ -4,6 +4,15 @@
 
 First public release line. Versions 0.4.x were internal.
 
+- Removed all references to the originating organization; component pins now
+  target the upcoming brandyn-s releases (code-graph v0.9.0, code-search
+  v0.4.0) in an explicit `promotion_state: pending-first-release`. Digests are
+  the placeholder `pending`, installers and launchers refuse to run, validators
+  report `pending`, and the promotion gate stays closed until a promotion run
+  records the published artifacts. Org-signed attestation bundles and the old
+  readiness evidence were removed. License and manifests now name the
+  codebase-search-plugin contributors.
+
 - Marketplace renamed to `code-intelligence`; install id is now
   `codebase-search@code-intelligence`.
 - Self-bootstrapping launchers: `bin/run-code-search` and `bin/code-graph` are

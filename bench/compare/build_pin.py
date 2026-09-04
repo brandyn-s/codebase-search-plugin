@@ -648,7 +648,7 @@ def validate_june_reference(reference: dict) -> None:
     expected = {
         "schema_version": 1,
         "kind": "external_content_address",
-        "repository": "redacted-org/code-graph",
+        "repository": "brandyn-s/code-graph",
         "source_revision": "d7b93959dace3215cd096a13c1a27e259063dc95",
         "path": (
             "bench/accuracy/baselines/data/"

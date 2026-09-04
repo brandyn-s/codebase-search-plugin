@@ -1,7 +1,7 @@
 {
   "name": "code-intelligence",
   "owner": {
-    "name": "redacted Security"
+    "name": "The codebase-search-plugin contributors"
   },
   "description": "Verifiable code intelligence plugins: semantic search and code graph with evidence",
   "plugins": [
@@ -11,7 +11,7 @@
       "description": "Verifiable code intelligence over an exact checkout with semantic discovery, structural understanding, and deterministic proofs.",
       "version": "0.5.0",
       "author": {
-        "name": "redacted Security"
+        "name": "The codebase-search-plugin contributors"
       },
       "category": "development",
       "tags": [

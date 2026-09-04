@@ -37,6 +37,14 @@ _bootstrap_log() {
     printf '[code-intelligence] %s\n' "$*" >&2
 }
 
+# True while component-bom.json declares that the pinned releases do not exist
+# yet. Plain grep so the launcher needs no Python before the venv exists.
+_bom_is_pending_first_release() {
+    local plugin_dir="$1"
+    grep -Eq '"promotion_state"[[:space:]]*:[[:space:]]*"pending-first-release"' \
+        "$plugin_dir/component-bom.json" 2>/dev/null
+}
+
 # A lock is live while the recorded pid is alive. A lock without a pid file
 # is treated as live for a grace period (the owner writes it right after
 # mkdir), then as abandoned.
@@ -77,6 +85,11 @@ ensure_components_installed() {
     fi
     if [ ! -f "$plugin_dir/install.sh" ]; then
         _bootstrap_log "install.sh not found in $plugin_dir"
+        return 1
+    fi
+    if _bom_is_pending_first_release "$plugin_dir"; then
+        _bootstrap_log "components not yet released; see docs/INSTALL.md"
+        _bootstrap_log "component-bom.json is in promotion_state pending-first-release: the pinned code-graph and code-search releases are not published, so the plugin cannot install them yet."
         return 1
     fi
 

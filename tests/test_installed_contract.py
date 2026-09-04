@@ -182,14 +182,14 @@ class InstalledContractTests(unittest.TestCase):
         verifier = load_revision_verifier()
         expected = "a" * 40
         valid = {
-            "url": "https://github.com/redacted-org/code-search.git",
+            "url": "https://github.com/brandyn-s/code-search.git",
             "vcs_info": {
                 "vcs": "git",
                 "requested_revision": expected,
                 "commit_id": expected,
             },
         }
-        repository = "https://github.com/redacted-org/code-search.git"
+        repository = "https://github.com/brandyn-s/code-search.git"
 
         verifier.verify_direct_url(valid, expected, repository)
         for invalid in (
@@ -217,13 +217,13 @@ class InstalledContractTests(unittest.TestCase):
                 },
                 "url": (
                     "file:///tmp/"
-                    "redacted_code_search-0.2.0-py3-none-any.whl"
+                    "code_search_mcp-0.2.0-py3-none-any.whl"
                 ),
             },
             installed_version="0.2.0",
             expected_tag="v0.2.0",
             expected_asset_name=(
-                "redacted_code_search-0.2.0-py3-none-any.whl"
+                "code_search_mcp-0.2.0-py3-none-any.whl"
             ),
             expected_sha256=expected_sha256,
         )

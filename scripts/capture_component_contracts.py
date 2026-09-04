@@ -21,6 +21,8 @@ import sys
 import tempfile
 
 from component_descriptor import (
+    PENDING_FIRST_RELEASE,
+    is_pending_first_release,
     DescriptorError,
     install_descriptor_sha256,
     validate_install_descriptor_shape,
@@ -33,27 +35,23 @@ SNAPSHOT_PATHS = {
     "code-search": Path("compatibility/code-search-tools.json"),
     "code-graph": Path("compatibility/code-graph-tools.json"),
 }
-CODE_SEARCH_GIT_REPOSITORY = (
-    "https://github.com/redacted-org/code-search.git"
-)
-# TODO(brandyn-s primary): component pins still reference the redacted-org
-# releases they were built from; re-point when the first brandyn-s releases are promoted.
-CODE_SEARCH_RELEASE_REPOSITORY = "redacted-org/code-search"
+CODE_SEARCH_GIT_REPOSITORY = "https://github.com/brandyn-s/code-search.git"
+CODE_SEARCH_RELEASE_REPOSITORY = "brandyn-s/code-search"
 CODE_SEARCH_RELEASE_SIGNER_WORKFLOW = (
-    "redacted-org/code-search/.github/workflows/release.yml"
+    "brandyn-s/code-search/.github/workflows/release.yml"
 )
 CODE_SEARCH_RELEASE_SOURCE_REF = "refs/heads/main"
-CODE_GRAPH_REPOSITORY = "redacted-org/code-graph"
+CODE_GRAPH_REPOSITORY = "brandyn-s/code-graph"
 CODE_GRAPH_RELEASE_SIGNER_WORKFLOW = (
-    "redacted-org/code-graph/.github/workflows/release.yml"
+    "brandyn-s/code-graph/.github/workflows/release.yml"
 )
 CODE_GRAPH_RELEASE_SOURCE_REF = "refs/heads/main"
 GRAPH_ASSET_NAMES = {
-    "darwin-amd64": "codebase-memory-mcp-darwin-amd64.tar.gz",
-    "darwin-arm64": "codebase-memory-mcp-darwin-arm64.tar.gz",
-    "linux-amd64": "codebase-memory-mcp-linux-amd64.tar.gz",
-    "linux-arm64": "codebase-memory-mcp-linux-arm64.tar.gz",
-    "windows-amd64": "codebase-memory-mcp-windows-amd64.zip",
+    "darwin-amd64": "code-graph-darwin-amd64.tar.gz",
+    "darwin-arm64": "code-graph-darwin-arm64.tar.gz",
+    "linux-amd64": "code-graph-linux-amd64.tar.gz",
+    "linux-arm64": "code-graph-linux-arm64.tar.gz",
+    "windows-amd64": "code-graph-windows-amd64.zip",
 }
 LOWER_HEX_SHA256 = re.compile(r"[0-9a-f]{64}")
 LOWER_HEX_COMMIT = re.compile(r"[0-9a-f]{40}")
@@ -139,6 +137,12 @@ def _load_candidate(path: Path) -> dict:
         raise CaptureError(f"{path}: cannot load candidate BOM: {exc}") from exc
     if not isinstance(candidate, dict):
         raise CaptureError(f"{path}: candidate BOM must be an object")
+    if is_pending_first_release(candidate):
+        raise CaptureError(
+            f"{path}: candidate BOM is {PENDING_FIRST_RELEASE}; capture needs "
+            "a candidate whose install descriptors carry the published "
+            "release digests (remove promotion_state after filling them)"
+        )
     if (
         isinstance(candidate.get("schema_version"), bool)
         or candidate.get("schema_version") != 1
@@ -256,7 +260,7 @@ def _validate_code_search_release(install: dict) -> None:
         not isinstance(asset, dict)
         or not _safe_asset_name(asset.get("name"), ".whl")
         or asset["name"]
-        != f"redacted_code_search-{release_version}-py3-none-any.whl"
+        != f"code_search_mcp-{release_version}-py3-none-any.whl"
         or not isinstance(asset.get("sha256"), str)
         or LOWER_HEX_SHA256.fullmatch(asset["sha256"]) is None
     ):
@@ -280,7 +284,7 @@ def _validate_code_search_release(install: dict) -> None:
     if (
         not isinstance(bundle, dict)
         or bundle.get("name")
-        != f"redacted_code_search-{release_version}-provenance.jsonl"
+        != f"code_search_mcp-{release_version}-provenance.jsonl"
         or not isinstance(bundle.get("sha256"), str)
         or LOWER_HEX_SHA256.fullmatch(bundle["sha256"]) is None
     ):

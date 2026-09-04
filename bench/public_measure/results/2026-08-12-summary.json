@@ -82,7 +82,7 @@
     "cases_sha256": "60491308ae85d0e6dc950846a03bfd463ce7e243381015462027552887148b18",
     "oracle_sha256": "711cbfd0b9f2e61999f660aafb9fe127ec7985c999312a91ceb63e13c01435a2",
     "plugin_behavior_revision": "037ced7fee7fcce0efe3b9ebce18750e587d89b0",
-    "code_graph_release": "v0.8.0-redacted.3",
+    "code_graph_release": "v0.8.0-internal.3",
     "code_graph_source_revision": "252454b5b547129f00405b0326e23fbe2ccdef6f",
     "code_graph_server_sha256": "8066fb75b97f1842e0763551c0bd0752204e05bbe97516d86b4fa1c34743d514",
     "code_search_release": "v0.3.4",

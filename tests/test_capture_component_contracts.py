@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,8 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tests"))
+from released_bom import released_bom  # noqa: E402
 CAPTURE = ROOT / "scripts" / "capture_component_contracts.py"
 FAKE_SERVER = ROOT / "tests" / "fixtures" / "fake_mcp_server.py"
 RELEASE_INSTALL_FIXTURE = (
@@ -67,13 +70,15 @@ class CaptureComponentContractsTests(unittest.TestCase):
         return wrapper
 
     def _candidate_bom(self, directory: Path) -> Path:
-        bom = json.loads(
-            (ROOT / "component-bom.json").read_text(encoding="utf-8")
+        bom = released_bom(
+            json.loads(
+                (ROOT / "component-bom.json").read_text(encoding="utf-8")
+            )
         )
         bom["components"]["code-search"]["install"] = {
             "kind": "git",
             "repository": (
-                "https://github.com/redacted-org/code-search.git"
+                "https://github.com/brandyn-s/code-search.git"
             ),
             "revision": "a" * 40,
         }
@@ -430,8 +435,10 @@ class CaptureComponentContractsTests(unittest.TestCase):
 
     def test_capture_rejects_unknown_install_descriptor_fields(self):
         capture = load_capture_module()
-        base = json.loads(
-            (ROOT / "component-bom.json").read_text(encoding="utf-8")
+        base = released_bom(
+            json.loads(
+                (ROOT / "component-bom.json").read_text(encoding="utf-8")
+            )
         )
         descriptor_paths = {
             "search install": ("components", "code-search", "install"),
@@ -515,7 +522,7 @@ class CaptureComponentContractsTests(unittest.TestCase):
             "different signer": (
                 "signer_workflow",
                 (
-                    "redacted-org/code-search/"
+                    "brandyn-s/code-search/"
                     ".github/workflows/other.yml"
                 ),
             ),
@@ -532,10 +539,22 @@ class CaptureComponentContractsTests(unittest.TestCase):
                 with self.assertRaises(capture.CaptureError):
                     capture._validate_code_search_release(mutated)
 
+    def test_capture_refuses_a_pending_first_release_candidate(self):
+        capture = load_capture_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate_path = Path(tmp) / "candidate-bom.json"
+            shutil.copy2(ROOT / "component-bom.json", candidate_path)
+            with self.assertRaisesRegex(
+                capture.CaptureError, "pending-first-release"
+            ):
+                capture._load_candidate(candidate_path)
+
     def test_capture_rejects_unbound_code_graph_attestation_bundle(self):
         capture = load_capture_module()
-        bom = json.loads(
-            (ROOT / "component-bom.json").read_text(encoding="utf-8")
+        bom = released_bom(
+            json.loads(
+                (ROOT / "component-bom.json").read_text(encoding="utf-8")
+            )
         )
         install = bom["components"]["code-graph"]["install"]
         install["attestation"]["bundle"]["path"] = (

@@ -233,7 +233,7 @@ class ReadinessSmokeGeneratorTests(unittest.TestCase):
         if search_release:
             bom["components"]["code-search"]["install"] = {
                 "kind": "github-release",
-                "repository": "redacted-org/code-search",
+                "repository": "brandyn-s/code-search",
                 "tag": "v0.2.0",
             }
         bom_path.write_text(json.dumps(bom), encoding="utf-8")

@@ -5,7 +5,7 @@ comment-only single-file update for code-search and code-graph. It then measures
 20 warm queries after clean indexing and after the update. The source is public
 Chainlit at revision `8b2d4bacfd4fa2c8af72e2d140d527d20125b07b`: 513 tracked
 files and 71,204 UTF-8 text lines. Both servers are released artifacts:
-code-search v0.3.6 and code-graph v0.8.0-redacted.9.
+code-search v0.3.6 and code-graph v0.8.0-internal.9.
 
 | Component / phase | Index time | Peak RSS | Allocated index | Warm p95 |
 |---|---:|---:|---:|---:|

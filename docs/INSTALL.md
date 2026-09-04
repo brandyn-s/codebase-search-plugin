@@ -102,7 +102,10 @@ sessions do not retain the prior MCP processes, then confirm both servers with
 
 ## Readiness record
 
-`component-bom.json` carries an `integrated_readiness` status. `ready` means the
+`component-bom.json` carries an `integrated_readiness` status. `pending` means
+the BOM is in `promotion_state: pending-first-release`: the pinned component
+releases are not published yet, installers and launchers refuse to run, and no
+readiness evidence exists. `ready` means the
 committed `promotion-candidate` record satisfied static evidence-shape,
 version, backend-issued evidence, and checkout-identity checks, and that
 trusted post-merge CI installed the exact pins and generated a fresh
@@ -112,13 +115,12 @@ completion; a `blocked` BOM must not be used for `/index-repo`. See
 
 ## Manual install (alternative)
 
-The BOM currently pins releases published by the originating organization;
-the links below follow the BOM and will move to `brandyn-s` when the first
-releases are promoted there.
-
 The production BOM pins code-search release
-[`v0.3.6`](https://github.com/redacted-org/code-search/releases/tag/v0.3.6)
-with `install.kind: github-release`. Its descriptor fixes the source commit,
+[`v0.4.0`](https://github.com/brandyn-s/code-search/releases/tag/v0.4.0)
+with `install.kind: github-release`. While the BOM is in `promotion_state:
+pending-first-release` that release has not been published and every digest
+below reads `pending`; the manual procedure applies once the first promotion
+run has recorded the real artifacts. Its descriptor fixes the source commit,
 wheel name and SHA-256, `SHA256SUMS` manifest name and SHA-256, JSONL
 attestation bundle name and SHA-256, signer workflow, and `refs/heads/main`;
 use those values directly rather than selecting a moving release.
@@ -140,7 +142,7 @@ Follow the same order as the installers:
    its version, filename, checksum, and PEP 610 installation provenance.
 
 For code-graph, use the release named by the BOM (currently
-[`v0.8.0-redacted.11`](https://github.com/redacted-org/code-graph/releases/tag/v0.8.0-redacted.11)).
+[`v0.9.0`](https://github.com/brandyn-s/code-graph/releases/tag/v0.9.0)).
 Resolve its tag to the BOM's pinned source commit; download exactly the
 platform archive and `checksums.txt`; verify both BOM digests and the exact
 archive manifest entry; verify the operator-fetched, vendored JSONL bundle at

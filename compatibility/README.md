@@ -7,15 +7,23 @@ published component and has been captured from `tools/list`.
 
 ## Current readiness evidence
 
-The current BOM's integrated readiness status is `ready`. Its
+The current BOM is in `promotion_state: pending-first-release`, so its
+integrated readiness status is `pending`: the pinned code-graph `v0.9.0` and
+code-search `v0.4.0` releases are not published yet, every artifact digest is
+the placeholder `pending`, and no readiness evidence or attestation bundle is
+committed. A promotion run against the published releases fills the digests,
+vendors the code-graph bundle under `attestations/`, regenerates both tool
+snapshots and `readiness-evidence.json`, removes `promotion_state`, and sets
+the status to `blocked` or `ready`. When the status is `ready`, its
 `tested_capabilities` section declares complete version-1 `index_identity`
 outputs, semantic `index_ready`, graph `status: ready`, and the optional
-boolean `skip_report` input exposed by code-graph `v0.8.0-redacted.11`. The
+boolean `skip_report` input exposed by code-graph. The
 committed schema snapshots cover MCP input surfaces; they do not by themselves
 prove output behavior. `/index-repo` revalidates every live input-schema
 fingerprint before either index starts.
 
-`readiness-evidence.json` is the committed `promotion-candidate` record. It
+`readiness-evidence.json`, once a promotion run commits it, is the
+`promotion-candidate` record. It
 declares producer v3, a blocked candidate BOM, the expected component
 install-descriptor hashes, and a smoke result covering both engines. The v3
 generator emits a record only after calling `skip_report=true`, binding final
@@ -80,8 +88,9 @@ server for a blocked BOM unless a reviewer explicitly supplies
 ## Code-search release promotion
 
 The production BOM pins code-search release
-[`v0.3.6`](https://github.com/redacted-org/code-search/releases/tag/v0.3.6),
-its exact source commit, wheel, and offline attestation bundle. Contract
+[`v0.4.0`](https://github.com/brandyn-s/code-search/releases/tag/v0.4.0),
+its exact source commit, wheel, and offline attestation bundle (digests are
+`pending` until the first promotion run). Contract
 capture and validation support future GitHub Release wheel candidates without
 weakening readiness: capture preserves the complete release descriptor,
 records the tag as the component version, and resets behavioral claims to a

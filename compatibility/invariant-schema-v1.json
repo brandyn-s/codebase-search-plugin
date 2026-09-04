@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://redacted.com/code-intel/invariant-schema-v1.json",
+  "$id": "https://github.com/brandyn-s/codebase-search-plugin/compatibility/invariant-schema-v1.json",
   "title": "Executable Engineering Invariant Bundle",
   "type": "object",
   "required": ["schema_version", "invariant", "subjects"],

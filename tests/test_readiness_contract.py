@@ -13,6 +13,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tests"))
+from released_bom import write_released_checkout  # noqa: E402
+
 REQUIRED_IDENTITY_FIELDS = [
     "repository_id",
     "checkout_id",
@@ -131,6 +134,9 @@ class ReadinessContractTests(unittest.TestCase):
             "install.ps1",
         ):
             shutil.copy2(ROOT / filename, checkout / filename)
+        # Readiness gates apply to released BOMs; the committed BOM is
+        # pending-first-release, so promote the copy to a released fixture.
+        write_released_checkout(checkout)
 
     def _run_validator(
         self,
@@ -319,17 +325,14 @@ class ReadinessContractTests(unittest.TestCase):
             )
 
         readiness = bom["integrated_readiness"]
-        self.assertEqual(readiness["status"], "ready")
+        # The first public releases are not published yet: the BOM is in an
+        # explicit pending state with no evidence and every gate preserved.
+        self.assertEqual(bom["promotion_state"], "pending-first-release")
+        self.assertEqual(readiness["status"], "pending")
         self.assertEqual(readiness["requires"], READINESS_REQUIREMENTS)
-        self.assertEqual(
-            readiness["evidence"],
-            "compatibility/readiness-evidence.json",
-        )
-        self.assertIn(
-            "committed promotion-candidate",
-            readiness["reason"].lower(),
-        )
-        self.assertIn("trusted post-merge ci", readiness["reason"].lower())
+        self.assertNotIn("evidence", readiness)
+        self.assertIn("promotion run", readiness["reason"].lower())
+        self.assertIn("not been published", readiness["reason"].lower())
 
     def test_valid_ready_fixture_passes_every_gate(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -344,6 +347,7 @@ class ReadinessContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             checkout = Path(tmp)
             self._copy_checkout(checkout)
+            self._promote_to_valid_ready_fixture(checkout)
             evidence_path = (
                 checkout / "compatibility" / "readiness-evidence.json"
             )
@@ -386,6 +390,7 @@ class ReadinessContractTests(unittest.TestCase):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
                 checkout = Path(tmp)
                 self._copy_checkout(checkout)
+                self._promote_to_valid_ready_fixture(checkout)
                 self._mutate_evidence(checkout, mutate)
 
                 completed = self._run_validator(checkout)
@@ -697,10 +702,8 @@ class ReadinessContractTests(unittest.TestCase):
             "using separately verified exact components",
             normalized_compatibility,
         )
-        self.assertIn(
-            "trusted post-merge CI",
-            bom["integrated_readiness"]["reason"],
-        )
+        self.assertIn("promotion run", bom["integrated_readiness"]["reason"])
+        self.assertIn("pending-first-release", install_doc)
         self.assertIn("current BOM attests", skill)
         for installer in (shell, powershell):
             self.assertIn("INTEGRATED READINESS: READY", installer)

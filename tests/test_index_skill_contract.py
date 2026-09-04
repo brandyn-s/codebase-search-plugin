@@ -128,9 +128,9 @@ class IndexRepoSkillContractTests(unittest.TestCase):
         self.assertIn("skip_report=true", text)
         self.assertIn("Before starting either index", text)
         self.assertIn("do not start code-search", text.lower())
-        self.assertIn("v0.8.0-redacted.11", compatibility)
+        self.assertIn("v0.9.0", compatibility)
         self.assertIn(
-            "integrated readiness status is `ready`",
+            "integrated readiness status is `pending`",
             compatibility.lower(),
         )
         self.assertIn("skip_report", compatibility)

@@ -48,7 +48,7 @@
       "source_revision": "4aa96181ae7509a055154ed6067f2be564f440a1"
     },
     "code-graph": {
-      "version": "v0.8.0-redacted.2",
+      "version": "v0.8.0-internal.2",
       "source_revision": "9cfa8d322bc14d1a1cfab37fb4c1145653b3c601"
     },
     "plugin": {
@@ -87,7 +87,7 @@
     "target_manifest_sha256": "5dea485edbcda52985c64fd2b53aa6f51ed34456b5e0b13cda89537e97a4e01b",
     "pilot_runner_sha256": "e2d60431cb5823d7f851ac2c9f1f2a1fed4c0cd9db0c7670d5c551b4b3b65cea",
     "component_bom_sha256": "a65bee017668a9816c8b19193948d77c98d2c8450730c1e236742296b60290a5",
-    "readiness_evidence_sha256": "0d4341971573697312c9192bf8b6c018cfa6be0671d092df52dd0afd75dfe6d9"
+    "readiness_evidence_sha256": "afc5b9993602d9c24d40ef7ab7717d7c4b1dde59b5f7ae9a26967f84547d66b3"
   },
   "required_preconditions": {
     "fresh_dual_index_readiness": {

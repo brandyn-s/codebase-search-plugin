@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://redacted.com/code-intel/evidence-schema-v1.json",
+  "$id": "https://github.com/brandyn-s/codebase-search-plugin/compatibility/evidence-schema-v1.json",
   "title": "Code Intelligence Evidence Reference",
   "type": "object",
   "required": [

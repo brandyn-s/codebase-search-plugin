@@ -3,7 +3,7 @@
   "version": "0.5.0",
   "description": "Verifiable code intelligence over an exact checkout: semantic discovery, structural understanding, and deterministic evidence-backed proofs.",
   "author": {
-    "name": "redacted Security"
+    "name": "The codebase-search-plugin contributors"
   },
   "repository": "https://github.com/brandyn-s/codebase-search-plugin",
   "keywords": [

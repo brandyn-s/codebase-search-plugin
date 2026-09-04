@@ -4856,7 +4856,7 @@ print("compare-modules-imported")
             reference = {
                 "schema_version": 1,
                 "kind": "external_content_address",
-                "repository": "redacted-org/code-graph",
+                "repository": "brandyn-s/code-graph",
                 "source_revision": "e" * 40,
                 "path": "bench/accuracy/example.json",
                 "sha256": hashlib.sha256(external_path.read_bytes()).hexdigest(),

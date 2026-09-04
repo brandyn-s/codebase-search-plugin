@@ -46,7 +46,7 @@
       "source_revision": "525368e4e0e531d677de69498be8d458ac5c48ba"
     },
     "code-graph": {
-      "version": "v0.8.0-redacted.2",
+      "version": "v0.8.0-internal.2",
       "source_revision": "9cfa8d322bc14d1a1cfab37fb4c1145653b3c601"
     },
     "plugin": {

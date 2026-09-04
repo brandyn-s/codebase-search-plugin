@@ -1,15 +1,15 @@
 {
   "asset": {
-    "name": "redacted_code_search-0.0.0-py3-none-any.whl",
+    "name": "code_search_mcp-0.0.0-py3-none-any.whl",
     "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   },
   "attestation": {
     "bundle": {
-      "name": "redacted_code_search-0.0.0-provenance.jsonl",
+      "name": "code_search_mcp-0.0.0-provenance.jsonl",
       "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     "deny_self_hosted_runners": true,
-    "signer_workflow": "redacted-org/code-search/.github/workflows/release.yml",
+    "signer_workflow": "brandyn-s/code-search/.github/workflows/release.yml",
     "source_ref": "refs/heads/main"
   },
   "checksums": {
@@ -17,7 +17,7 @@
     "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
   },
   "kind": "github-release",
-  "repository": "redacted-org/code-search",
+  "repository": "brandyn-s/code-search",
   "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "tag": "v0.0.0"
 }

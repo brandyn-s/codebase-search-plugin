@@ -14,7 +14,7 @@
       },
       "install_descriptor_sha256": "6dcc9483f35523e31281578a953ecbc36c8542f00f4caa913fdcf160fa0f5cf4",
       "status": "ready",
-      "version": "v0.8.0-redacted.2"
+      "version": "v0.8.0-internal.2"
     },
     "code-search": {
       "completion": {

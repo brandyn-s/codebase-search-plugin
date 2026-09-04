@@ -17,6 +17,8 @@ import tempfile
 from pathlib import Path
 
 from component_descriptor import (
+    PENDING_FIRST_RELEASE,
+    is_pending_first_release,
     DescriptorError,
     validate_install_descriptor_shape,
 )
@@ -202,6 +204,16 @@ def allowlisted_fetch_environment(source: dict[str, str]) -> dict[str, str]:
     return fetch_env
 
 
+CODE_SEARCH_RELEASE_REPOSITORY = "brandyn-s/code-search"
+CODE_SEARCH_RELEASE_SIGNER_WORKFLOW = (
+    "brandyn-s/code-search/.github/workflows/release.yml"
+)
+CODE_GRAPH_RELEASE_REPOSITORY = "brandyn-s/code-graph"
+CODE_GRAPH_RELEASE_SIGNER_WORKFLOW = (
+    "brandyn-s/code-graph/.github/workflows/release.yml"
+)
+
+
 def load_bom(path: Path) -> dict:
     try:
         bom = json.loads(path.read_text(encoding="utf-8"))
@@ -212,6 +224,13 @@ def load_bom(path: Path) -> dict:
         typescript_generator = bom["precision_generators"]["typescript-scip"]
     except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
         raise RealInstallError(f"{path}: component BOM is malformed: {exc}") from exc
+    if is_pending_first_release(bom):
+        raise RealInstallError(
+            f"{path}: promotion_state is {PENDING_FIRST_RELEASE}; the pinned "
+            "component releases are not published yet, so there is nothing to "
+            "install or validate. Publish the releases and run a promotion to "
+            "record their digests first."
+        )
 
     try:
         validate_install_descriptor_shape("code-search", search)
@@ -610,7 +629,7 @@ def install_code_search_release(
     source_revision = install.get("source_revision")
     attestation = install.get("attestation")
     if (
-        repository != "redacted-org/code-search"
+        repository != CODE_SEARCH_RELEASE_REPOSITORY
         or not isinstance(tag, str)
         or not tag.startswith("v")
         or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", source_revision or "")
@@ -638,14 +657,10 @@ def install_code_search_release(
     source_ref = attestation.get("source_ref")
     version = tag.removeprefix("v")
     if (
-        wheel_name != f"redacted_code_search-{version}-py3-none-any.whl"
+        wheel_name != f"code_search_mcp-{version}-py3-none-any.whl"
         or checksums_name != "SHA256SUMS"
-        or bundle_name != f"redacted_code_search-{version}-provenance.jsonl"
-        or signer_workflow
-        != (
-            "redacted-org/code-search/"
-            ".github/workflows/release.yml"
-        )
+        or bundle_name != f"code_search_mcp-{version}-provenance.jsonl"
+        or signer_workflow != CODE_SEARCH_RELEASE_SIGNER_WORKFLOW
         or source_ref != "refs/heads/main"
         or attestation.get("deny_self_hosted_runners") is not True
     ):
@@ -1087,7 +1102,7 @@ def install_code_graph(
     source_revision = install.get("source_revision")
     attestation = install.get("attestation")
     if (
-        repository != "redacted-org/code-graph"
+        repository != CODE_GRAPH_RELEASE_REPOSITORY
         or not isinstance(tag, str)
         or re.fullmatch(r"v[0-9][0-9A-Za-z._+-]*", tag) is None
         or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", source_revision or "")
@@ -1104,8 +1119,7 @@ def install_code_graph(
     bundle_path = bundle.get("path") if isinstance(bundle, dict) else None
     bundle_sha256 = bundle.get("sha256") if isinstance(bundle, dict) else None
     if (
-        signer_workflow
-        != "redacted-org/code-graph/.github/workflows/release.yml"
+        signer_workflow != CODE_GRAPH_RELEASE_SIGNER_WORKFLOW
         or source_ref != "refs/heads/main"
         or attestation.get("deny_self_hosted_runners") is not True
         or bundle_path != expected_bundle_path
@@ -1185,12 +1199,12 @@ def install_code_graph(
         bundle.extractall(extracted, filter="data")
     matches = [
         path
-        for path in extracted.rglob("codebase-memory-mcp")
+        for path in extracted.rglob("code-graph")
         if path.is_file()
     ]
     if len(matches) != 1:
         raise RealInstallError(
-            f"expected one codebase-memory-mcp binary, found {len(matches)}"
+            f"expected one code-graph binary, found {len(matches)}"
         )
     executable = matches[0]
     executable.chmod(executable.stat().st_mode | 0o111)

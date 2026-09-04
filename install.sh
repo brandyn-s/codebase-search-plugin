@@ -78,6 +78,20 @@ env -u CODE_INTEL_READINESS_EVIDENCE_OVERRIDE \
     "$PYTHON" "$PLUGIN_DIR/scripts/validate_plugin.py"
 echo ""
 
+# A BOM in promotion_state pending-first-release names component releases
+# that have not been published; its digests are placeholders, so there is
+# nothing that can be downloaded or verified yet.
+PROMOTION_STATE=$("$PYTHON" -c \
+    'import json,sys; print(json.load(open(sys.argv[1])).get("promotion_state") or "")' \
+    "$BOM_FILE")
+if [ "$PROMOTION_STATE" = "pending-first-release" ]; then
+    echo "Error: components not yet released; see docs/INSTALL.md" >&2
+    echo "  component-bom.json is in promotion_state pending-first-release: the pinned" >&2
+    echo "  code-graph and code-search releases have not been published, so the plugin" >&2
+    echo "  cannot install them yet. Nothing was changed." >&2
+    exit 1
+fi
+
 # component-bom.json is the single source of truth for both installers.
 CODE_SEARCH_KIND=$("$PYTHON" -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["kind"])' \
@@ -512,9 +526,9 @@ case "$CODE_SEARCH_KIND" in
             'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"]["revision"])' \
             "$BOM_FILE")
         echo "  Installing code-search from GitHub..."
-        # Distribution name of the pinned source; older pins used redacted-code-search.
+        # Distribution name of the pinned source (PyPI name of code-search).
         CODE_SEARCH_DIST=$("$PYTHON" -c \
-            'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"].get("distribution", "redacted-code-search"))' \
+            'import json,sys; print(json.load(open(sys.argv[1]))["components"]["code-search"]["install"].get("distribution", "code-search-mcp"))' \
             "$BOM_FILE")
         "$VENV_PIP" install --quiet \
             "${CODE_SEARCH_DIST} @ git+${CODE_SEARCH_REPOSITORY}@${CODE_SEARCH_REF}"

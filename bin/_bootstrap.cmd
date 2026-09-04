@@ -30,6 +30,11 @@ if not exist "%PLUGIN_DIR%\install.ps1" (
     echo [code-intelligence] install.ps1 not found in "%PLUGIN_DIR%" 1>&2
     exit /b 1
 )
+findstr /R /C:"\"promotion_state\" *: *\"pending-first-release\"" "%PLUGIN_DIR%\component-bom.json" >nul 2>nul && (
+    echo [code-intelligence] components not yet released; see docs/INSTALL.md 1>&2
+    echo [code-intelligence] component-bom.json is in promotion_state pending-first-release: the pinned code-graph and code-search releases are not published, so the plugin cannot install them yet. 1>&2
+    exit /b 1
+)
 if not exist "%RUNTIME_DIR%" mkdir "%RUNTIME_DIR%"
 
 :acquire
